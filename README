@@ -4,7 +4,7 @@ This repository contains
 - Code for testing some of the functions
 
 Requirements:
-- Boost.Random ( http://www.boost.org/doc/libs/1_52_0/doc/html/boost_random.html
+- Boost.Random (tested with version 1.46) http://www.boost.org/doc/libs/1_52_0/doc/html/boost_random.html
 - Armadillo (tested with version 3.4.4) http://arma.sourceforge.net/
 
 Install:
