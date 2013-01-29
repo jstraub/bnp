@@ -1,4 +1,6 @@
-
+/* Copyright (c) 2012, Julian Straub <jstraub@csail.mit.edu>
+ * Licensed under the MIT license. See LICENSE.txt or 
+ * http://www.opensource.org/licenses/mit-license.php */
 
 #include "random.hpp"
 

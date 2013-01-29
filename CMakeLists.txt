@@ -1,3 +1,7 @@
+# Copyright (c) 2012, Julian Straub <jstraub@csail.mit.edu>
+# Licensed under the MIT license. See LICENSE.txt or 
+# http://www.opensource.org/licenses/mit-license.php 
+
 project(dirichlet)
 cmake_minimum_required(VERSION 2.6)
 
@@ -26,15 +30,13 @@ ENDIF()
 # Include directories (.h .hpp files)
 include_directories(
   ./include
-  #$ENV{WORKSPACE_HOME}/workspace_research/3rdparty/armadillo-3.4.4/include
-  #$ENV{WORKSPACE_HOME}/workspace_research/3rdparty/include
+  $ENV{WORKSPACE_HOME}/workspace_research/3rdparty/include
   /usr/include
   )
 
 # Include library directories
 link_directories(
-  #$ENV{WORKSPACE_HOME}/workspace_research/3rdparty/armadillo-3.4.4/
-  #$ENV{WORKSPACE_HOME}/workspace_research/3rdparty/lib
+  $ENV{WORKSPACE_HOME}/workspace_research/3rdparty/lib
   /usr/lib/
   )
 

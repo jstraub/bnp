@@ -8,6 +8,7 @@ Requirements:
 - Armadillo (tested with version 3.4.4) http://arma.sourceforge.net/
 
 Install:
+- edit the CMakeLists.txt to point cmake to the boost and armadillo libraries.
 - mkdir build; cd build
 - cmake ..; make 
 
