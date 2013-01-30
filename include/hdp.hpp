@@ -36,6 +36,8 @@ class BaseMeasure
 public:
   BaseMeasure()
   {};
+  virtual ~BaseMeasure()
+  {};
   virtual double predictiveProb(const Col<U>& x_q, const Mat<U>& x_given) =0;
   virtual double predictiveProb(const Col<U>& x_q) =0;
 };
