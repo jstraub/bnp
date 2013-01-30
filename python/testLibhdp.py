@@ -6,5 +6,5 @@ import libhdp
 
 A=np.zeros((4,4))
 Aa=np.zeros(33)
-libhdp.Dir(Aa)
+B=libhdp.Dir(Aa)
 

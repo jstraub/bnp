@@ -74,11 +74,34 @@ public:
   {
 	  cout<<"alphas: "<<mAlphas<<endl;
   };
-  void print()
+  Dir_py(const Dir_py& dir) :
+	  Dir(dir)
   {
 	  cout<<"alphas: "<<mAlphas<<endl;
   };
 };
+
+class InvNormWishart_py : public InvNormWishart
+{
+public:
+	InvNormWishart_py(const numeric::array& vtheta, double kappa,
+			const numeric::array& Delta, double nu) :
+				cpVtheta(np2col(vtheta)), cpDelta(np2mat(Delta)),
+				InvNormWishart(cpVtheta,kappa,cpDelta,nu)
+	{};
+	InvNormWishart_py(const InvNormWishart_py& inw) :
+		InvNormWishart(inw)
+	{};
+private:
+	colvec cpVtheta;
+	mat cpDelta;
+};
+
+typedef DP<Dir_py> DP_Dir;
+typedef DP<InvNormWishart_py> DP_INW;
+typedef HDP<Dir_py> HDP_Dir;
+typedef HDP<InvNormWishart_py> HDP_INW;
+
 
 
 
@@ -90,7 +113,15 @@ BOOST_PYTHON_MODULE(libhdp)
 	//def("np2arma",&np2arma);
 
 	class_<Dir_py>("Dir", init<numeric::array>())
-			.def("print", &Dir_py::print);
+			.def(init<Dir_py>());
+	class_<InvNormWishart_py>("InvNormWishart",init<const numeric::array, double,
+			const numeric::array, double>())
+			.def(init<InvNormWishart_py>());
+
+	class_<DP_Dir>("DP_Dir",init<Dir_py,double>());
+	class_<DP_INW>("DP_INW",init<InvNormWishart_py,double>());
+	class_<HDP_Dir>("HDP_Dir",init<Dir_py,double,double>());
+	class_<HDP_INW>("HDP_INW",init<InvNormWishart_py,double,double>());
 	//
 }
 
