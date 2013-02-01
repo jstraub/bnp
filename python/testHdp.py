@@ -1,5 +1,9 @@
 #!/usr/bin/python
 
+# Copyright (c) 2012, Julian Straub <jstraub@csail.mit.edu>
+# Licensed under the MIT license. See LICENSE.txt or 
+# http://www.opensource.org/licenses/mit-license.php 
+
 import scipy
 import scipy.io as sio
 import matplotlib.pyplot as plt
