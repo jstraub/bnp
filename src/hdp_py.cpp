@@ -135,26 +135,6 @@ Col<U> np2col(const numeric::array& np)
 	return Col<U>((U*)a->data,a->dimensions[0],false,true);
 }
 
-//class Dir_wrap : public BaseMeasure<uint32_t>
-//{
-//public:
-//  Dir_wrap(const numeric::array& alphas)
-//  : mAlphas(np2row<double>(alphas)), mAlpha0(sum(mAlphas))
-//  {};
-//
-//  double predictiveProb(const Col<uint32_t>& x_q, const Mat<uint32_t>& x_given) const
-//  {
-//    return BaseMeasure<uint32_t>::predictiveProb(x_q, x_given);
-//  };
-//  double predictiveProb(const Col<uint32_t>& x_q) const
-//  {
-//    return BaseMeasure<uint32_t>::predictiveProb(x_q);
-//  };
-//
-//  Row<double> mAlphas;
-//  double mAlpha0;
-//};
-
 class Dir_py : public Dir
 {
 public:
@@ -243,20 +223,15 @@ BOOST_PYTHON_MODULE(libbnp)
 	import_array();
 	boost::python::numeric::array::set_module_and_type("numpy", "ndarray");
 
-	//def("np2arma",&np2arma);
-//	class_<BaseMeasure<uint32_t> >("BaseMeasure_uint", no_init);
-//	class_<BaseMeasure<double> >("BaseMeasure_double", no_init);
-
-//	class_<Dir_wrap, bases<BaseMeasure<uint32_t> > >("Dir", init<numeric::array>());
-
 	class_<Dir_py>("Dir_py", init<numeric::array>())
 			.def(init<Dir_py>());
 	class_<InvNormWishart_py>("INW",init<const numeric::array, double,
 			const numeric::array, double>())
 			.def(init<InvNormWishart_py>());
 
-//	class_<DP_Dir>("DP_Dir",init<Dir_py,double>());
+	//	class_<DP_Dir>("DP_Dir",init<Dir_py,double>());
 	//	class_<DP_INW>("DP_INW",init<InvNormWishart_py,double>());
+
 	class_<HDP_Dir>("HDP_Dir",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_Dir::densityEst)
         .def("getClassLabels",&HDP_Dir::getClassLabels)
