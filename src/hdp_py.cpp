@@ -2,9 +2,12 @@
  * Licensed under the MIT license. See LICENSE.txt or 
  * http://www.opensource.org/licenses/mit-license.php */
 
+#include <baseMeasure.hpp>
 #include <hdp.hpp>
 
 #include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <typeinfo>
 
 #include <armadillo>

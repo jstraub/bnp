@@ -72,4 +72,18 @@ private:
   boost::uniform_01<> mDist;
 };
 
+uint32_t sampleDiscLogProb(RandDisc& rndDisc, colvec l)
+{
+  //    cout<<"max(l)="<<l.max()<<" min(l)="<<l.min()<<endl;
+  double lmax=l.max();
+  double lmin=l.min();
+  for(uint32_t i=0; i<l.n_elem; ++i)
+    if(!is_finite(l(i)))
+      l(i)=0.0;
+    else
+      l(i)=exp(l(i) + (lmax - lmin)*0.5);
+  //    cout<<"l(exp) ="<<l.t()<<endl;
+  //    cout<<"l(norm) ="<<l.t()/sum(l)<<endl;
+  return rndDisc.draw(l/sum(l));
+};
 
