@@ -180,7 +180,7 @@ int main(int argc, char** argv)
   alphas *= 1.1;
   double alpha =1.0, gamma=1.0;
   Dir dir(alphas);
-  HDP<Dir> hdp(dir, alpha, gamma);
+  HDP<uint32_t> hdp(dir, alpha, gamma);
   vector<Col<uint32_t> > z_ji = hdp.densityEst(x_int,10,10,Niter);
 #else
   mat means(J,d);

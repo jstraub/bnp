@@ -8,6 +8,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <typeinfo>
 
 #include <armadillo>
 
@@ -35,24 +36,36 @@ class BaseMeasure
 {
 public:
   BaseMeasure()
-  {};
+  {
+    cout<<"Creating "<<typeid(this).name()<<endl;
+  };
   virtual ~BaseMeasure()
   {};
-  virtual double predictiveProb(const Col<U>& x_q, const Mat<U>& x_given) =0;
-  virtual double predictiveProb(const Col<U>& x_q) =0;
+  virtual double predictiveProb(const Col<U>& x_q, const Mat<U>& x_given) const
+  {
+    cerr<<"BaseMeasure:: Something gone wrong with virtual functions"<<endl;
+    exit(0);
+    return 0.0;
+  };
+  virtual double predictiveProb(const Col<U>& x_q) const
+  {
+    cerr<<"BaseMeasure:: Something gone wrong with virtual functions"<<endl;
+    exit(0);
+    return 0.0;
+  };
 };
 
 class Dir : public BaseMeasure<uint32_t>
 {
 public:
   Dir(const Row<double>& alphas)
-    : mAlphas(alphas), mAlpha0(sum(alphas))
+  : mAlphas(alphas), mAlpha0(sum(alphas))
   {};
   Dir(const Dir& dir)
-    : mAlphas(dir.mAlphas), mAlpha0(sum(dir.mAlphas))
+  : mAlphas(dir.mAlphas), mAlpha0(sum(dir.mAlphas))
   {};
 
-  double predictiveProb(const Col<uint32_t>& x_q, const Mat<uint32_t>& x_given)
+  double predictiveProb(const Col<uint32_t>& x_q, const Mat<uint32_t>& x_given) const
   {
     // TODO: assumes x_q is 1D! (so actually just a uint32_t
 
@@ -61,13 +74,13 @@ public:
     uvec ids=x_given==k;
     uint32_t C_k=sum(ids);
     uint32_t L=x_given.n_rows;
-//    cout<<"k="<<k<<" C_k="<<C_k<<" L="<<L<<" alpha0="<<mAlpha0
-//      <<" alpha_k="<<mAlphas(k)
-//      <<" log(p)="<< log((C_k + mAlphas(k))/(L + mAlpha0))<<endl;
-//    cout<<x_q<<" -" <<x_given.t()<<endl;
+    //    cout<<"k="<<k<<" C_k="<<C_k<<" L="<<L<<" alpha0="<<mAlpha0
+    //      <<" alpha_k="<<mAlphas(k)
+    //      <<" log(p)="<< log((C_k + mAlphas(k))/(L + mAlpha0))<<endl;
+    //    cout<<x_q<<" -" <<x_given.t()<<endl;
     return log((C_k + mAlphas(k))/(L + mAlpha0));
   };
-  double predictiveProb(const Col<uint32_t>& x_q)
+  double predictiveProb(const Col<uint32_t>& x_q) const
   {
     const uint32_t k=x_q(0);
     return log(mAlphas(k)/mAlpha0);
@@ -81,15 +94,18 @@ private:
 class InvNormWishart : public BaseMeasure<double>
 {
 public:
-  InvNormWishart(colvec& vtheta, double kappa, mat& Delta, double nu)
-    : mVtheta(vtheta), mKappa(kappa), mDelta(Delta), mNu(nu)
-  { };
+  // make a copy of vtheta and Delta (that should only be a copy of the header anyway
+  InvNormWishart(colvec vtheta, double kappa, mat Delta, double nu)
+  : mVtheta(vtheta), mKappa(kappa), mDelta(Delta), mNu(nu)
+  {
+    cout<<"Creating "<<typeid(this).name()<<endl;
+  };
 
   InvNormWishart(const InvNormWishart& inw)
-    : mVtheta(inw.mVtheta), mKappa(inw.mKappa), mDelta(inw.mDelta), mNu(inw.mNu)
+  : mVtheta(inw.mVtheta), mKappa(inw.mKappa), mDelta(inw.mDelta), mNu(inw.mNu)
   { };
 
-  double predictiveProb(const Col<double>& x_q, const Mat<double>& x_given)
+  double predictiveProb(const Col<double>& x_q, const Mat<double>& x_given) const
   {
     // compute posterior under x_given
     // M0: number of data points in the cluster 
@@ -101,12 +117,12 @@ public:
     double kappa = mKappa+M0;
     double nu = mNu+M0;
     colvec vtheta = (mKappa*mVtheta + M1)/kappa;
-//    cout<<"vtheta="<<vtheta<<endl;
-//    cout<<"mVtheta="<<mVtheta<<endl;
-//    cout<<"M2="<<M2<<endl;
-//    cout<<"mDelta="<<mDelta<<endl;
+    //    cout<<"vtheta="<<vtheta<<endl;
+    //    cout<<"mVtheta="<<mVtheta<<endl;
+    //    cout<<"M2="<<M2<<endl;
+    //    cout<<"mDelta="<<mDelta<<endl;
     mat Delta = (mNu*mDelta + M2 + mKappa*(mVtheta*mVtheta.t()) - kappa*(vtheta*vtheta.t()))/nu;
-    
+
     // compute the likelihood of x_q under the posterior
     // This can be approximated by using a moment matched gaussian
     // to the multivariate student-t distribution which arises in 
@@ -117,7 +133,7 @@ public:
     return logGaus(x_q, vtheta, C_matched);
   };
 
-  double predictiveProb(const Col<double>& x_q)
+  double predictiveProb(const Col<double>& x_q) const
   {
     // compute the likelihood of x_q under the posterior
     // This can be approximated by using a moment matched gaussian
@@ -131,15 +147,15 @@ public:
 
   static double logGaus(const colvec& x, const colvec& mu, const mat& C)
   {
-//    cout<<"C"<<C<<endl;
-//    cout<<"mu"<<mu<<endl;
-//    cout<<"x"<<x<<endl;
+    //    cout<<"C"<<C<<endl;
+    //    cout<<"mu"<<mu<<endl;
+    //    cout<<"x"<<x<<endl;
     double detC=det(C);
     if(!is_finite(detC))
       return 0.0;
     mat CinvXMu=solve(C,x-mu);
     mat logXCX = (x-mu).t() * CinvXMu;
-//    cout<<"rows="<<C.n_rows<<" log(det(C))="<<log(det(C*0.001))-double(C.n_rows)*1000.0<<" logXC="<<logXCX(0)<<" p="<<-0.5*(double(C.n_rows)*1.8378770664093453 + log(det(C)) + logXCX(0))<<endl;
+    //    cout<<"rows="<<C.n_rows<<" log(det(C))="<<log(det(C*0.001))-double(C.n_rows)*1000.0<<" logXC="<<logXCX(0)<<" p="<<-0.5*(double(C.n_rows)*1.8378770664093453 + log(det(C)) + logXCX(0))<<endl;
 
     return -0.5*(double(C.n_rows)*1.8378770664093453 + log(detC) + logXCX(0));
   };
@@ -150,38 +166,40 @@ public:
   double mNu;
 };
 
-template<class H>
+template<class U>
 class DP
 {
 public:
-	DP(const H& base, double alpha)
-    : mH(base), mAlpha(alpha)
-	{};
+  DP(const BaseMeasure<U>& base, double alpha)
+  : mH(base), mAlpha(alpha)
+  {};
 
-	~DP()
+  ~DP()
   {	};
 
-  H mH; // base measure
-  double mAlpha;
+  const BaseMeasure<U>& mH; // base measure
+  double mAlpha;    
 private:
 };
 
 
 
-template <class H>
-class HDP : public DP<H>
+template <class U>
+class HDP : public DP<U>
 {
-  public:
-	HDP(const H& base, double alpha, double gamma)
-    : DP<H>(base, alpha), mGamma(gamma)
-	{	};
+public:
+  HDP(const BaseMeasure<U>& base, double alpha, double gamma)
+  : DP<U>(base, alpha), mGamma(gamma)
+    {
+    cout<<"Creating "<<typeid(this).name()<<endl;
+    };
 
-	~HDP()
+  ~HDP()
   {	};
 
-  template<class U>
+  // method for "one shot" computation without storing data in this class
   vector<Col<uint32_t> > densityEst(const vector<Mat<U> >& x, uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
-  {
+      {
     RandDisc rndDisc;
     // x is a list of numpy arrays: one array per document
     uint32_t J=x.size(); // number of documents
@@ -249,7 +267,7 @@ class HDP : public DP<H>
             Mat<U> x_k_ji = getXinK(x,j,i,k,k_jt,t_ji,tt==It-1);
             //HDP hdp_x_ji = posterior(x_k_ji); // compute posterior hdp given the data in 
             double f_k =  this->mH.predictiveProb(x[j].row(i).t(),x_k_ji);
-              //logGaus(x[j].row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());  // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
+            //logGaus(x[j].row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());  // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
             f(T[j]+k) = f_k;
             l(T[j]+k) = log(this->mAlpha*m_k/((n_j+this->mAlpha)*(m_+mGamma))) + f_k; // TODO: shouldnt this be mAlpha of the posterior hdp?
           }
@@ -260,7 +278,7 @@ class HDP : public DP<H>
           //        cout<<"Cov=:"<<mmCov()<<endl;
           //
           double f_knew = this->mH.predictiveProb(x[j].row(i).t());
-            //logGaus(x[j].row(i).t(), mVtheta, mmCov());
+          //logGaus(x[j].row(i).t(), mVtheta, mmCov());
           f[T[j]+K] = f_knew;
           l[T[j]+K] = log(this->mAlpha*mGamma/((n_j+this->mAlpha)*(m_+mGamma))) + f_knew;
 
@@ -351,7 +369,7 @@ class HDP : public DP<H>
               Mat<U> x_k_ji = getXinK(x,j,i_jt(i),k,k_jt,t_ji); // for posterior computation
               //HDP hdp_x_ji = posterior(x_k_ji); // compute posterior hdp given the data in 
               f_k += this->mH.predictiveProb(x_jt.row(i).t(),x_k_ji);
-                //logGaus(x_jt.row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());
+              //logGaus(x_jt.row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());
             }
             f(k)=f_k;
             l(k)=log(m_k/(m_+mGamma)) + f_k;
@@ -359,7 +377,7 @@ class HDP : public DP<H>
           double f_knew=0.0;
           for (uint32_t i=0; i<x_jt.n_rows; ++i) // product over independent x_ji_t
             f_knew += this->mH.predictiveProb(x_jt.row(i).t());
-              //logGaus(x_jt.row(i).t(), mVtheta, mmCov());
+          //logGaus(x_jt.row(i).t(), mVtheta, mmCov());
           f(K)=f_knew;
           l(K)=log(mGamma/(m_+mGamma)) + f_knew; // update dish at table t in restaurant j
           uint32_t z_jt = sampleDiscLogProb(rndDisc, l);
@@ -422,34 +440,68 @@ class HDP : public DP<H>
       }
 
       // TODO: compute log likelyhood of data under model
-//      for (uint32_t k=0; k<K; ++k)
-//      {
-//        Mat<U> x_k = zeros<Mat<U> >(d,1);
-//        for (uint32_t j=0; j<J; ++j)
-//        {
-//          Col<uint32_t> id=find(z_ji[j] == k);
-//          uint32_t offset=x_k.n_rows;
-//          x_k.resize(x_k.n_rows+id.n_elem, x_k.n_cols);
-//          for (uint32_t i=0; i<id.n_elem; ++i)
-//            x_k.row(offset+i) = x[j].row(id(i)); 
-//        } 
-//        x_k.shed_row(0);
-//        mat mu=mean(x_k,0);
-//        mat c=var(x_k,0,0);
-//        cout<<"@"<<k<<": mu="<<mu(0,0)<<" var="<<c(0,0)<<endl;
-//      }
+      //      for (uint32_t k=0; k<K; ++k)
+      //      {
+      //        Mat<U> x_k = zeros<Mat<U> >(d,1);
+      //        for (uint32_t j=0; j<J; ++j)
+      //        {
+      //          Col<uint32_t> id=find(z_ji[j] == k);
+      //          uint32_t offset=x_k.n_rows;
+      //          x_k.resize(x_k.n_rows+id.n_elem, x_k.n_cols);
+      //          for (uint32_t i=0; i<id.n_elem; ++i)
+      //            x_k.row(offset+i) = x[j].row(id(i));
+      //        }
+      //        x_k.shed_row(0);
+      //        mat mu=mean(x_k,0);
+      //        mat c=var(x_k,0,0);
+      //        cout<<"@"<<k<<": mu="<<mu(0,0)<<" var="<<c(0,0)<<endl;
+      //      }
     }
     return z_ji;
+      };
+  // compute density estimate based on data previously fed into the class using addDoc
+  bool densityEst(uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
+  {
+    if(mX.size() > 0)
+    {
+      mZ = densityEst(mX,K0,T0,It);
+      return true;
+    }else{
+      return false;
+    }
+  };
+
+  // interface mainly for python
+  uint32_t addDoc(const Mat<U>& x_i)
+  {
+    mX.push_back(x_i);
+    return mX.size();
+  };
+
+  // after computing the labels we can use this to get them.
+  bool getClassLabels(Col<uint32_t>& z_i, uint32_t i)
+  {
+    if(mZ.size() > 0 && i < mZ.size())
+    {
+      z_i=mZ[i];
+      return true;
+    }else{
+      return false;
+    }
   };
 
   double mGamma;
 
+protected:
+
+  vector<Mat<U> > mX;
+  vector<Col<uint32_t> > mZ;
+
 private:
 
-  template<class U>
   Mat<U> getXinK(const vector<Mat<U> >& x, uint32_t j_x, uint32_t i_x, uint32_t k, 
       const vector<Col<uint32_t> >& k_jt, const vector<Col<uint32_t> >& t_ji, bool disp=false) const
-  {
+          {
     uint32_t J = k_jt.size();
     uint32_t d = x[0].n_cols;
     Mat<U> x_k=zeros<Mat<U> >(1,d); // datapoints in cluster k
@@ -495,7 +547,7 @@ private:
     if(disp) cout<<x_k.t()<<endl;
 #endif
     return x_k;
-  };
+          };
 };
 
 

@@ -42,7 +42,7 @@ int main(int argc, char** argv)
   //alphas *= 1.1; // smaller alpha means more uncertainty in the where the good distributions are
   double alpha =1.0, gamma=1000.0;
   Dir dir(alphas);
-  HDP<Dir> hdp_dir(dir, alpha, gamma);
+  HDP<uint32_t> hdp_dir(dir, alpha, gamma);
 
   vector<Col<uint32_t> > z_ji = hdp_dir.densityEst(x,10,10,100);
 
@@ -88,7 +88,7 @@ int main(int argc, char** argv)
   alpha=1.0;
   gamma=1.0;
   InvNormWishart inw(vtheta, kappa,Delta, nu);
-  HDP<InvNormWishart> hdp_inw(inw, alpha, gamma);
+  HDP<double> hdp_inw(inw, alpha, gamma);
 
   z_ji = hdp_inw.densityEst(xx,10,10,20);
   J=z_ji.size();

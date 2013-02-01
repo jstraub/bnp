@@ -33,6 +33,7 @@ include_directories(
   ./include
   $ENV{WORKSPACE_HOME}/workspace_research/3rdparty/include
   /usr/share/pyshared/numpy/core/include
+  /usr/include/python2.7
   /usr/include
   )
 
@@ -65,19 +66,7 @@ target_link_libraries(testRandom ${LIBS} stdc++)
 add_executable(testArmadillo ./src/testArmadillo.cpp)
 target_link_libraries(testArmadillo ${LIBS} stdc++)
 
-# wrapper for python
-FIND_PACKAGE(Boost 1.46.1)
-IF(Boost_FOUND)
-  INCLUDE_DIRECTORIES("${Boost_INCLUDE_DIRS}" "/usr/include/python2.7")
-  SET(Boost_USE_STATIC_LIBS OFF)
-  SET(Boost_USE_MULTITHREADED ON)
-  SET(Boost_USE_STATIC_RUNTIME OFF)
-  FIND_PACKAGE(Boost 1.46.1 COMPONENTS python random)
-
-  ADD_LIBRARY(hdp SHARED src/hdp_py.cpp)
-  TARGET_LINK_LIBRARIES(hdp ${Boost_LIBRARIES} armadillo python2.7)
-  INSTALL(TARGETS hdp LIBRARY DESTINATION /home/jstraub/workspace_research/bnp/python)
-ELSEIF(NOT Boost_FOUND)
-  MESSAGE(FATAL_ERROR "Unable to find correct Boost version. Did you set BOOST_ROOT?")
-ENDIF()
+ADD_LIBRARY(bnp SHARED src/hdp_py.cpp)
+TARGET_LINK_LIBRARIES(bnp ${LIBS} boost_python  python2.7)
+INSTALL(TARGETS bnp LIBRARY DESTINATION /home/jstraub/workspace_research/bnp/python)
 
