@@ -1,6 +1,7 @@
 
 This repository contains
 - C++ code for Inference in a Hierarchical Dirichlet Process Model
+- Python code in python/ folder (need to do $ make install before python scripts are usable)
 - Code for testing some of the functions
 
 Requirements:
@@ -10,5 +11,5 @@ Requirements:
 Install:
 - edit the CMakeLists.txt to point cmake to the boost and armadillo libraries.
 - mkdir build; cd build
-- cmake ..; make 
+- cmake ..; make install
 
