@@ -29,6 +29,65 @@ public:
 
   ~HDP()
   {	};
+  // method for "one shot" computation without storing data in this class
+  vector<Col<uint32_t> > densityEst(const vector<Mat<U> >& x, uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
+  {
+    RandDisc rndDisc;
+    // x is a list of numpy arrays: one array per document
+    uint32_t J=x.size(); // number of documents
+    vector<uint32_t> N(J,0);
+    for (uint32_t j=0; j<J; ++j)
+      N.at(j)=int(x[j].n_rows); // number of datapoints in each document
+    uint32_t d=x[0].n_cols;      // dimension (assumed to be equal among documents
+
+    uint32_t K=K0; // number of clusters/dishes in the franchise
+    vector<uint32_t> T(J,0);   // number of tables in each restaurant
+    vector<Col<uint32_t> > t_ji(J); // assignment of a table in restaurant j to customer i -> stores table number for each customer (per restaurant)
+    vector<Col<uint32_t> > k_jt(J); // assignment of a dish in restaurant j at table t -> stores dish number for each table (per restaurant)
+    RandInt rndT(0,T0);
+    RandInt rndK(0,K0);
+    for (uint32_t j=0; j<J; ++j)
+    {
+      T[j]=T0;
+      t_ji[j] = rndT.draw(N[j]);
+      k_jt[j] = rndK.draw(T[j]);
+    }
+
+    vector<Col<uint32_t> > z_ji(J);
+    vector<uint32_t> Tprev=T;   // number of tables in each restaurant
+    uint32_t Kprev=K;
+
+
+    // TODO: think whether it makes sense to use columns and Mat here
+    uint32_t Nw=100; // TODO: vocabulary size
+    uint32_t T=10; // truncation on document level
+    uint32_t K=100; // truncation on corpus level
+    double alpha_0 = 1;
+    vector<Col<double> > a_jt(J,Col<double>(T));
+    vector<Col<double> > b_jt(J,Col<double>(T));
+    vector<Mat<double> > phi_jtk(J,Mat<double>(T,K));
+    vector<Mat<double> > zeta_jnt(J);
+    vector<double> u_k(K);
+    vector<double> v_k(K);
+    vector<Col<double> > lambda_kw(K,Col<double>(Nw));
+    
+    for (uint32_t tt=0; tt<It; ++tt)
+    {
+      cout<<"---------------- Iteration "<<tt<<" K="<<K<<" -------------------"<<endl;
+      for (uint32_t j=0; j<J; ++j)
+      { // Document level updates
+        for (uint32_t t=0; t<T; ++t)
+        {
+          a_jt[j][t]=1.0+sum(zeta_jnt[j].col(t));
+          b_jt[j][t]=alpha_0;
+          for (uint32_t s=t+1; s<T; ++s)
+            b_jt[j][t]+=sum(zeta_jnt[j].col(s))
+          phi_jtk[j]
+        }
+      }
+      // corpus level updates
+    }
+  }
 
   // method for "one shot" computation without storing data in this class
   vector<Col<uint32_t> > densityEst(const vector<Mat<U> >& x, uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
