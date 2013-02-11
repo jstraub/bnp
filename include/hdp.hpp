@@ -57,7 +57,8 @@ public:
     vector<uint32_t> Tprev=T;   // number of tables in each restaurant
     uint32_t Kprev=K;
 
-
+  
+    // From: Online Variational Inference for the HDP
     // TODO: think whether it makes sense to use columns and Mat here
     uint32_t Nw=100; // TODO: vocabulary size
     uint32_t T=10; // truncation on document level
