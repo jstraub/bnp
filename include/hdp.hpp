@@ -29,66 +29,6 @@ public:
 
   ~HDP()
   {	};
-  // method for "one shot" computation without storing data in this class
-  vector<Col<uint32_t> > densityEst(const vector<Mat<U> >& x, uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
-  {
-    RandDisc rndDisc;
-    // x is a list of numpy arrays: one array per document
-    uint32_t J=x.size(); // number of documents
-    vector<uint32_t> N(J,0);
-    for (uint32_t j=0; j<J; ++j)
-      N.at(j)=int(x[j].n_rows); // number of datapoints in each document
-    uint32_t d=x[0].n_cols;      // dimension (assumed to be equal among documents
-
-    uint32_t K=K0; // number of clusters/dishes in the franchise
-    vector<uint32_t> T(J,0);   // number of tables in each restaurant
-    vector<Col<uint32_t> > t_ji(J); // assignment of a table in restaurant j to customer i -> stores table number for each customer (per restaurant)
-    vector<Col<uint32_t> > k_jt(J); // assignment of a dish in restaurant j at table t -> stores dish number for each table (per restaurant)
-    RandInt rndT(0,T0);
-    RandInt rndK(0,K0);
-    for (uint32_t j=0; j<J; ++j)
-    {
-      T[j]=T0;
-      t_ji[j] = rndT.draw(N[j]);
-      k_jt[j] = rndK.draw(T[j]);
-    }
-
-    vector<Col<uint32_t> > z_ji(J);
-    vector<uint32_t> Tprev=T;   // number of tables in each restaurant
-    uint32_t Kprev=K;
-
-  
-    // From: Online Variational Inference for the HDP
-    // TODO: think whether it makes sense to use columns and Mat here
-    uint32_t Nw=100; // TODO: vocabulary size
-    uint32_t T=10; // truncation on document level
-    uint32_t K=100; // truncation on corpus level
-    double alpha_0 = 1;
-    vector<Col<double> > a_jt(J,Col<double>(T));
-    vector<Col<double> > b_jt(J,Col<double>(T));
-    vector<Mat<double> > phi_jtk(J,Mat<double>(T,K));
-    vector<Mat<double> > zeta_jnt(J);
-    vector<double> u_k(K);
-    vector<double> v_k(K);
-    vector<Col<double> > lambda_kw(K,Col<double>(Nw));
-    
-    for (uint32_t tt=0; tt<It; ++tt)
-    {
-      cout<<"---------------- Iteration "<<tt<<" K="<<K<<" -------------------"<<endl;
-      for (uint32_t j=0; j<J; ++j)
-      { // Document level updates
-        for (uint32_t t=0; t<T; ++t)
-        {
-          a_jt[j][t]=1.0+sum(zeta_jnt[j].col(t));
-          b_jt[j][t]=alpha_0;
-          for (uint32_t s=t+1; s<T; ++s)
-            b_jt[j][t]+=sum(zeta_jnt[j].col(s))
-          phi_jtk[j]
-        }
-      }
-      // corpus level updates
-    }
-  }
 
   // method for "one shot" computation without storing data in this class
   vector<Col<uint32_t> > densityEst(const vector<Mat<U> >& x, uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
@@ -443,4 +383,149 @@ private:
           };
 };
 
+template <>
+class HDP<uint32_t>
+{
+public:
+
+  double ElogBeta(const vector<Col<double> >& lambda_kw, uint32_t k, uint32_t w_dn)
+  {
+    return digamma(lambda_kw[k](w_dn)) - digamma(sum(lambda_kw[k]));
+  }
+
+  // method for "one shot" computation without storing data in this class
+  vector<Col<uint32_t> > densityEst(const vector<Mat<uint32_t> >& x, uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
+  {
+
+  
+    // From: Online Variational Inference for the HDP
+    // TODO: think whether it makes sense to use columns and Mat here
+    uint32_t Nw=100; // TODO: vocabulary size
+    uint32_t T=10; // truncation on document level
+    uint32_t K=100; // truncation on corpus level
+    double alpha = 1;
+    double omega = 1;
+    double nu = 1;
+    double ro = 0.75;
+
+    vector<Col<double> > lambda_kw(K,Col<double>(Nw));
+    
+    Col<double> lambda(K); lambda.randu(); //TODO
+    Col<double> a(K); a.zeros();
+    Col<double> b(K); b.zeros();
+    uint32_t D=x.size();
+
+    vector<Col<uint32_t> > z_ji(D);
+    Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
+    for (uint32_t dd=0; dd<D; ++dd)
+    {
+      uint32_t d=ind[dd];  
+      uint32_t N=x[d].n_rows;
+      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
+      cout<<"\tcomputing zeta"<<endl;
+      Mat<double> zeta(T,K);
+      for (uint32_t i=0; i<T; ++i) {
+        for (uint32_t k=0; k<K; ++k) {
+          zeta(i,k)=0.0;
+          for (uint32_t n=0; n<N; ++n) {
+            zeta(i,k) += ElogBeta(lambda_kw, k, x[d](n));
+          }
+          zeta(i,k)=exp(zeta(i,k));
+          zeta.row(n)/=sum(zeta.row(n));
+        }
+      }
+      cout<<"\tcomputing phi"<<endl;
+      Mat<double> phi(N,T);
+      for (uint32_t n=0; n<N; ++n){
+        for (uint32_t i=0; i<T; ++i) {
+          phi(n,i)=0.0;
+          for (uint32_t k=0; k<K; ++k) {
+            phi(n,i)+=zeta(i,k)* ElogBeta(lambda_kw, k, x[d](n));
+          }
+          phi(n,i)=exp(phi(n,i));
+          phi.row(n)/=sum(phi.row(n));
+        }
+      }
+
+      bool converged = false;
+      vector<double> gamma_1(T,1.0);
+      vector<double> gamma_2(T,alpha);
+
+      while(!converged){
+
+        for (uint32_t i=0; i<T; ++i) {
+          for (uint32_t n=0; n<N; ++n){
+            gamma_1[i]+=phi(n,i);
+            for (uint32_t j=i+1; j<T; ++j) {
+              gamma_2[i] += phi(n,j);
+            }
+          }
+          
+          zeta(i,k)=0.0;
+          for (uint32_t k=0; k<K; ++k) {
+            zeta(i,k) += ElogSigma(alpha_1,alpha_2,k);
+            for (uint32_t n=0; n<N; ++n){
+              zeta(i,k) += phi(n,i)*ElogBeta(lambda_kw,k, x[d](n))
+            }
+            zeta(i,k) = exp(zeta(i,k));
+          }
+          phi.row(n)/=sum(phi.row(n));
+        }
+
+        for (uint32_t n=0; n<N; ++n){
+          phi(n,i)=0.0;
+          for (uint32_t i=0; i<T; ++i) {
+            phi(n,i) += ElogSigma(gamma_1,gamma_2,k);
+            for (uint32_t k=0; k<K; ++k) {
+              phi(n,i) += zeta(i,k)*ElogBeta(lambda_kw,k,x[d](n)) ;
+            }
+            phi(i,k) = exp(phi(i,k));
+          }
+          phi.row(n)/=sum(phi.row(n));
+        }
+
+        coverged=true;//TODO
+      }
+
+      //vector<Col<double> > lambda_kv(K,Col<double>(Nw));
+      Col<double> lambda_kv(K); lambda_kv.zeros();
+      Col<double> a_k(K); a_k.zeros();
+      Col<double> b_k(K); b_k.zeros();
+      for (uint32_t k=0; k<K; ++k) {
+        for (uint32_t i=0; i<T; ++i) {
+          double _lambda = 0.0;
+          for (uint32_t n=0; n<N; ++n){
+            _lambda+=phi(n,i)*x[d](n)
+          }
+          lambda_kv(k)+=zeta(i,k)*_lambda;
+          a_k(k)+=zeta(i,k);
+          for (uint32_t l=k+1; l<K; ++l) {
+            b_k(k)+=zeta(i,l);
+          }
+        }
+        lambda_kv(k) = D*lambda_kv(k)+nu;
+        a_k(k) = D*a_k(k)+1.0;
+        b_k(k) = D*b_k(k)+omega;
+      }
+
+      // update global params
+      lambda = (1.0-ro)*lambda + ro*lambda_kv;
+      a = (1.0-ro)*a + ro*a_k;
+      b = (1.0-ro)*b + ro*b_k;
+
+//      for (uint32_t j=0; j<J; ++j)
+//      { // Document level updates
+//        for (uint32_t t=0; t<T; ++t)
+//        {
+//          a_jt[j][t]=1.0+sum(zeta_jnt[j].col(t));
+//          b_jt[j][t]=alpha_0;
+//          for (uint32_t s=t+1; s<T; ++s)
+//            b_jt[j][t]+=sum(zeta_jnt[j].col(s))
+//          phi_jtk[j]
+//        }
+//      }
+//      // corpus level updates
+//    }
+  }
+}
 

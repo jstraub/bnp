@@ -16,7 +16,7 @@ using namespace arma;
 int main(int argc, char** argv)
 {
 
-  cout<<" ------------------------ inverse normal wishart base measure ------------------- "<<endl;
+  cout<<" ------------------------ Dir base measure ------------------- "<<endl;
   // inverse normal wishart base measure
 //  mat x_rand(90,1);
 //  x_rand.randu();
