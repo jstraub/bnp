@@ -383,149 +383,208 @@ private:
           };
 };
 
-template <>
-class HDP<uint32_t>
+class HDP_onl : public HDP<uint32_t>
 {
 public:
 
-  double ElogBeta(const vector<Col<double> >& lambda_kw, uint32_t k, uint32_t w_dn)
+  HDP_onl(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
+  : HDP<uint32_t>(base, alpha, gamma)
+    {
+//    cout<<"Creating "<<typeid(this).name()<<endl;
+    };
+  
+  ~HDP_onl()
+  { };
+
+  double digamma(double x)
   {
-    return digamma(lambda_kw[k](w_dn)) - digamma(sum(lambda_kw[k]));
+    //http://en.wikipedia.org/wiki/Digamma_function#Computation_and_approximation
+    double x_sq = x*x;
+    return log(x)-1.0/(2.0*x)-1.0/(12.0*x_sq)+1.0/(12*x_sq*x_sq)-1.0/(252.0*x_sq*x_sq*x_sq);
   }
 
-  // method for "one shot" computation without storing data in this class
-  vector<Col<uint32_t> > densityEst(const vector<Mat<uint32_t> >& x, uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
+  double ElogBeta(const vector<Col<double> >& lambda, uint32_t k, uint32_t w_dn)
   {
+    return digamma(lambda[k](w_dn)) - digamma(sum(lambda[k]));
+  }
 
+  double ElogSigma(const Col<double>& a, const Col<double>& b, uint32_t k)
+  {
+    double e=digamma(a(k)) - digamma(a(k) + b(k));
+    for (uint32_t l=0; l<k; ++l)
+      e+=digamma(b(k)) - digamma(a(k) + b(k));
+    return e; 
+  }
+
+//  double ElogSigma(const vector<double>& a, const vector<double>& b, uint32_t k)
+//  {
+//    double e=digamma(a[k]) - digamma(a[k] + b[k]);
+//    for (uint32_t l=0; l<k; ++l)
+//      e+=digamma(b[k]) - digamma(a[k] + b[k]);
+//    return e; 
+//  };
+
+  // method for "one shot" computation without storing data in this class
+  //  Nw: number of different words
+  //  ro: forgetting rate
+  //  uint32_t T=10; // truncation on document level
+  //  uint32_t K=100; // truncation on corpus level
+  vector<Col<uint32_t> > densityEst(const vector<Mat<uint32_t> >& x, uint32_t Nw, double ro=0.75, uint32_t K=100, uint32_t T=10)
+  {
   
     // From: Online Variational Inference for the HDP
     // TODO: think whether it makes sense to use columns and Mat here
-    uint32_t Nw=100; // TODO: vocabulary size
-    uint32_t T=10; // truncation on document level
-    uint32_t K=100; // truncation on corpus level
-    double alpha = 1;
-    double omega = 1;
-    double nu = 1;
-    double ro = 0.75;
+    //double mAlpha = 1;
+    //double mGamma = 1;
+    double nu = ((Dir*)(&mH))->mAlpha0; // get nu from vbase measure (Dir)
+    //double ro = 0.75;
 
-    vector<Col<double> > lambda_kw(K,Col<double>(Nw));
-    
-    Col<double> lambda(K); lambda.randu(); //TODO
-    Col<double> a(K); a.zeros();
-    Col<double> b(K); b.zeros();
+    vector<Col<double> > lambda(K,Col<double>(Nw));
+    for (uint32_t k=0; k<K; ++k)
+      lambda[k].randu();
+
+    Col<double> a(K); a.ones();
+    Col<double> b(K); b.ones(); b*=mGamma;
     uint32_t D=x.size();
 
-    vector<Col<uint32_t> > z_ji(D);
+    vector<Col<uint32_t> > z_dn(D);
     Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
     for (uint32_t dd=0; dd<D; ++dd)
     {
       uint32_t d=ind[dd];  
       uint32_t N=x[d].n_rows;
       cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
-      cout<<"\tcomputing zeta"<<endl;
+      cout<<"\tinit zeta"<<endl;
       Mat<double> zeta(T,K);
       for (uint32_t i=0; i<T; ++i) {
         for (uint32_t k=0; k<K; ++k) {
           zeta(i,k)=0.0;
           for (uint32_t n=0; n<N; ++n) {
-            zeta(i,k) += ElogBeta(lambda_kw, k, x[d](n));
+            zeta(i,k) += ElogBeta(lambda, k, x[d](n));
           }
+          //cout<<zeta(i,k)<<endl;
           zeta(i,k)=exp(zeta(i,k));
-          zeta.row(n)/=sum(zeta.row(n));
         }
+        zeta.row(i)/=sum(zeta.row(i));
       }
-      cout<<"\tcomputing phi"<<endl;
+        //cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
+      cout<<"\tinit phi"<<endl;
       Mat<double> phi(N,T);
       for (uint32_t n=0; n<N; ++n){
         for (uint32_t i=0; i<T; ++i) {
           phi(n,i)=0.0;
           for (uint32_t k=0; k<K; ++k) {
-            phi(n,i)+=zeta(i,k)* ElogBeta(lambda_kw, k, x[d](n));
+            phi(n,i)+=zeta(i,k)* ElogBeta(lambda, k, x[d](n));
           }
           phi(n,i)=exp(phi(n,i));
-          phi.row(n)/=sum(phi.row(n));
         }
+        phi.row(n)/=sum(phi.row(n));
       }
+        //cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
 
       bool converged = false;
-      vector<double> gamma_1(T,1.0);
-      vector<double> gamma_2(T,alpha);
+      Col<double> gamma_1(T);
+      Col<double> gamma_2(T);
 
+      uint32_t o=0;
       while(!converged){
-
-        for (uint32_t i=0; i<T; ++i) {
+        cout<<"Iterating local params #"<<o<<endl;
+        gamma_1.ones();
+        gamma_2.ones(); gamma_2 *= mAlpha;
+        for (uint32_t i=0; i<T; ++i) 
+        {
           for (uint32_t n=0; n<N; ++n){
-            gamma_1[i]+=phi(n,i);
+            gamma_1(i)+=phi(n,i);
             for (uint32_t j=i+1; j<T; ++j) {
-              gamma_2[i] += phi(n,j);
+              gamma_2(i) += phi(n,j);
             }
-          }
-          
-          zeta(i,k)=0.0;
+          }  
+          cout<<gamma_1(i)<<" "<<gamma_2(i)<<endl;
+        }
+
+        for (uint32_t i=0; i<T; ++i){
+          //zeta(i,k)=0.0;
           for (uint32_t k=0; k<K; ++k) {
-            zeta(i,k) += ElogSigma(alpha_1,alpha_2,k);
+            zeta(i,k) = ElogSigma(a,b,k);
+            //cout<<zeta(i,k)<<endl;
             for (uint32_t n=0; n<N; ++n){
-              zeta(i,k) += phi(n,i)*ElogBeta(lambda_kw,k, x[d](n))
+              zeta(i,k) += phi(n,i)*ElogBeta(lambda,k, x[d](n));
             }
             zeta(i,k) = exp(zeta(i,k));
           }
-          phi.row(n)/=sum(phi.row(n));
+          zeta.row(i)/=sum(zeta.row(i));
         }
 
+
         for (uint32_t n=0; n<N; ++n){
-          phi(n,i)=0.0;
+          //phi(n,i)=0.0;
           for (uint32_t i=0; i<T; ++i) {
-            phi(n,i) += ElogSigma(gamma_1,gamma_2,k);
+            phi(n,i) = ElogSigma(gamma_1,gamma_2,i);
             for (uint32_t k=0; k<K; ++k) {
-              phi(n,i) += zeta(i,k)*ElogBeta(lambda_kw,k,x[d](n)) ;
+              phi(n,i) += zeta(i,k)*ElogBeta(lambda,k,x[d](n)) ;
             }
-            phi(i,k) = exp(phi(i,k));
+            phi(n,i) = exp(phi(n,i));
           }
           phi.row(n)/=sum(phi.row(n));
         }
 
-        coverged=true;//TODO
+        converged=o>30;//TODO
+        //cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
+        //cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
+        ++o;
       }
 
-      //vector<Col<double> > lambda_kv(K,Col<double>(Nw));
-      Col<double> lambda_kv(K); lambda_kv.zeros();
+      vector<Col<double> > lambda_kv(K,Col<double>(Nw));
+      for (uint32_t k=0; k<K; ++k){
+        lambda_kv[k].zeros();
+      }
       Col<double> a_k(K); a_k.zeros();
       Col<double> b_k(K); b_k.zeros();
       for (uint32_t k=0; k<K; ++k) {
         for (uint32_t i=0; i<T; ++i) {
-          double _lambda = 0.0;
+          Col<double> _lambda(Nw); _lambda.zeros();
           for (uint32_t n=0; n<N; ++n){
-            _lambda+=phi(n,i)*x[d](n)
+            _lambda(x[d](n))=phi(n,i);
           }
-          lambda_kv(k)+=zeta(i,k)*_lambda;
+          lambda_kv[k]+=zeta(i,k)*_lambda;
           a_k(k)+=zeta(i,k);
           for (uint32_t l=k+1; l<K; ++l) {
             b_k(k)+=zeta(i,l);
           }
         }
-        lambda_kv(k) = D*lambda_kv(k)+nu;
+        lambda_kv[k] = D*lambda_kv[k]+nu;
         a_k(k) = D*a_k(k)+1.0;
-        b_k(k) = D*b_k(k)+omega;
+        b_k(k) = D*b_k(k)+mGamma;
       }
 
       // update global params
-      lambda = (1.0-ro)*lambda + ro*lambda_kv;
+      for (uint32_t k=0; k<K; ++k)
+        lambda[k] = (1.0-ro)*lambda[k] + ro*lambda_kv[k];
       a = (1.0-ro)*a + ro*a_k;
       b = (1.0-ro)*b + ro*b_k;
 
-//      for (uint32_t j=0; j<J; ++j)
-//      { // Document level updates
-//        for (uint32_t t=0; t<T; ++t)
-//        {
-//          a_jt[j][t]=1.0+sum(zeta_jnt[j].col(t));
-//          b_jt[j][t]=alpha_0;
-//          for (uint32_t s=t+1; s<T; ++s)
-//            b_jt[j][t]+=sum(zeta_jnt[j].col(s))
-//          phi_jtk[j]
-//        }
-//      }
-//      // corpus level updates
-//    }
-  }
-}
+      cout<<"----------------- dd="<<dd<<" -----------------"<<endl;
+      cout<<"a=\t"<<a.t();
+      cout<<"b=\t"<<b.t();
+      for (uint32_t k=0; k<K; ++k)
+      {
+        cout<<"@"<<k<<" lambda=\t"<<lambda[k].t();
+      }
+
+        cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
+        cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
+
+      z_dn[d].set_size(N);
+      for (uint32_t n=0; n<N; ++n){
+        cout<<phi.row(n);
+        uint32_t z=as_scalar(find(phi.row(n) == max(phi.row(n)),1));
+        uint32_t c_di=as_scalar(find(zeta.row(z) == max(zeta.row(z)),1));
+        z_dn[d](n) = c_di;
+      }
+    }
+    return z_dn;
+  };
+
+
+};
 
