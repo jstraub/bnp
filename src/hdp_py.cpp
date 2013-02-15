@@ -104,7 +104,7 @@ bool checkPyArr(PyArrayObject* a, const int ndims, const NpTypes npType)
 		return false;
 	}
 
-	cout<<"Type="<<a->descr->type<< " Type_num=" <<a->descr->type_num<<endl;
+	//cout<<"Type="<<a->descr->type<< " Type_num=" <<a->descr->type_num<<endl;
 	return true;
 }
 
@@ -186,7 +186,7 @@ public:
   {
     cout<<"mX.size()="<<HDP<U>::mX.size()<<endl;
     for (uint32_t i=0; i<HDP<U>::mX.size(); ++i)
-      cout<<"  x_"<<i<<": "<<HDP<U>::mX[i].n_rows<<"x"<<HDP<U>::mX[i].n_cols<<endl;
+      cout<<"  x_"<<i<<": "<<HDP<U>::mX[i].n_rows<<"x"<<HDP<U>::mX[i].n_cols<<": "<<HDP<U>::mX[i]<<endl;
 
     return HDP<U>::densityEst(K0, T0, It);
   }
@@ -195,6 +195,8 @@ public:
   uint32_t addDoc(const numeric::array& x_i)
   {
     Mat<U> x_i_mat=np2mat<U>(x_i); // can do this since x_i_mat gets copied inside
+
+    cout<<"adding  x: "<<x_i_mat.n_rows<<"x"<<x_i_mat.n_cols<<": "<<x_i_mat<<endl;
     return HDP<U>::addDoc(x_i_mat);
   };
 
@@ -220,13 +222,54 @@ public:
 typedef HDP_py<uint32_t> HDP_Dir;
 typedef HDP_py<double> HDP_INW;
 
+class HDP_onl_py : public HDP_onl
+{
+public:
+  HDP_onl_py(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
+  : HDP_onl(base,alpha,gamma)
+  {
+    cout<<"Creating "<<typeid(this).name()<<endl;
+  };
+
+  bool densityEst(uint32_t Nw, double ro=0.75, uint32_t K=100, uint32_t T=10)
+  {
+    cout<<"mX.size()="<<HDP_onl::mX.size()<<endl;
+    for (uint32_t i=0; i<HDP_onl::mX.size(); ++i)
+      cout<<"  x_"<<i<<": "<<HDP_onl::mX[i].n_rows<<"x"<<HDP_onl::mX[i].n_cols<<endl;
+
+    return HDP_onl::densityEst(Nw,ro,K,T);
+  }
+
+  // makes no copy of the external data x_i
+  uint32_t addDoc(const numeric::array& x_i)
+  {
+    Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
+    return HDP_onl::addDoc(x_i_mat);
+  };
+
+  // works on the data in z_i -> size has to be correct in order for this to work!
+  // makes a copy of the internal labels vector
+  bool getClassLabels(numeric::array& z_i, uint32_t i)
+  {
+    Col<uint32_t> z_i_col;
+    if(!HDP_onl::getClassLabels(z_i_col, i)){return false;} // works on the data in z_i_mat
+    Col<uint32_t> z_i_wrap=np2col<uint32_t>(z_i); // can do this since x_i_mat gets copied inside
+    if(z_i_col.n_rows != z_i_wrap.n_rows)
+      return false;
+    else{
+      for (uint32_t i=0; i<z_i_wrap.n_rows; ++i)
+        z_i_wrap.at(i)=z_i_col.at(i);
+      return true;
+    }
+  };
+};
 
 BOOST_PYTHON_MODULE(libbnp)
 {
 	import_array();
 	boost::python::numeric::array::set_module_and_type("numpy", "ndarray");
 
-	class_<Dir_py>("Dir_py", init<numeric::array>())
+	class_<Dir_py>("Dir", init<numeric::array>())
 			.def(init<Dir_py>());
 	class_<InvNormWishart_py>("INW",init<const numeric::array, double,
 			const numeric::array, double>())
@@ -246,5 +289,12 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("getClassLabels",&HDP_INW::getClassLabels)
         .def("addDoc",&HDP_INW::addDoc)
         .def_readonly("mGamma", &HDP_INW::mGamma);
+
+	class_<HDP_onl_py>("HDP_onl",init<Dir_py&,double,double>())
+        .def("densityEst",&HDP_onl_py::densityEst)
+        .def("getClassLabels",&HDP_onl_py::getClassLabels)
+        .def("addDoc",&HDP_onl_py::addDoc)
+        .def_readonly("mGamma", &HDP_onl_py::mGamma);
+
 }
 

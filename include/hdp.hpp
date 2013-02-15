@@ -399,12 +399,18 @@ public:
   double digamma(double x)
   {
     //http://en.wikipedia.org/wiki/Digamma_function#Computation_and_approximation
+    if(x<1e-6){
+      cout<<"\tdigamma param x near zero: "<<x<<endl;
+    }
     double x_sq = x*x;
     return log(x)-1.0/(2.0*x)-1.0/(12.0*x_sq)+1.0/(12*x_sq*x_sq)-1.0/(252.0*x_sq*x_sq*x_sq);
   }
 
   double ElogBeta(const vector<Col<double> >& lambda, uint32_t k, uint32_t w_dn)
   {
+    if(lambda[k](w_dn)<1e-6){
+      cout<<"\tlambda[k]("<<w_dn<<") near zero: "<<lambda[k](w_dn)<<endl;
+    }
     return digamma(lambda[k](w_dn)) - digamma(sum(lambda[k]));
   }
 
@@ -426,26 +432,31 @@ public:
 
   // method for "one shot" computation without storing data in this class
   //  Nw: number of different words
-  //  ro: forgetting rate
+  //  kappa: forgetting rate
   //  uint32_t T=10; // truncation on document level
   //  uint32_t K=100; // truncation on corpus level
-  vector<Col<uint32_t> > densityEst(const vector<Mat<uint32_t> >& x, uint32_t Nw, double ro=0.75, uint32_t K=100, uint32_t T=10)
+  vector<Col<uint32_t> > densityEst(const vector<Mat<uint32_t> >& x, uint32_t Nw, double kappa=0.75, uint32_t K=100, uint32_t T=10)
   {
   
+    const double EPS = 1e-20;
+
     // From: Online Variational Inference for the HDP
     // TODO: think whether it makes sense to use columns and Mat here
     //double mAlpha = 1;
     //double mGamma = 1;
     double nu = ((Dir*)(&mH))->mAlpha0; // get nu from vbase measure (Dir)
-    //double ro = 0.75;
+    //double kappa = 0.75;
 
     vector<Col<double> > lambda(K,Col<double>(Nw));
-    for (uint32_t k=0; k<K; ++k)
+    for (uint32_t k=0; k<K; ++k){
       lambda[k].randu();
+      lambda[k]+=0.1;
+    }
 
     Col<double> a(K); a.ones();
     Col<double> b(K); b.ones(); b*=mGamma;
     uint32_t D=x.size();
+
 
     vector<Col<uint32_t> > z_dn(D);
     Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
@@ -460,14 +471,17 @@ public:
         for (uint32_t k=0; k<K; ++k) {
           zeta(i,k)=0.0;
           for (uint32_t n=0; n<N; ++n) {
+            if(i==0 && k==0) cout<<zeta(i,k)<<" -> ";
             zeta(i,k) += ElogBeta(lambda, k, x[d](n));
           }
-          //cout<<zeta(i,k)<<endl;
-          zeta(i,k)=exp(zeta(i,k));
         }
-        zeta.row(i)/=sum(zeta.row(i));
+        zeta.row(i)=exp(zeta.row(i));
+        cout<<" exp()="<<zeta(0,0);
+        double denom = sum(zeta.row(i));
+        if(denom > EPS) zeta.row(i)/=denom; // avoid division by 0
+        cout<<" normalized="<<zeta(0,0)<<endl;
       }
-        //cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
+      cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
       cout<<"\tinit phi"<<endl;
       Mat<double> phi(N,T);
       for (uint32_t n=0; n<N; ++n){
@@ -476,19 +490,22 @@ public:
           for (uint32_t k=0; k<K; ++k) {
             phi(n,i)+=zeta(i,k)* ElogBeta(lambda, k, x[d](n));
           }
-          phi(n,i)=exp(phi(n,i));
         }
-        phi.row(n)/=sum(phi.row(n));
+        phi.row(n)=exp(phi.row(n));
+        double denom = sum(phi.row(n));
+        if(denom > EPS) phi.row(n)/=denom; // avoid division by 0
       }
-        //cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
+        cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
 
+      // ------------------------ doc level updates --------------------
       bool converged = false;
       Col<double> gamma_1(T);
       Col<double> gamma_2(T);
-
+  
       uint32_t o=0;
       while(!converged){
-        cout<<"Iterating local params #"<<o<<endl;
+        cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
+        // gammas -------------------------
         gamma_1.ones();
         gamma_2.ones(); gamma_2 *= mAlpha;
         for (uint32_t i=0; i<T; ++i) 
@@ -501,7 +518,7 @@ public:
           }  
           cout<<gamma_1(i)<<" "<<gamma_2(i)<<endl;
         }
-
+        // zeta --------------------------
         for (uint32_t i=0; i<T; ++i){
           //zeta(i,k)=0.0;
           for (uint32_t k=0; k<K; ++k) {
@@ -510,12 +527,13 @@ public:
             for (uint32_t n=0; n<N; ++n){
               zeta(i,k) += phi(n,i)*ElogBeta(lambda,k, x[d](n));
             }
-            zeta(i,k) = exp(zeta(i,k));
           }
-          zeta.row(i)/=sum(zeta.row(i));
+          zeta.row(i)=exp(zeta.row(i));
+          double denom = sum(zeta.row(i));
+          if(denom > EPS) zeta.row(i)/=denom; // avoid division by 0
         }
 
-
+        // phi ------------------------
         for (uint32_t n=0; n<N; ++n){
           //phi(n,i)=0.0;
           for (uint32_t i=0; i<T; ++i) {
@@ -523,9 +541,10 @@ public:
             for (uint32_t k=0; k<K; ++k) {
               phi(n,i) += zeta(i,k)*ElogBeta(lambda,k,x[d](n)) ;
             }
-            phi(n,i) = exp(phi(n,i));
           }
-          phi.row(n)/=sum(phi.row(n));
+          phi.row(n)=exp(phi.row(n));
+          double denom = sum(phi.row(n));
+          if(denom > EPS) phi.row(n)/=denom; // avoid division by 0
         }
 
         converged=o>30;//TODO
@@ -533,7 +552,11 @@ public:
         //cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
         ++o;
       }
+  
+      cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
+      cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
 
+      // --------------------- natural gradients ---------------------------
       vector<Col<double> > lambda_kv(K,Col<double>(Nw));
       for (uint32_t k=0; k<K; ++k){
         lambda_kv[k].zeros();
@@ -544,7 +567,7 @@ public:
         for (uint32_t i=0; i<T; ++i) {
           Col<double> _lambda(Nw); _lambda.zeros();
           for (uint32_t n=0; n<N; ++n){
-            _lambda(x[d](n))=phi(n,i);
+            _lambda(x[d](n))+=phi(n,i);
           }
           lambda_kv[k]+=zeta(i,k)*_lambda;
           a_k(k)+=zeta(i,k);
@@ -557,7 +580,8 @@ public:
         b_k(k) = D*b_k(k)+mGamma;
       }
 
-      // update global params
+      // ----------------------- update global params -----------------------
+      double ro = exp(-kappa*log(1+double(dd)));
       for (uint32_t k=0; k<K; ++k)
         lambda[k] = (1.0-ro)*lambda[k] + ro*lambda_kv[k];
       a = (1.0-ro)*a + ro*a_k;
@@ -571,8 +595,6 @@ public:
         cout<<"@"<<k<<" lambda=\t"<<lambda[k].t();
       }
 
-        cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
-        cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
 
       z_dn[d].set_size(N);
       for (uint32_t n=0; n<N; ++n){
@@ -582,8 +604,22 @@ public:
         z_dn[d](n) = c_di;
       }
     }
+
     return z_dn;
   };
+
+    // compute density estimate based on data previously fed into the class using addDoc
+  bool densityEst(uint32_t Nw, double kappa=0.75, uint32_t K=100, uint32_t T=10)
+  {
+    if(mX.size() > 0)
+    {
+      mZ = densityEst(mX,Nw,kappa,K,T);
+      return true;
+    }else{
+      return false;
+    }
+  };
+
 
 
 };
