@@ -262,6 +262,37 @@ public:
       return true;
     }
   };
+
+  // works on the data in lambda -> size has to be correct in order for this to work!
+  // makes a copy of the internal labels vector
+  bool getLambda(numeric::array& lambda, uint32_t k)
+  {
+    Col<double> lambda_col;
+    if(!HDP_onl::getLambda(lambda_col, k)){return false;} // works on the data in _mat
+    Col<double> lambda_wrap=np2col<double>(lambda); 
+    if(lambda_col.n_rows != lambda_wrap.n_rows)
+      return false;
+    else{
+      for (uint32_t i=0; i<lambda_wrap.n_rows; ++i)
+        lambda_wrap.at(i)=lambda_col.at(i);
+      return true;
+    }
+  };
+
+  void getA(numeric::array& a)
+  {
+    Col<double> a_wrap=np2col<double>(a); 
+     for (uint32_t i=0; i<a_wrap.n_rows; ++i)
+        a_wrap.at(i)=HDP_onl::mA.at(i);
+  };
+
+  void getB(numeric::array& b)
+  {
+    Col<double> b_wrap=np2col<double>(b); 
+     for (uint32_t i=0; i<b_wrap.n_rows; ++i)
+        b_wrap.at(i)=HDP_onl::mB.at(i);
+  };
+
 };
 
 BOOST_PYTHON_MODULE(libbnp)
@@ -294,6 +325,9 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("densityEst",&HDP_onl_py::densityEst)
         .def("getClassLabels",&HDP_onl_py::getClassLabels)
         .def("addDoc",&HDP_onl_py::addDoc)
+        .def("getA",&HDP_onl_py::getA)
+        .def("getB",&HDP_onl_py::getB)
+        .def("getLambda",&HDP_onl_py::getLambda)
         .def_readonly("mGamma", &HDP_onl_py::mGamma);
 
 }
