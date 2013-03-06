@@ -8,11 +8,38 @@
 //#include <boost/random/uniform_int_distribution.hpp>
 #include <boost/random/uniform_int.hpp>
 #include <boost/random/uniform_01.hpp>
+#include <boost/random/gamma_distribution.hpp>
 
 #include <armadillo>
 #include <time.h>
 
 using namespace arma;
+
+
+class GammaRnd
+{
+public:
+  GammaRnd(double alpha, double beta) // alpha = shape; beta = scale
+    : mGen(time(0)),mAlpha(alpha), mBeta(beta), mGamma(mAlpha)
+  {};
+
+  double draw(void)
+  {
+    return mBeta*mGamma(mGen);
+  };
+  void draw(Col<double>& c)
+  {
+    for (uint32_t i=0; i<c.n_rows; ++i)
+      c(i)=draw();
+  };
+
+private:
+  boost::mt19937 mGen;
+  double mAlpha;
+  double mBeta;
+  boost::gamma_distribution<> mGamma;
+};
+
 
 class RandInt
 {

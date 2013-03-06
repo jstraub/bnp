@@ -16,18 +16,25 @@ using namespace arma;
 int main(int argc, char** argv)
 {
 
-  cout<<" ------------------------ inverse normal wishart base measure ------------------- "<<endl;
+  cout<<" ------------------------ Dir base measure online ------------------- "<<endl;
   // inverse normal wishart base measure
 //  mat x_rand(90,1);
 //  x_rand.randu();
 //  x_rand += 12.0;
-  vector<Mat<uint32_t> > x(2,zeros<Mat<uint32_t> >(90,1));
-  x[0].zeros();
-  x[0].rows(0,29) += 1;
-  x[0].rows(30,59) += 2;
-  x[1].zeros();
-  x[1].rows(0,29) += 2;
-  x[1].rows(60,89) += 1;
+  vector<Mat<uint32_t> > x(12,zeros<Mat<uint32_t> >(90,1));
+
+  for (uint32_t d=0; d<12; d+=3)
+  {
+    x[d].zeros();
+    x[d].rows(0,29) += 1;
+    x[d].rows(30,59) += 2;
+    x[d+1].zeros();
+    x[d+1].rows(0,29) += 1;
+    x[d+1].rows(60,89) += 1;
+    x[d+2].zeros();
+    //x[d+2].rows(0,29) += 1;
+    //x[d+2].rows(60,89) += 1;
+  }
 //  x[2].randn();
 //  x[2].rows(0,29) -= 8;
 //  x[3].randn();
@@ -42,9 +49,9 @@ int main(int argc, char** argv)
   //alphas *= 1.1; // smaller alpha means more uncertainty in the where the good distributions are
   double alpha =1.0, gamma=1000.0;
   Dir dir(alphas);
-  HDP<uint32_t> hdp_dir(dir, alpha, gamma);
+  HDP_onl hdp_onl(dir, alpha, gamma);
 
-  vector<Col<uint32_t> > z_ji = hdp_dir.densityEst(x,10,10,100);
+  vector<Col<uint32_t> > z_ji = hdp_onl.densityEst(x,4,0.6,10,2);
 
   uint32_t J=z_ji.size();
   cout<<"z_ji:"<<endl;
@@ -62,6 +69,30 @@ int main(int argc, char** argv)
     cout<<endl;
   }
 
+  return 0;
+
+  cout<<" ---------------------------------- Dir base measure ---------------------------" <<endl;
+  HDP<uint32_t> hdp_dir(dir, alpha, gamma);
+
+  z_ji = hdp_dir.densityEst(x,10,10,100);
+  J=z_ji.size();
+
+  cout<<"z_ji:"<<endl;
+  for(uint32_t j=0; j<J; ++j)
+  {
+    for(uint32_t i=0; i<z_ji[j].n_elem; ++i)
+      cout<<z_ji[j](i)<<" ";
+    cout<<endl;
+  }
+  cout<<"x:"<<endl;
+  for(uint32_t j=0; j<x.size(); ++j)
+  {
+    for(uint32_t i=0; i<x[j].n_elem; ++i)
+      cout<<x[j](i)<<" ";
+    cout<<endl;
+  }
+
+  
   return 0;
 
   cout<<" ------------------------ inverse normal wishart base measure ------------------- "<<endl;
