@@ -17,7 +17,7 @@ import libbnp as bnp
 if __name__ == '__main__':
 
   D = 1000 #number of documents to process
-  N_d = 1000 # max number of words per doc
+  N_d = 10 # max number of words per doc
   Nw = 256 # how many different symbols are in the alphabet
   ro = 0.75 # forgetting rate
   K = 40 # top level truncation
@@ -48,41 +48,50 @@ if __name__ == '__main__':
 
   dirichlet=bnp.Dir(dirAlphas)
   print("Dir created")
-  hdp=bnp.HDP_onl(dirichlet,alpha,gamma)
-  for x_i in x[0:D]:
-    hdp.addDoc(np.vstack(x_i[0:N_d]))
-  result=hdp.densityEst(Nw,ro,K,T)
+
+  variational = False
+  if variational:
+    hdp=bnp.HDP_onl(dirichlet,alpha,gamma)
+    for x_i in x[0:D]:
+      hdp.addDoc(np.vstack(x_i[0:N_d]))
+    result=hdp.densityEst(Nw,ro,K,T)
+  else:
+    hdp=bnp.HDP_Dir(dirichlet,alpha,gamma)
+    for x_i in x[0:D]:
+      hdp.addDoc(np.vstack(x_i[0:N_d]))
+    result=hdp.densityEst(10,10,10)
+
 
   print("---------------------- DONE -------------------------");
 
-  #z_di=[]
-  lamb=[]
-  for k in range(0,K):
-    lamb.append(np.zeros(Nw,dtype=np.double))
-    hdp.getLambda(lamb[k],k)
-    print(lamb[k])
-    #z_di.append(np.zeros(len(x[d]),dtype=np.uint32))
-    #hdp.getClassLabels(z_di[d],d)
-    #print(z_di[d])
-  a=np.zeros(K,dtype=np.double)
-  b=np.zeros(K,dtype=np.double)
-  hdp.getA(a)
-  hdp.getB(b)
-
-  plt.figure(1)
-  for k in range(0,40):
-    plt.subplot(7,6,k+1)
-    plt.plot(lamb[k])
-    plt.xlabel('topic '+str(k))
-
-  plt.subplot(7,6,41)
-  plt.plot(a)
-  plt.xlabel('A')
-  plt.subplot(7,6,42)
-  plt.plot(b)
-  plt.xlabel('B')
-  plt.show(1)
-
+#  #z_di=[]
+#  lamb=[]
+#  for k in range(0,K):
+#    lamb.append(np.zeros(Nw,dtype=np.double))
+#    hdp.getLambda(lamb[k],k)
+#    print(lamb[k])
+#    #z_di.append(np.zeros(len(x[d]),dtype=np.uint32))
+#    #hdp.getClassLabels(z_di[d],d)
+#    #print(z_di[d])
+#  a=np.zeros(K,dtype=np.double)
+#  b=np.zeros(K,dtype=np.double)
+#  hdp.getA(a)
+#  hdp.getB(b)
+#
+#  plt.figure(1)
+#  for k in range(0,40):
+#    plt.subplot(7,6,k+1)
+#    plt.plot(lamb[k])
+#    plt.xlabel('topic '+str(k))
+#
+#  plt.subplot(7,6,41)
+#  plt.plot(a)
+#  plt.xlabel('A')
+#  plt.subplot(7,6,42)
+#  plt.plot(b)
+#  plt.xlabel('B')
+#  plt.show(1)
+#
   
 #  plt.figure(1)
 #  for d in range(0,J):

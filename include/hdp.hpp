@@ -438,6 +438,7 @@ public:
       r -= log(denom); // avoid division by 0
       //cout<<" r - logDenom="<<r<<endl;
       r = exp(r);
+      r /= sum(r);
       //cout<<" exp(r - logDenom)="<<r<<endl;
       return true;
     }else{ // cannot compute this -> set the smallest r to 1.0 and the rest to 0
@@ -486,8 +487,12 @@ public:
         gammaRnd.draw(lambda[k]);
         lambda[k]*=double(D)*100.0/double(K*Nw);
         lambda[k]+=((Dir*)(&mH))->mAlphas.t();
-
     }
+
+    mZeta.resize(D,Mat<double>());
+    mPhi.resize(D,Mat<double>());
+    mGammaA.resize(D,Col<double>());
+    mGammaB.resize(D,Col<double>());
 
     vector<Col<uint32_t> > z_dn(D);
     Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
@@ -514,12 +519,14 @@ public:
             zeta(i,k) += ElogBeta(lambda, k, x[d](n));
           }
         }
-        if(normalizeLogDistribution(zeta.row(i)))
-        {
-          cerr<<"zeta normally computed"<<endl;
-        }else{
-          cerr<<"zeta thresholded"<<endl;
-        }
+        normalizeLogDistribution(zeta.row(i));
+//        if(normalizeLogDistribution(zeta.row(i)))
+//        {
+//          cerr<<"zeta normally computed"<<endl;
+//        }else{
+//          cerr<<"zeta thresholded"<<endl;
+//        }
+
         //cout<<" normalized="<<zeta(0,0)<<endl;
       }
       cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
@@ -534,12 +541,14 @@ public:
           }
         }
 
-        if(normalizeLogDistribution(phi.row(n)))
-        {
-          cerr<<"phi normally computed"<<endl;
-        }else{
-          cerr<<"phi thresholded"<<endl;
-        }
+        normalizeLogDistribution(phi.row(n));
+//        if(normalizeLogDistribution(phi.row(n)))
+//        {
+//          cerr<<"phi normally computed"<<endl;
+//        }else{
+//          cerr<<"phi thresholded"<<endl;
+//        }
+//
 //        phi.row(n)=exp(phi.row(n));
 //        double denom = sum(phi.row(n));
 //        if(denom > EPS)
@@ -587,12 +596,13 @@ public:
               zeta(i,k) += phi(n,i)*ElogBeta(lambda,k, x[d](n));
             }
           }
-          if(normalizeLogDistribution(zeta.row(i)))
-          {
-            cerr<<"zeta normally computed"<<endl;
-          }else{
-            cerr<<"zeta thresholded"<<endl;
-          }
+          normalizeLogDistribution(zeta.row(i));
+//          if(normalizeLogDistribution(zeta.row(i)))
+//          {
+//            cerr<<"zeta normally computed"<<endl;
+//          }else{
+//            cerr<<"zeta thresholded"<<endl;
+//          }
 
 //          zeta.row(i)=exp(zeta.row(i));
 //          double denom = sum(zeta.row(i));
@@ -608,12 +618,13 @@ public:
               phi(n,i) += zeta(i,k)*ElogBeta(lambda,k,x[d](n)) ;
             }
           }
-          if(normalizeLogDistribution(phi.row(n)))
-          {
-            cerr<<"phi normally computed"<<endl;
-          }else{
-            cerr<<"phi thresholded"<<endl;
-          }
+          normalizeLogDistribution(phi.row(n));
+//          if(normalizeLogDistribution(phi.row(n)))
+//          {
+//            cerr<<"phi normally computed"<<endl;
+//          }else{
+//            cerr<<"phi thresholded"<<endl;
+//          }
           //          phi.row(n)=exp(phi.row(n));
           //          double denom = sum(phi.row(n));
 //          if(denom > EPS) phi.row(n)/=denom; // avoid division by 0
@@ -630,6 +641,23 @@ public:
         //cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
         ++o;
       }
+
+      mZeta[d] = Mat<double>(zeta);
+      mPhi[d] = Mat<double>(phi);
+      mGammaA[d] = Col<double>(gamma_1);
+      mGammaB[d] = Col<double>(gamma_2);
+
+      cout<<"z_dn: "<<endl;
+      z_dn[d].set_size(N);
+      for (uint32_t n=0; n<N; ++n){
+        //cout<<phi.row(n);
+        uint32_t z=as_scalar(find(phi.row(n) == max(phi.row(n)),1));
+        uint32_t c_di=as_scalar(find(zeta.row(z) == max(zeta.row(z)),1));
+        z_dn[d](n) = c_di;
+        cout<<z_dn[d](n)<<" ("<<max(phi.row(n))<<"@"<< z<<" -> "<<max(zeta.row(z))<<"@"<<c_di<<") "<<endl ;
+        if (max(phi.row(n))>1.0)
+          cout<<phi.row(n)<<endl;
+      }; cout<<endl;
   
       cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
       cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
@@ -677,14 +705,6 @@ public:
       a = (1.0-ro)*a + ro*a_k;
       b = (1.0-ro)*b + ro*b_k;
 
-
-//      z_dn[d].set_size(N);
-//      for (uint32_t n=0; n<N; ++n){
-//        cout<<phi.row(n);
-//        uint32_t z=as_scalar(find(phi.row(n) == max(phi.row(n)),1));
-//        uint32_t c_di=as_scalar(find(zeta.row(z) == max(zeta.row(z)),1));
-//        z_dn[d](n) = c_di;
-//      }
     }
 
 
@@ -728,11 +748,98 @@ public:
       return false;
     }
   };
-protected:
-  vector<Col<double> > mLambda;
-  Col<double> mA;
-  Col<double> mB;
 
+  // stick breaking proportions from a set of beta distributions parameterized by their 
+  // alpha and beta parameters. The mode of the beta distributions is used to compute
+  // the stickbreaking proportions
+  static void stickBreaking(Col<double>& prop, const Col<double>& alpha, const Col<double>& beta)
+  {
+    // breaking proportions
+    Col<double> v(prop);
+    for (uint32_t i=0; i<v.n_elem; ++i){
+      if (alpha[i]+beta[i] != 2.0) {
+        v[i] = (alpha[i]-1.0)/(alpha[i]+beta[i]-2.0);
+      }else{
+        v[1] = 1.0;
+      }
+    }
+
+    // stick breaking proportions
+    for (uint32_t i=0; i<prop.n_elem; ++i){
+      prop[i] = v[i];
+      for (uint32_t j=0; j<i; ++j){
+        prop[i] *= (1.0 - v[j]);
+      }
+    }
+  }
+
+  static uint32_t multinomialMode(const Row<double>& p )
+  {
+    uint32_t ind =0;
+    p.max(ind);
+    return ind;
+  }
+
+  bool getDocTopics(Col<double>& prop, Col<uint32_t>& topicInd, uint32_t d)
+  {
+    uint32_t K = mLambda.size(); // corp level topics
+    uint32_t T = mGammaA[0].n_elem; // doc level topics
+
+    prop.set_size(T);
+    topicInd.set_size(T);
+
+    if (T != prop.n_elem || T != topicInd.n_elem){
+      cerr<<"getDocTopics:: proportions was not properly preallocated "<<T<<"!="<<prop.n_elem<<" and "<<topicInd.n_elem<<endl;
+      return false;
+    }
+
+    stickBreaking(prop,mGammaA[d],mGammaB[d]);
+    for (uint32_t k=0; k<K; ++k){
+      topicInd[k] = multinomialMode(mZeta[d].row(k));
+    }
+    return true;
+  }
+
+  bool getCorpTopicProportions(Col<double>& prop)
+  {
+    uint32_t K = mLambda.size(); // corp level topics
+
+    prop.set_size(K);
+
+    if (K != prop.n_elem){
+      cerr<<"getCorpTopicProportions:: proportions was not properly preallocated "<<K<<" != "<<prop.n_elem<<endl;
+      return false;
+    }
+
+    stickBreaking(prop,mA,mB);
+    return true;
+  }
+
+  bool getCorpTopic(Col<double>& topic, uint32_t k)
+  {
+    if(mLambda.size() > 0 && k < mLambda.size())
+    {
+      double norm = 1.0/(sum(mLambda[k]) - mLambda[k].n_elem);
+      topic = (mLambda[k]-1)*norm;
+//      for (uint32_t i=0; i<mLambda[k].n_elem; ++i){
+//        topic[i] = (mLambda[k][i] -1)*norm
+//      }
+
+      return true;
+    }else{
+      return false;
+    }
+  };
+
+
+protected:
+  vector<Col<double> > mLambda; // corpus level topics (Dirichlet)
+  Col<double> mA; // corpus level Beta process alpha parameter for stickbreaking
+  Col<double> mB; // corpus level Beta process beta parameter for stickbreaking
+  vector<Mat<double> > mZeta; // document level topic indices/pointers to corpus level topics (Multinomial) 
+  vector<Mat<double> > mPhi; // document level word to doc level topic assignment (Multinomial)
+  vector<Col<double> > mGammaA; // document level Beta distribution alpha parameter for stickbreaking
+  vector<Col<double> > mGammaB; // document level Beta distribution beta parameter for stickbreaking
 
 };
 
