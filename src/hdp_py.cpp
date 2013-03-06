@@ -293,6 +293,52 @@ public:
         b_wrap.at(i)=HDP_onl::mB.at(i);
   };
 
+  bool getDocTopics(numeric::array& prop, numeric::array& topicInd, uint32_t d)
+  {
+    Col<double> prop_col;
+    Col<uint32_t> topicInd_col;
+    if(!HDP_onl::getDocTopics(prop_col, topicInd_col, d)){return false;} // works on the data in _mat
+    Col<double> prop_wrap=np2col<double>(prop); 
+    Col<uint32_t> topicInd_wrap=np2col<uint32_t>(topicInd); 
+    if((prop_col.n_rows != prop_wrap.n_rows) || (topicInd_col.n_rows != topicInd_wrap.n_rows))
+      return false;
+    else{
+      for (uint32_t i=0; i<topicInd_wrap.n_rows; ++i)
+        topicInd_wrap.at(i)=topicInd_col.at(i);
+      for (uint32_t i=0; i<prop_wrap.n_rows; ++i)
+        prop_wrap.at(i)=prop_col.at(i);
+      return true;
+    }
+  };
+
+  bool getCorpTopicProportions(numeric::array& prop)
+  {
+    Col<double> prop_col;
+    if(!HDP_onl::getCorpTopicProportions(prop_col)){return false;} // works on the data in _mat
+    Col<double> prop_wrap=np2col<double>(prop); 
+    if(prop_col.n_rows != prop_wrap.n_rows)
+      return false;
+    else{
+      for (uint32_t i=0; i<prop_wrap.n_rows; ++i)
+        prop_wrap.at(i)=prop_col.at(i);
+      return true;
+    }
+  }; 
+
+  bool getCorpTopic(numeric::array& topic, uint32_t k)
+  {
+    Col<double> topic_col;
+    if(!HDP_onl::getCorpTopic(topic_col, k)){return false;} // works on the data in _mat
+    Col<double> topic_wrap=np2col<double>(topic); 
+    if(topic_col.n_rows != topic_wrap.n_rows)
+      return false;
+    else{
+      for (uint32_t i=0; i<topic_wrap.n_rows; ++i)
+        topic_wrap.at(i)=topic_col.at(i);
+      return true;
+    }
+  };
+
 };
 
 BOOST_PYTHON_MODULE(libbnp)
@@ -328,6 +374,9 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("getA",&HDP_onl_py::getA)
         .def("getB",&HDP_onl_py::getB)
         .def("getLambda",&HDP_onl_py::getLambda)
+        .def("getDocTopics",&HDP_onl_py::getDocTopics)
+        .def("getCorpTopicProportions",&HDP_onl_py::getCorpTopicProportions)
+        .def("getCorpTopic",&HDP_onl_py::getCorpTopic)
         .def_readonly("mGamma", &HDP_onl_py::mGamma);
 
 }
