@@ -474,6 +474,8 @@ public:
     //double nu = ((Dir*)(&mH))->mAlpha0; // get nu from vbase measure (Dir)
     //double kappa = 0.75;
 
+    // T-1 gamma draws determine a T dim multinomial
+    // T = T-1;
 
     Col<double> a(K); a.ones();
     Col<double> b(K); b.ones(); b*=mGamma;
@@ -561,7 +563,7 @@ public:
 
       // ------------------------ doc level updates --------------------
       bool converged = false;
-      Col<double> gamma_1(T);
+      Col<double> gamma_1(T); 
       Col<double> gamma_2(T);
   
       Col<double> gamma_1_prev(T);
@@ -764,12 +766,17 @@ public:
   };
 
   // stick breaking proportions 
+  // truncated stickbreaking -> stick breaks will be dim longer than proportions v 
   static void stickBreaking(Col<double>& prop, const Col<double>& v)
   {
-    prop.set_size(v.n_elem);
+    prop.set_size(v.n_elem+1);
     // stick breaking proportions
     for (uint32_t i=0; i<prop.n_elem; ++i){
-      prop[i] = v[i];
+      if (i == prop.n_elem-1){
+        prop[i] = 1.0;
+      }else{
+        prop[i] = v[i];
+      }
       for (uint32_t j=0; j<i; ++j){
         prop[i] *= (1.0 - v[j]);
       }
@@ -783,33 +790,33 @@ public:
     return ind;
   };
 
-  bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& topicInd, uint32_t d)
+  bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d)
   {
     uint32_t K = mLambda.size(); // corp level topics
     uint32_t T = mGammaA[0].n_elem; // doc level topics
 
-    sigPi.set_size(T);
+    sigPi.set_size(T+1);
     pi.set_size(T);
-    topicInd.set_size(T);
+    c.set_size(T);
 
-    if (T != sigPi.n_elem || T != topicInd.n_elem){
-      cerr<<"getDocTopics:: proportions was not properly preallocated "<<T<<"!="<<sigPi.n_elem<<" and "<<topicInd.n_elem<<endl;
-      return false;
-    }
+//    if (T != sigPi.n_elem || T != c.n_elem){
+//      cerr<<"getDocTopics:: proportions was not properly preallocated "<<T<<"!="<<sigPi.n_elem<<" and "<<c.n_elem<<endl;
+//      return false;
+//    }
 
     betaMode(pi,mGammaA[d],mGammaB[d]);
     stickBreaking(sigPi,pi);
-    for (uint32_t k=0; k<K; ++k){
-      topicInd[k] = multinomialMode(mZeta[d].row(k));
+    for (uint32_t i=0; i<T; ++i){
+      c[i] = multinomialMode(mZeta[d].row(i));
     }
     return true;
   }
 
-  bool getWordTopics(Col<uint32_t>& topicInd, uint32_t d){
-    topicInd.set_size(mX[d].n_elem);
+  bool getWordTopics(Col<uint32_t>& z, uint32_t d){
+    z.set_size(mX[d].n_elem);
 
-    for (uint32_t i=0; i<topicInd.n_elem; ++i){
-      topicInd[i] = multinomialMode(mPhi[d].row(i));
+    for (uint32_t i=0; i<z.n_elem; ++i){
+      z[i] = multinomialMode(mPhi[d].row(i));
     }
     return true;
   };
@@ -818,13 +825,13 @@ public:
   {
     uint32_t K = mLambda.size(); // corp level topics
 
-    sigV.set_size(K);
+    sigV.set_size(K+1);
     v.set_size(K);
 
-    if (K != sigV.n_elem){
-      cerr<<"getCorpTopicProportions:: proportions was not properly preallocated "<<K<<" != "<<sigV.n_elem<<endl;
-      return false;
-    }
+//    if (K != sigV.n_elem){
+//      cerr<<"getCorpTopicProportions:: proportions was not properly preallocated "<<K<<" != "<<sigV.n_elem<<endl;
+//      return false;
+//    }
 
     betaMode(v, mA,mB);
     stickBreaking(sigV,v);
