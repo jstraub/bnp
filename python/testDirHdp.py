@@ -43,10 +43,10 @@ if __name__ == '__main__':
   if useSynthetic:
     D = 10 #number of documents to process
     N_d = 100 # max number of words per doc
-    Nw = 4 # how many different symbols are in the alphabet
+    Nw = 40 # how many different symbols are in the alphabet
     ro = 0.9 # forgetting rate
-    K = 10 # top level truncation
-    T = 3 # low level truncation
+    K = 30 # top level truncation
+    T = 10 # low level truncation
     alpha = 1. # concentration on G_i
     omega = 10. # concentration on G_0
     dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
@@ -87,12 +87,27 @@ if __name__ == '__main__':
     hdp_var.loadHDPSample(x=x,hdp=hdp)
 
     logP_gt = hdp_sample.logP_fullJoint()
-    #print('------------------------------------')
     logP_var = hdp_var.logP_fullJoint()
+    kl_pq = hdp_sample.KLdivergence(hdp_var)
+    kl_qp = hdp_var.KLdivergence(hdp_sample)
 
+    hdp_sample.checkSticks()
+    hdp_var.checkSticks()
+
+    print('\n-----------------------------\n')
     print('logP of full joint of groundtruth = {}'.format(logP_gt))
     print('logP of full joint of variational = {}'.format(logP_var))
-  
+    print('KL(p||q) = {}'.format(kl_pq))
+    print('KL(q||p) = {}'.format(kl_qp))
+
+    fig1=plt.figure()
+    plt.imshow(hdp_sample.docTopicsImg(),interpolation='nearest', cmap = cm.hot)
+    fig1.show()
+    fig2=plt.figure()
+    plt.imshow(hdp_var.docTopicsImg(),interpolation='nearest', cmap = cm.hot)
+    fig2.show()
+    raw_input()
+
   else:
     hdp=bnp.HDP_Dir(dirichlet,alpha,omega)
     for x_i in x[0:D]:

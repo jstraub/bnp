@@ -105,12 +105,12 @@ class HDP_sample:
     #print('x={}; x.len={}; x[d].size={}; c.len={}; z.len={}; v.size={}; sigV.size={}; pi.len={}; sigPi.len={}'.format(self.x[d][n],len(self.x),self.x[d].size,len(self.c),len(self.z),self.v.size,self.sigV.size,len(self.pi),len(self.sigPi)))
     #print('z={}; c={}; beta.size {}\n'.format(self.z[d][n], self.c[d][ self.z[d][n]],self.beta.shape))
 
-    print('\tx|beta =    {}'.format(logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]])))
-    print('\tc|sigV =    {}'.format(logCat(self.c[d][ self.z[d][n]], self.sigV)))
-    print('\tv|omega =   {}'.format(logBeta(self.v, 1.0, self.omega)))
-    print('\tz|sigPi =   {}'.format(logCat(self.z[d][n], self.sigPi[d])))
-    print('\tpi|alpha =  {}'.format(logBeta(self.pi[d], 1.0, self.alpha)))
-    print('\tbeta|lambda={}'.format(logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)))
+#    print('\tx|beta =    {}'.format(logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]])))
+#    print('\tc|sigV =    {}'.format(logCat(self.c[d][ self.z[d][n]], self.sigV)))
+#    print('\tv|omega =   {}'.format(logBeta(self.v, 1.0, self.omega)))
+#    print('\tz|sigPi =   {}'.format(logCat(self.z[d][n], self.sigPi[d])))
+#    print('\tpi|alpha =  {}'.format(logBeta(self.pi[d], 1.0, self.alpha)))
+#    print('\tbeta|lambda={}'.format(logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)))
     return logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
     + logCat(self.c[d][ self.z[d][n]], self.sigV) \
     + logBeta(self.v, 1.0, self.omega) \
@@ -125,7 +125,7 @@ class HDP_sample:
       N = self.x[d].size
       for n in range(0,N):
         logP_w = self.logP_wordJoint(d,n)
-        print('logP({},{})={}'.format(d,n,logP_w))
+#        print('logP({},{})={}'.format(d,n,logP_w))
         logP += logP_w
     return logP
 
@@ -173,7 +173,23 @@ class HDP_sample:
         #print('c({}): {}'.format(d,self.c[d]))
         self.z.append(np.zeros(self.x[d].size,dtype=np.uint32))
         hdp.getWordTopics(self.z[d],d)
+
+  def checkSticks(self):
+    print('sigV = {}; {}'.format(self.sigV,np.sum(self.sigV)))
+    D=len(self.x)
+    for d in range(0,D):
+      np.sum(self.sigPi[d])
+      print('sigPi = {}; {}'.format(self.sigPi[d],np.sum(self.sigPi[d])))
       
+  def KLdivergence(self,q):
+    kl = .0;
+    D=len(self.x)
+    for d in range(0,D):
+      N=self.x[d].size
+      for n in range(0,N):
+        kl += (self.logP_wordJoint(d,n) - q.logP_wordJoint(d,n))* np.exp(self.logP_wordJoint(d,n))
+    return kl
+
 
   def docTopicsImg(self):
     D = len(self.x)
