@@ -14,19 +14,9 @@ import cProfile
 
 import libbnp as bnp
 
-if __name__ == '__main__':
+from dirHdpGenerative import *
 
-  D = 1000 #number of documents to process
-  N_d = 10 # max number of words per doc
-  Nw = 256 # how many different symbols are in the alphabet
-  ro = 0.75 # forgetting rate
-  K = 40 # top level truncation
-  T = 10 # low level truncation
-  alpha = 1. # concentration on G_i
-  gamma = 10. # concentration on G_0
-  dirAlphas = np.ones(Nw)*1.0e-5 # alphas for dirichlet base measure
-
-  pathToData = "../../data/bof/bofs249.txt"
+def dataFromBOFs(pathToData):
   x=[];
   sceneType=[]
   f = open(pathToData,'r')
@@ -41,6 +31,45 @@ if __name__ == '__main__':
     #print(np.max(x_i))
     #if len(x) == 9 :
     #  print(x_i.T)
+  return x
+
+
+if __name__ == '__main__':
+
+  useSynthetic = True
+  variational = True
+
+  if useSynthetic:
+    D = 100 #number of documents to process
+    N_d = 100 # max number of words per doc
+    Nw = 4 # how many different symbols are in the alphabet
+    ro = 0.9 # forgetting rate
+    K = 10 # top level truncation
+    T = 3 # low level truncation
+    alpha = 1. # concentration on G_i
+    omega = 10. # concentration on G_0
+    dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
+
+    hdp_sample = HDP_sample(omega,alpha,dirAlphas)
+
+    x, gtCorpProp, gtTopic, pi, c = hdp_sample.generateDirHDPSample(D,N_d,K,T,Nw)
+
+    logP_gt = hdp_sample.logP_self()
+    print('logP of groundtruth = {}'.format(logP_gt))
+
+  else:
+    D = 1000 #number of documents to process
+    N_d = 10 # max number of words per doc
+    Nw = 256 # how many different symbols are in the alphabet
+    ro = 0.75 # forgetting rate
+    K = 40 # top level truncation
+    T = 10 # low level truncation
+    alpha = 1. # concentration on G_i
+    omega = 10. # concentration on G_0
+    dirAlphas = np.ones(Nw)*1.0e-5 # alphas for dirichlet base measure
+ 
+    pathToData = "../../data/bof/bofs249.txt"
+    x = dataFromBOFs(pathToData)
 
   D=min(D,len(x))
 
@@ -49,57 +78,54 @@ if __name__ == '__main__':
   dirichlet=bnp.Dir(dirAlphas)
   print("Dir created")
 
-  variational = False
   if variational:
-    hdp=bnp.HDP_onl(dirichlet,alpha,gamma)
+    hdp=bnp.HDP_onl(dirichlet,alpha,omega)
     for x_i in x[0:D]:
       hdp.addDoc(np.vstack(x_i[0:N_d]))
     result=hdp.densityEst(Nw,ro,K,T)
   else:
-    hdp=bnp.HDP_Dir(dirichlet,alpha,gamma)
+    hdp=bnp.HDP_Dir(dirichlet,alpha,omega)
     for x_i in x[0:D]:
       hdp.addDoc(np.vstack(x_i[0:N_d]))
     result=hdp.densityEst(10,10,10)
 
+  print("---------------------- Corpus Topic Proportions -------------------------");
 
-  print("---------------------- DONE -------------------------");
+  corpProp = np.zeros(K,dtype=np.double)
+  hdp.getCorpTopicProportions(corpProp)
+  print('topic proportions: \t{}\t{}'.format(corpProp,np.sum(corpProp)))
+  print('GT topic proportions: \t{}\t{}'.format(gtCorpProp,np.sum(gtCorpProp)))
 
-#  #z_di=[]
-#  lamb=[]
-#  for k in range(0,K):
-#    lamb.append(np.zeros(Nw,dtype=np.double))
-#    hdp.getLambda(lamb[k],k)
-#    print(lamb[k])
-#    #z_di.append(np.zeros(len(x[d]),dtype=np.uint32))
-#    #hdp.getClassLabels(z_di[d],d)
-#    #print(z_di[d])
+  print("---------------------- Corpus Topics -------------------------");
+  topic=[]
+  for k in range(0,K):
+    topic.append(np.zeros(Nw,dtype=np.double))
+    hdp.getCorpTopic(topic[k],k)
+    print('topic_{}=\t{}\t{}'.format(k,topic[k]))
+    print('gtTopic_{}=\t{}\t{}'.format(k,gtTopic[k,:]))
 #  a=np.zeros(K,dtype=np.double)
 #  b=np.zeros(K,dtype=np.double)
 #  hdp.getA(a)
 #  hdp.getB(b)
-#
-#  plt.figure(1)
-#  for k in range(0,40):
-#    plt.subplot(7,6,k+1)
-#    plt.plot(lamb[k])
-#    plt.xlabel('topic '+str(k))
-#
-#  plt.subplot(7,6,41)
-#  plt.plot(a)
-#  plt.xlabel('A')
-#  plt.subplot(7,6,42)
-#  plt.plot(b)
-#  plt.xlabel('B')
-#  plt.show(1)
-#
-  
-#  plt.figure(1)
-#  for d in range(0,J):
-#    plt.subplot(1,J,d)
-#    for k in range(0,K):
-#      plt.plot(x[d][z_di[d]==k,0],x[d][z_di[d]==k,1],'xk',color=cm.spectral(float(k)/(K-1)),hold=True)
-#      print(cm.spectral(float(k)/K))
-#      plt.xlim([-12,12])
-#      plt.ylim([-12,12])
-#  plt.show(1)
-#
+#  print('alpha_1={}'.format(a))
+#  print('alpha_2={}'.format(b))
+
+  docProp=[]
+  docTopicInd=[]
+  for d in range(0,D):
+    docProp.append(np.zeros(T,dtype=np.double))
+    docTopicInd.append(np.zeros(T,dtype=np.uint32))
+    hdp.getDocTopics(docProp[d],docTopicInd[d],d)
+    print('docTopicProp({}): {}'.format(d,docProp[d]))
+    print('docTopicInd({}): {}'.format(d,docTopicInd[d]))
+
+  vT = np.zeros((K,D))
+  for d in range(0,D):
+    for t in range(0,T):
+      k=docTopicInd[d][t]
+      vT[k,d]=docProp[d][t]
+
+
+
+
+

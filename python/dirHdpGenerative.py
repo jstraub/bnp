@@ -1,24 +1,154 @@
 
 import numpy as np
 import libbnp as bnp
+import scipy.special as scisp
+import pdb
 
-def generateDirHDPSample(D,N,K,T):
+def stickBreaking(v):
+  N = v.size
+  prop = np.zeros(N)
+  for i in range(0,N):
+    prop[i]=v[i]
+    for j in range(0,i):
+      prop[i] *= (1.0-v[j])
 
-  x=[]
-  # draw K topics from Dirichlet
+  return prop
+
+def logCat(x, pi):
+  #TODO: do I not need the CDF here as well?
+  logP = 0.0
+  if x < pi.size:
+    logP += np.log(pi[x])
+    for i in xrange(0,pi.size):
+      if i != x:
+        logP += np.log(1.0-pi[i])
+  return logP
+
+def logBeta(x, alpha, beta):
+#  if type(x) is np.ndarray:
+#    N=x.size
+#    print('\t\talpha={}; beta={}'.format(alpha, beta))
+#    print('\t\tbetaln={}'.format(-N*scisp.betaln(alpha,beta)))
+#    print('\t\talphaterm={}'.format((alpha-1.0)*np.sum(np.log(x))))
+#    print('\t\tbetaterm={}'.format((beta-1.0)*np.sum(np.log(1.0-x))))
+#    print('\t\tbetaterm={}'.format(np.sum(np.log(1.0-x))))
+#    print('\t\tbetaterm={}'.format(np.log(1.0-x)))
+#    print('\t\tbetaterm={}'.format(1.0-x))
+#    print('\t\tbetaterm={}'.format(x))
+#  print('\t\tterm={}'.format(np.log(scisp.betainc(alpha,beta,x))))
+
+  #DONE: uses the CDF!!
+  return np.sum(np.log(scisp.betainc(alpha,beta,x)))
+
+#    return -N*scisp.betaln(alpha,beta) \
+#          +(alpha-1.0)*np.sum(np.log(x)) \
+#          +(beta-1.0)*np.sum(np.log(1.0-x))
+#  else:
+#    return -scisp.betaln(alpha,beta) \
+#          +(alpha-1.0)*np.log(x) \
+#          +(beta-1.0)*np.log(1.0-x)
+
+def logDir(x, alpha):
+  # TODO: need the cdf of the dirichlet distribution!
+  logP = 0.0
+  if alpha.size == x.size:
+    logP = scisp.gammaln(np.sum(alpha))
+    for i in xrange(0, alpha.size):
+      logP += -scisp.gammaln(alpha[i]) + (alpha[i]-1.0)*np.log(x[i])
+  return logP
+
+
+class HDP_sample:
+
+  # hyper parameters
+  omega = 0
+  alpha = 0 
+  Lambda = np.zeros(1)
+  # parameters
+  c = []
+  z = []
+  beta = np.zeros(1)
+  v = np.zeros(1)
+  sigV = np.zeros(1)
+  pi = []
+  sigPi = []
+  # data
+  x = []
   
-  # draw breaking proportions using Beta
+  def __init__(self, omega,alpha,Lambda):
+    self.omega = omega
+    self.alpha = alpha
+    self.Lambda = Lambda
 
-  for d in range(0,D): # for each document
-    # draw T doc level pointers to topics (multinomial)
+  def logP_word(self, d, n):
+
+    #print('d={}, n={}'.format(d,n))
+    #print('x={}; x.len={}; x[d].size={}; c.len={}; z.len={}; v.size={}; sigV.size={}; pi.len={}; sigPi.len={}'.format(self.x[d][n],len(self.x),self.x[d].size,len(self.c),len(self.z),self.v.size,self.sigV.size,len(self.pi),len(self.sigPi)))
+    #print('z={}; c={}; beta.size {}\n'.format(self.z[d][n], self.c[d][ self.z[d][n]],self.beta.shape))
+
+    print('\tx|beta =    {}'.format(logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]])))
+    print('\tc|sigV =    {}'.format(logCat(self.c[d][ self.z[d][n]], self.sigV)))
+    print('\tv|omega =   {}'.format(logBeta(self.v, 1.0, self.omega)))
+    print('\tz|sigPi =   {}'.format(logCat(self.z[d][n], self.sigPi[d])))
+    print('\tpi|alpha =  {}'.format(logBeta(self.pi[d], 1.0, self.alpha)))
+    print('\tbeta|lambda={}'.format(logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)))
+
+
+    return logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
+    + logCat(self.c[d][ self.z[d][n]], self.sigV) \
+    + logBeta(self.v, 1.0, self.omega) \
+    + logCat(self.z[d][n], self.sigPi[d]) \
+    + logBeta(self.pi[d], 1.0, self.alpha) \
+    + logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)
+
+  def logP_self(self):
+    logP = 0.0
+    D = len(self.x)
+    for d in range(0,D):
+      N = self.x[d].size
+      for n in range(0,N):
+        logP_w = self.logP_word(d,n)
+        print('logP({},{})={}'.format(d,n,logP_w))
+        logP += logP_w
+    return logP
+
+  def generateDirHDPSample(self,D,N,K,T,Nw):
     
-    # draw T doc level breaking proportions using Beta
-
-    for i in range(0,N): # for each word
+    # doc level
+    self.x=[]
+    # draw K topics from Dirichlet
+    self.beta = np.random.dirichlet(self.Lambda,K)
+    # draw breaking proportions using Beta
+    self.v = np.random.beta(1,self.omega,K)
+    self.sigV = stickBreaking(self.v)
+  
+    self.c=[]  # pointers to corp level topics
+    self.pi=[] # breaking proportions for selected doc level topics
+    self.sigPi=[]
+    self.z=[]
+  
+    for d in range(0,D): # for each document
+      # draw T doc level pointers to topics (multinomial)
+      self.c.append(np.zeros(T))
+      _, self.c[d] = np.nonzero(np.random.multinomial(1,self.sigV,T))
+      # draw T doc level breaking proportions using Beta
+      self.pi.append(np.zeros(T))
+      self.sigPi.append(np.zeros(T))
+      self.pi[d] = np.random.beta(1,self.alpha,T)
+      self.sigPi[d] = stickBreaking(self.pi[d])
+  
+      self.x.append(np.zeros(N))
       # draw topic assignment of word (multinomial)
-
-      # draw words
-
-
-  return x
-
+      self.z.append(np.zeros(N))
+      _, self.z[d] = np.nonzero(np.random.multinomial(1,self.sigPi[d],N))
+      for i in range(0,N): # for each word
+        # draw words
+        _, self.x[d][i] = np.nonzero(np.random.multinomial(1,self.beta[ self.c[d][ self.z[d][i]], :],1))
+  
+      self.x[d] = self.x[d].astype(np.uint32)
+  
+    for d in range(0,D):
+      print('d={}: {}'.format(d,self.x[d]))
+  
+    return self.x, self.sigV, self.beta, self.pi, self.c
+  

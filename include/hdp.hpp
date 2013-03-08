@@ -12,8 +12,9 @@
 #include <stdint.h>
 #include <typeinfo>
 
-
+#include <boost/math/special_functions/gamma.hpp>
 #include <boost/math/special_functions/digamma.hpp>
+#include <boost/math/special_functions/beta.hpp>
 #include <armadillo>
 
 using namespace std;
@@ -391,12 +392,10 @@ public:
 
   HDP_onl(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
   : HDP<uint32_t>(base, alpha, gamma)
-    {
-//    cout<<"Creating "<<typeid(this).name()<<endl;
-    };
+  {};
   
   ~HDP_onl()
-  { };
+  {};
 
   double digamma(double x)
   {
@@ -831,6 +830,53 @@ public:
     }
   };
 
+  // cateorical distribution (Multionomial for one word)
+  static double Cat(Row<double> pi, uint32_t x)
+  {
+    assert(x<pi.n_elem);
+    double p = pi[x];
+    for (uint32_t i=0; i< pi.n_elem; ++i)
+      if (i!=x) p*=(1.0 - pi[i]);
+    return p;
+  };
+
+  // log cateorical distribution (Multionomial for one word)
+  static double logCat(Row<double> pi, uint32_t x)
+  {
+    assert(x<pi.n_elem);
+    double p = log(pi[x]);
+    for (uint32_t i=0; i< pi.n_elem; ++i)
+      if (i!=x) p += log(1.0 - pi[i]);
+    return p;
+  };
+
+  static double Beta(double alpha, double beta, double x)
+  {
+    return (1.0/boost::math::beta(alpha,beta)) * pow(x,alpha-1.0) * pow(1.0-x,beta-1.0);
+  };
+
+  static double logBeta(double alpha, double beta, double x)
+  {
+    return boost::math::lgamma(alpha+beta) - boost::math::lgamma(alpha) 
+      - boost::math::lgamma(beta) + log(x)*(alpha-1.0) + log(1.0-x)*(beta-1.0);
+  };
+
+  static double logDir(Row<double> alpha, Row<double> x)
+  { 
+    assert(alpha.n_elem == x.n_elem);
+    double logP=boost::math::lgamma(sum(alpha));
+    for (uint32_t i=0; i<alpha.n_elem; ++i){
+      logP += -boost::math::lgamma(alpha[i]) + (alpha[i]-1.0)*log(x[i]);
+    }
+    return logP;
+  };
+
+  // eval probability of a word under the estimated model
+  double logProb(uint32_t w)
+  {
+    // TODO : For now I dont need it in here -> do it in python
+    return 0.0;
+  };
 
 protected:
   vector<Col<double> > mLambda; // corpus level topics (Dirichlet)
