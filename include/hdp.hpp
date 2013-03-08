@@ -748,21 +748,25 @@ public:
     }
   };
 
-  // stick breaking proportions from a set of beta distributions parameterized by their 
-  // alpha and beta parameters. The mode of the beta distributions is used to compute
-  // the stickbreaking proportions
-  static void stickBreaking(Col<double>& prop, const Col<double>& alpha, const Col<double>& beta)
+
+  static void betaMode(Col<double>& v, const Col<double>& alpha, const Col<double>& beta)
   {
-    // breaking proportions
-    Col<double> v(prop);
+    assert(alpha.n_elem == beta.n_elem);
+     // breaking proportions
+    v.set_size(alpha.n_elem);
     for (uint32_t i=0; i<v.n_elem; ++i){
       if (alpha[i]+beta[i] != 2.0) {
         v[i] = (alpha[i]-1.0)/(alpha[i]+beta[i]-2.0);
       }else{
-        v[1] = 1.0;
+        v[i] = 1.0;
       }
     }
+  };
 
+  // stick breaking proportions 
+  static void stickBreaking(Col<double>& prop, const Col<double>& v)
+  {
+    prop.set_size(v.n_elem);
     // stick breaking proportions
     for (uint32_t i=0; i<prop.n_elem; ++i){
       prop[i] = v[i];
@@ -770,47 +774,60 @@ public:
         prop[i] *= (1.0 - v[j]);
       }
     }
-  }
+  };
 
   static uint32_t multinomialMode(const Row<double>& p )
   {
     uint32_t ind =0;
     p.max(ind);
     return ind;
-  }
+  };
 
-  bool getDocTopics(Col<double>& prop, Col<uint32_t>& topicInd, uint32_t d)
+  bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& topicInd, uint32_t d)
   {
     uint32_t K = mLambda.size(); // corp level topics
     uint32_t T = mGammaA[0].n_elem; // doc level topics
 
-    prop.set_size(T);
+    sigPi.set_size(T);
+    pi.set_size(T);
     topicInd.set_size(T);
 
-    if (T != prop.n_elem || T != topicInd.n_elem){
-      cerr<<"getDocTopics:: proportions was not properly preallocated "<<T<<"!="<<prop.n_elem<<" and "<<topicInd.n_elem<<endl;
+    if (T != sigPi.n_elem || T != topicInd.n_elem){
+      cerr<<"getDocTopics:: proportions was not properly preallocated "<<T<<"!="<<sigPi.n_elem<<" and "<<topicInd.n_elem<<endl;
       return false;
     }
 
-    stickBreaking(prop,mGammaA[d],mGammaB[d]);
+    betaMode(pi,mGammaA[d],mGammaB[d]);
+    stickBreaking(sigPi,pi);
     for (uint32_t k=0; k<K; ++k){
       topicInd[k] = multinomialMode(mZeta[d].row(k));
     }
     return true;
   }
 
-  bool getCorpTopicProportions(Col<double>& prop)
+  bool getWordTopics(Col<uint32_t>& topicInd, uint32_t d){
+    topicInd.set_size(mX[d].n_elem);
+
+    for (uint32_t i=0; i<topicInd.n_elem; ++i){
+      topicInd[i] = multinomialMode(mPhi[d].row(i));
+    }
+    return true;
+  };
+
+  bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV)
   {
     uint32_t K = mLambda.size(); // corp level topics
 
-    prop.set_size(K);
+    sigV.set_size(K);
+    v.set_size(K);
 
-    if (K != prop.n_elem){
-      cerr<<"getCorpTopicProportions:: proportions was not properly preallocated "<<K<<" != "<<prop.n_elem<<endl;
+    if (K != sigV.n_elem){
+      cerr<<"getCorpTopicProportions:: proportions was not properly preallocated "<<K<<" != "<<sigV.n_elem<<endl;
       return false;
     }
 
-    stickBreaking(prop,mA,mB);
+    betaMode(v, mA,mB);
+    stickBreaking(sigV,v);
     return true;
   }
 
@@ -820,10 +837,6 @@ public:
     {
       double norm = 1.0/(sum(mLambda[k]) - mLambda[k].n_elem);
       topic = (mLambda[k]-1)*norm;
-//      for (uint32_t i=0; i<mLambda[k].n_elem; ++i){
-//        topic[i] = (mLambda[k][i] -1)*norm
-//      }
-
       return true;
     }else{
       return false;

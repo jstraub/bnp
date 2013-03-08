@@ -15,7 +15,6 @@ def stickBreaking(v):
   return prop
 
 def logCat(x, pi):
-  #TODO: do I not need the CDF here as well?
   logP = 0.0
   if x < pi.size:
     logP += np.log(pi[x])
@@ -25,31 +24,45 @@ def logCat(x, pi):
   return logP
 
 def logBeta(x, alpha, beta):
-#  if type(x) is np.ndarray:
-#    N=x.size
+  if type(x) is np.ndarray:
+    N=x.size
+
+    # at these x the value is only 1/log(B(alpha,beta))
+    # because 0^0 = 1
+    issue=(x<1.0e-15)|(1.0-x<1.0e-15) 
+
 #    print('\t\talpha={}; beta={}'.format(alpha, beta))
 #    print('\t\tbetaln={}'.format(-N*scisp.betaln(alpha,beta)))
 #    print('\t\talphaterm={}'.format((alpha-1.0)*np.sum(np.log(x))))
 #    print('\t\tbetaterm={}'.format((beta-1.0)*np.sum(np.log(1.0-x))))
-#    print('\t\tbetaterm={}'.format(np.sum(np.log(1.0-x))))
-#    print('\t\tbetaterm={}'.format(np.log(1.0-x)))
+#    print('\t\tbetaterm={}'.format(np.sum(np.log(1.0-x[~issue]))))
+#    print('\t\tbetaterm={}'.format(np.log(1.0-x[~issue])))
 #    print('\t\tbetaterm={}'.format(1.0-x))
 #    print('\t\tbetaterm={}'.format(x))
-#  print('\t\tterm={}'.format(np.log(scisp.betainc(alpha,beta,x))))
 
-  #DONE: uses the CDF!!
-  return np.sum(np.log(scisp.betainc(alpha,beta,x)))
+  # CDF: - do not use!
+  #print('\t\tterm={}'.format(np.log(scisp.betainc(alpha,beta,x))))
+  #return np.sum(np.log(scisp.betainc(alpha,beta,x)))
 
-#    return -N*scisp.betaln(alpha,beta) \
-#          +(alpha-1.0)*np.sum(np.log(x)) \
-#          +(beta-1.0)*np.sum(np.log(1.0-x))
-#  else:
-#    return -scisp.betaln(alpha,beta) \
-#          +(alpha-1.0)*np.log(x) \
-#          +(beta-1.0)*np.log(1.0-x)
+    if alpha == 1.0:
+      return -N*scisp.betaln(alpha,beta) \
+          +(beta-1.0)*np.sum(np.log(1.0-x[~issue]))
+    elif beta == 1.0:
+      return -N*scisp.betaln(alpha,beta) \
+          +(alpha-1.0)*np.sum(np.log(x[~issue]))
+    else:
+      return -N*scisp.betaln(alpha,beta) \
+          +(alpha-1.0)*np.sum(np.log(x[~issue])) \
+          +(beta-1.0)*np.sum(np.log(1.0-x[~issue]))
+  else:
+    if (x<1.0e-15)|(1.0-x<1.0e-15):
+      return -scisp.betaln(alpha,beta)
+    else:
+      return -scisp.betaln(alpha,beta) \
+          +(alpha-1.0)*np.log(x) \
+          +(beta-1.0)*np.log(1.0-x)
 
 def logDir(x, alpha):
-  # TODO: need the cdf of the dirichlet distribution!
   logP = 0.0
   if alpha.size == x.size:
     logP = scisp.gammaln(np.sum(alpha))
@@ -80,20 +93,16 @@ class HDP_sample:
     self.alpha = alpha
     self.Lambda = Lambda
 
-  def logP_word(self, d, n):
-
+  def logP_wordJoint(self, d, n):
     #print('d={}, n={}'.format(d,n))
     #print('x={}; x.len={}; x[d].size={}; c.len={}; z.len={}; v.size={}; sigV.size={}; pi.len={}; sigPi.len={}'.format(self.x[d][n],len(self.x),self.x[d].size,len(self.c),len(self.z),self.v.size,self.sigV.size,len(self.pi),len(self.sigPi)))
     #print('z={}; c={}; beta.size {}\n'.format(self.z[d][n], self.c[d][ self.z[d][n]],self.beta.shape))
-
     print('\tx|beta =    {}'.format(logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]])))
     print('\tc|sigV =    {}'.format(logCat(self.c[d][ self.z[d][n]], self.sigV)))
     print('\tv|omega =   {}'.format(logBeta(self.v, 1.0, self.omega)))
     print('\tz|sigPi =   {}'.format(logCat(self.z[d][n], self.sigPi[d])))
     print('\tpi|alpha =  {}'.format(logBeta(self.pi[d], 1.0, self.alpha)))
     print('\tbeta|lambda={}'.format(logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)))
-
-
     return logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
     + logCat(self.c[d][ self.z[d][n]], self.sigV) \
     + logBeta(self.v, 1.0, self.omega) \
@@ -101,7 +110,7 @@ class HDP_sample:
     + logBeta(self.pi[d], 1.0, self.alpha) \
     + logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)
 
-  def logP_self(self):
+  def logP_fullJoint(self):
     logP = 0.0
     D = len(self.x)
     for d in range(0,D):
@@ -111,6 +120,19 @@ class HDP_sample:
         print('logP({},{})={}'.format(d,n,logP_w))
         logP += logP_w
     return logP
+
+  def loadHDPSample(self,x,beta,c,z,v,sigV,pi,sigPi,omega,alpha,Lambda):
+    self.x = x
+    self.beta = beta
+    self.c = c
+    self.z = z
+    self.v = v
+    self.sigV = sigV
+    self.pi = pi
+    self.sigPi = sigPi
+    self.omega = omega
+    self.alpha = alpha
+    self.Lambda = Lambda
 
   def generateDirHDPSample(self,D,N,K,T,Nw):
     
