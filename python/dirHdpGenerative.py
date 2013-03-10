@@ -144,7 +144,7 @@ class HDP_sample:
       self.Lambda = Lambda
     else:
       D=len(self.x)
-      #print("---------------------- Corpus Topic Proportions -------------------------");
+      print("---------------------- Loading from hdp -------------------------");
       self.sigV = np.zeros(self.K+1,dtype=np.double)
       self.v = np.zeros(self.K,dtype=np.double)
       hdp.getCorpTopicProportions(self.v,self.sigV)
@@ -175,6 +175,7 @@ class HDP_sample:
         hdp.getWordTopics(self.z[d],d)
 
   def checkSticks(self):
+    print('--------------------- Checking Stick pieces -----------------')
     print('sigV = {}; {}'.format(self.sigV,np.sum(self.sigV)))
     D=len(self.x)
     for d in range(0,D):
@@ -198,7 +199,10 @@ class HDP_sample:
     for d in range(0,D):
       for t in range(0,self.T):
         k=self.c[d][t]
-        vT[k,d]=self.sigPi[d][t]
+        vT[k,d] += self.sigPi[d][t]
+    print('vT={}'.format(vT))
+    print('vT_norm={}'.format(np.sum(vT,0)))
+    print('sigPi_d={}'.format(self.sigPi[d]))
     return vT
 
   def generateDirHDPSample(self,D,N):

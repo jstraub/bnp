@@ -283,14 +283,14 @@ public:
   {
     Col<double> a_wrap=np2col<double>(a); 
      for (uint32_t i=0; i<a_wrap.n_rows; ++i)
-        a_wrap.at(i)=HDP_onl::mA.at(i);
+        a_wrap.at(i)=HDP_onl::mA.at(0,i);
   };
 
   void getB(numeric::array& b)
   {
     Col<double> b_wrap=np2col<double>(b); 
      for (uint32_t i=0; i<b_wrap.n_rows; ++i)
-        b_wrap.at(i)=HDP_onl::mB.at(i);
+        b_wrap.at(i)=HDP_onl::mA.at(1,i);
   };
 
   bool getDocTopics(numeric::array& pi, numeric::array& prop, numeric::array& topicInd, uint32_t d)
@@ -380,14 +380,14 @@ BOOST_PYTHON_MODULE(libbnp)
 	class_<HDP_Dir>("HDP_Dir",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_Dir::densityEst)
         .def("getClassLabels",&HDP_Dir::getClassLabels)
-        .def("addDoc",&HDP_Dir::addDoc)
-        .def_readonly("mGamma", &HDP_Dir::mGamma);
+        .def("addDoc",&HDP_Dir::addDoc);
+  //      .def_readonly("mGamma", &HDP_Dir::mGamma);
 
 	class_<HDP_INW>("HDP_INW",init<InvNormWishart_py&,double,double>())
         .def("densityEst",&HDP_INW::densityEst)
         .def("getClassLabels",&HDP_INW::getClassLabels)
-        .def("addDoc",&HDP_INW::addDoc)
-        .def_readonly("mGamma", &HDP_INW::mGamma);
+        .def("addDoc",&HDP_INW::addDoc);
+  //      .def_readonly("mGamma", &HDP_INW::mGamma);
 
 	class_<HDP_onl_py>("HDP_onl",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_onl_py::densityEst)
@@ -399,8 +399,8 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("getDocTopics",&HDP_onl_py::getDocTopics)
         .def("getWordTopics",&HDP_onl_py::getWordTopics)
         .def("getCorpTopicProportions",&HDP_onl_py::getCorpTopicProportions)
-        .def("getCorpTopic",&HDP_onl_py::getCorpTopic)
-        .def_readonly("mGamma", &HDP_onl_py::mGamma);
+        .def("getCorpTopic",&HDP_onl_py::getCorpTopic);
+   //     .def_readonly("mGamma", &HDP_onl_py::mGamma);
 
 }
 

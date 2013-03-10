@@ -29,7 +29,13 @@ public:
   };
   void draw(Col<double>& c)
   {
-    for (uint32_t i=0; i<c.n_rows; ++i)
+    for (uint32_t i=0; i<c.n_elem; ++i)
+      c(i)=draw();
+  };
+
+  void draw(Row<double>& c)
+  {
+    for (uint32_t i=0; i<c.n_elem; ++i)
       c(i)=draw();
   };
 

@@ -24,8 +24,8 @@ template <class U>
 class HDP : public DP<U>
 {
 public:
-  HDP(const BaseMeasure<U>& base, double alpha, double gamma)
-  : DP<U>(base, alpha), mGamma(gamma)
+  HDP(const BaseMeasure<U>& base, double alpha, double omega)
+  : DP<U>(base, alpha), mOmega(omega)
     {
 //    cout<<"Creating "<<typeid(this).name()<<endl;
     };
@@ -105,7 +105,7 @@ public:
             double f_k =  this->mH.predictiveProb(x[j].row(i).t(),x_k_ji);
             //logGaus(x[j].row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());  // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
             f(T[j]+k) = f_k;
-            l(T[j]+k) = log(this->mAlpha*m_k/((n_j+this->mAlpha)*(m_+mGamma))) + f_k; // TODO: shouldnt this be mAlpha of the posterior hdp?
+            l(T[j]+k) = log(this->mAlpha*m_k/((n_j+this->mAlpha)*(m_+mOmega))) + f_k; // TODO: shouldnt this be mAlpha of the posterior hdp?
           }
           // handle the case where x_ji sits at a new table with a new dish
           //        cout<<"ji=:"<<j<<" " <<i<<endl;
@@ -116,7 +116,7 @@ public:
           double f_knew = this->mH.predictiveProb(x[j].row(i).t());
           //logGaus(x[j].row(i).t(), mVtheta, mmCov());
           f[T[j]+K] = f_knew;
-          l[T[j]+K] = log(this->mAlpha*mGamma/((n_j+this->mAlpha)*(m_+mGamma))) + f_knew;
+          l[T[j]+K] = log(this->mAlpha*mOmega/((n_j+this->mAlpha)*(m_+mOmega))) + f_knew;
 
           //        cout<<"l.n_elem= "<<l.n_elem<<" l="<<l.t()<<endl;
           uint32_t z_i = sampleDiscLogProb(rndDisc,l);
@@ -208,14 +208,14 @@ public:
               //logGaus(x_jt.row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());
             }
             f(k)=f_k;
-            l(k)=log(m_k/(m_+mGamma)) + f_k;
+            l(k)=log(m_k/(m_+mOmega)) + f_k;
           }
           double f_knew=0.0;
           for (uint32_t i=0; i<x_jt.n_rows; ++i) // product over independent x_ji_t
             f_knew += this->mH.predictiveProb(x_jt.row(i).t());
           //logGaus(x_jt.row(i).t(), mVtheta, mmCov());
           f(K)=f_knew;
-          l(K)=log(mGamma/(m_+mGamma)) + f_knew; // update dish at table t in restaurant j
+          l(K)=log(mOmega/(m_+mOmega)) + f_knew; // update dish at table t in restaurant j
           uint32_t z_jt = sampleDiscLogProb(rndDisc, l);
 #ifndef NDEBUG
           cout<<endl<<"l="<<l.t()<<" |l|="<<l.n_elem<<endl;
@@ -326,7 +326,7 @@ public:
     }
   };
 
-  double mGamma;
+  double mOmega;
 
 protected:
 
@@ -390,8 +390,8 @@ class HDP_onl : public HDP<uint32_t>
 {
 public:
 
-  HDP_onl(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
-  : HDP<uint32_t>(base, alpha, gamma)
+  HDP_onl(const BaseMeasure<uint32_t>& base, double alpha, double omega)
+  : HDP<uint32_t>(base, alpha, omega)
   {};
   
   ~HDP_onl()
@@ -409,19 +409,19 @@ public:
     return boost::math::digamma(x);
   }
 
-  double ElogBeta(const vector<Col<double> >& lambda, uint32_t k, uint32_t w_dn)
+  double ElogBeta(const Mat<double>& lambda, uint32_t k, uint32_t w_dn)
   {
     //if(lambda[k](w_dn)<1e-6){
     //  cout<<"\tlambda[k]("<<w_dn<<") near zero: "<<lambda[k](w_dn)<<endl;
     //}
-    return digamma(lambda[k](w_dn)) - digamma(sum(lambda[k]));
+    return digamma(lambda(k,w_dn)) - digamma(sum(lambda.row(k)));
   }
 
-  double ElogSigma(const Col<double>& a, const Col<double>& b, uint32_t k)
+  double ElogSigma(const Mat<double>& a, uint32_t k)
   {
-    double e=digamma(a(k)) - digamma(a(k) + b(k));
+    double e=digamma(a(k,0)) - digamma(a(k,0) + a(k,1));
     for (uint32_t l=0; l<k; ++l)
-      e+=digamma(b(k)) - digamma(a(k) + b(k));
+      e+=digamma(a(k,1)) - digamma(a(k,0) + a(k,1));
     return e; 
   }
 
@@ -430,9 +430,12 @@ public:
   bool normalizeLogDistribution(arma::subview_row<double> r)
   {
     //r.row(i)=exp(r.row(i));
+    //cout<<" r="<<r<<endl;
     double minR = as_scalar(min(r));
+    //cout<<" minR="<<minR<<endl;
     if(minR > -100.0) {
-      double denom = as_scalar(sum(exp(r)));
+      //cout<<" logDenom="<<sum(exp(r),1)<<endl;
+      double denom = as_scalar(sum(exp(r),1));
       //cout<<" logDenom="<<denom<<endl;
       r -= log(denom); // avoid division by 0
       //cout<<" r - logDenom="<<r<<endl;
@@ -442,6 +445,7 @@ public:
       return true;
     }else{ // cannot compute this -> set the smallest r to 1.0 and the rest to 0
       double maxR = as_scalar(max(r));
+      //cout<<"maxR="<<maxR<<" <-" <<arma::max(r) <<endl;
       uint32_t kMax=as_scalar(find(r==maxR,1));
       //cout<<"maxR="<<maxR<<" kMax="<<kMax<<" <-" <<arma::max(r) <<endl;
       r.zeros();
@@ -458,66 +462,19 @@ public:
 //      e+=digamma(b[k]) - digamma(a[k] + b[k]);
 //    return e; 
 //  };
-
-  // method for "one shot" computation without storing data in this class
-  //  Nw: number of different words
-  //  kappa: forgetting rate
-  //  uint32_t T=10; // truncation on document level
-  //  uint32_t K=100; // truncation on corpus level
-  vector<Col<uint32_t> > densityEst(const vector<Mat<uint32_t> >& x, uint32_t Nw, double kappa=0.75, uint32_t K=100, uint32_t T=10)
+//
+  void initZeta(Mat<double>& zeta, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
   {
-
-    // From: Online Variational Inference for the HDP
-    // TODO: think whether it makes sense to use columns and Mat here
-    //double mAlpha = 1;
-    //double mGamma = 1;
-    //double nu = ((Dir*)(&mH))->mAlpha0; // get nu from vbase measure (Dir)
-    //double kappa = 0.75;
-
-    // T-1 gamma draws determine a T dim multinomial
-    // T = T-1;
-
-    Col<double> a(K); a.ones();
-    Col<double> b(K); b.ones(); b*=mGamma;
-    uint32_t D=x.size();
-
-    // initialize lambda
-    GammaRnd gammaRnd(1.0,1.0);
-    vector<Col<double> > lambda(K,Col<double>(Nw));
-    for (uint32_t k=0; k<K; ++k){
-        gammaRnd.draw(lambda[k]);
-        lambda[k]*=double(D)*100.0/double(K*Nw);
-        lambda[k]+=((Dir*)(&mH))->mAlphas.t();
-    }
-
-    mZeta.resize(D,Mat<double>());
-    mPhi.resize(D,Mat<double>());
-    mGammaA.resize(D,Col<double>());
-    mGammaB.resize(D,Col<double>());
-
-    vector<Col<uint32_t> > z_dn(D);
-    Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
-    for (uint32_t dd=0; dd<D; ++dd)
-    {
-      uint32_t d=ind[dd];  
-      uint32_t N=x[d].n_rows;
-      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
-      cout<<"----------------- dd="<<dd<<" -----------------"<<endl;
-      cout<<"a=\t"<<a.t();
-      cout<<"b=\t"<<b.t();
-      for (uint32_t k=0; k<K; ++k)
-      {
-        cout<<"@"<<k<<" lambda=\t"<<lambda[k].t();
-      }
-
-      cout<<"\tinit zeta"<<endl;
-      Mat<double> zeta(T,K);
+    uint32_t N = x_d.n_rows;
+    uint32_t T = zeta.n_rows;
+    uint32_t K = zeta.n_cols;
+      cerr<<"\tinit zeta"<<endl;
       for (uint32_t i=0; i<T; ++i) {
         for (uint32_t k=0; k<K; ++k) {
           zeta(i,k)=0.0;
           for (uint32_t n=0; n<N; ++n) {
             if(i==0 && k==0) cout<<zeta(i,k)<<" -> ";
-            zeta(i,k) += ElogBeta(lambda, k, x[d](n));
+            zeta(i,k) += ElogBeta(lambda, k, x_d(n));
           }
         }
         normalizeLogDistribution(zeta.row(i));
@@ -532,112 +489,250 @@ public:
       }
       cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
       cerr<<"normalization check:"<<endl<<sum(zeta,1).t()<<endl; // sum over rows
-      cout<<"\tinit phi"<<endl;
-      Mat<double> phi(N,T);
-      for (uint32_t n=0; n<N; ++n){
-        for (uint32_t i=0; i<T; ++i) {
-          phi(n,i)=0.0;
-          for (uint32_t k=0; k<K; ++k) {
-            phi(n,i)+=zeta(i,k)* ElogBeta(lambda, k, x[d](n));
-          }
-        }
+  };
 
-        normalizeLogDistribution(phi.row(n));
-//        if(normalizeLogDistribution(phi.row(n)))
-//        {
-//          cerr<<"phi normally computed"<<endl;
-//        }else{
-//          cerr<<"phi thresholded"<<endl;
-//        }
-//
-//        phi.row(n)=exp(phi.row(n));
-//        double denom = sum(phi.row(n));
-//        if(denom > EPS)
-//        {
-//          phi.row(n)/=denom; // avoid division by 0
-//        }else{
-//          cout<<"Phi Init: denominator too small -> no division!
-//        }
+  void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+  {
+    uint32_t N = x_d.n_rows;
+    uint32_t T = zeta.n_rows;
+    uint32_t K = zeta.n_cols;
+    cout<<"\tinit phi"<<endl;
+    for (uint32_t n=0; n<N; ++n){
+      for (uint32_t i=0; i<T; ++i) {
+        phi(n,i)=0.0;
+        for (uint32_t k=0; k<K; ++k) {
+          phi(n,i)+=zeta(i,k)* ElogBeta(lambda, k, x_d(n));
+        }
       }
-        cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
+      normalizeLogDistribution(phi.row(n));
+      //        if(normalizeLogDistribution(phi.row(n)))
+      //        {
+      //          cerr<<"phi normally computed"<<endl;
+      //        }else{
+      //          cerr<<"phi thresholded"<<endl;
+      //        }
+      //
+      //        phi.row(n)=exp(phi.row(n));
+      //        double denom = sum(phi.row(n));
+      //        if(denom > EPS)
+      //        {
+      //          phi.row(n)/=denom; // avoid division by 0
+      //        }else{
+      //          cout<<"Phi Init: denominator too small -> no division!
+      //        }
+    }
+    cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
+  };
+
+  void updateGamma(Mat<double>& gamma, const Mat<double>& phi)
+  {
+    uint32_t N = phi.n_rows;
+    uint32_t T = phi.n_cols;
+
+    gamma.ones();
+    gamma.col(1) *= mAlpha;
+    //gamma_1.ones();
+    //gamma_2.ones(); gamma_2 *= mAlpha;
+    for (uint32_t i=0; i<T; ++i) 
+    {
+      for (uint32_t n=0; n<N; ++n){
+        //gamma_1(i)+=phi(n,i);
+        gamma(i,0) += phi(n,i);
+        for (uint32_t j=i+1; j<T; ++j) {
+          gamma(i,1) += phi(n,j);
+          //gamma_2(i) += phi(n,j);
+        }
+      }
+      //cout<<gamma_1(i)<<" "<<gamma_2(i)<<endl;
+    }
+    cout<<gamma.t()<<endl;
+  };
+
+  void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& a, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+  {
+    uint32_t N = x_d.n_rows;
+    uint32_t T = zeta.n_rows;
+    uint32_t K = zeta.n_cols;
+
+    for (uint32_t i=0; i<T; ++i){
+      //zeta(i,k)=0.0;
+      for (uint32_t k=0; k<K; ++k) {
+        zeta(i,k) = ElogSigma(a,k);
+        //cout<<zeta(i,k)<<endl;
+        for (uint32_t n=0; n<N; ++n){
+          zeta(i,k) += phi(n,i)*ElogBeta(lambda,k,x_d(n));
+        }
+      }
+      normalizeLogDistribution(zeta.row(i));
+      //          if(normalizeLogDistribution(zeta.row(i)))
+      //          {
+      //            cerr<<"zeta normally computed"<<endl;
+      //          }else{
+      //            cerr<<"zeta thresholded"<<endl;
+      //          }
+
+      //          zeta.row(i)=exp(zeta.row(i));
+      //          double denom = sum(zeta.row(i));
+      //          if(denom > EPS) zeta.row(i)/=denom; // avoid division by 0
+    }
+  }
+
+
+  void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+  {
+    uint32_t N = x_d.n_rows;
+    uint32_t T = zeta.n_rows;
+    uint32_t K = zeta.n_cols;
+
+    for (uint32_t n=0; n<N; ++n){
+      //phi(n,i)=0.0;
+      for (uint32_t i=0; i<T; ++i) {
+        phi(n,i) = ElogSigma(gamma,i);
+        for (uint32_t k=0; k<K; ++k) {
+          phi(n,i) += zeta(i,k)*ElogBeta(lambda,k,x_d(n)) ;
+        }
+      }
+      normalizeLogDistribution(phi.row(n));
+      //          if(normalizeLogDistribution(phi.row(n)))
+      //          {
+      //            cerr<<"phi normally computed"<<endl;
+      //          }else{
+      //            cerr<<"phi thresholded"<<endl;
+      //          }
+      //          phi.row(n)=exp(phi.row(n));
+      //          double denom = sum(phi.row(n));
+      //          if(denom > EPS) phi.row(n)/=denom; // avoid division by 0
+    }
+  }
+
+  void computeNaturalGradients(Mat<double>& d_lambda, Mat<double>& d_a, const Mat<double>& zeta, const Mat<double>&  phi, double omega, uint32_t D, const Mat<uint32_t>& x_d)
+  {
+    uint32_t N = x_d.n_rows;
+    uint32_t Nw = d_lambda.n_cols;
+    uint32_t T = zeta.n_rows;
+    uint32_t K = zeta.n_cols;
+
+    d_lambda.zeros();
+      //for (uint32_t k=0; k<K; ++k){
+      //  d_lambda[k].zeros();
+      //}
+      d_a.zeros();
+    //Col<double> d_a(K); d_a.zeros();
+    //Col<double> b_k(K); b_k.zeros();
+    for (uint32_t k=0; k<K; ++k) { // for all K corpus level topics
+      for (uint32_t i=0; i<T; ++i) {
+        Row<double> _lambda(Nw); _lambda.zeros();
+        for (uint32_t n=0; n<N; ++n){
+          _lambda(x_d(n)) += phi(n,i);
+        }
+        d_lambda.row(k) += zeta(i,k) * _lambda;
+        d_a(k,0) += zeta(i,k);
+        for (uint32_t l=k+1; l<K; ++l) {
+          d_a(k,1) += zeta(i,l);
+        }
+      }
+      d_lambda.row(k) = D*d_lambda.row(k);
+      //cout<<"lambda-nu="<<d_lambda[k].t()<<endl;
+      d_lambda.row(k) += ((Dir*)(&mH))->mAlphas;
+      //cout<<"lambda="<<d_lambda[k].t()<<endl;
+      d_a(k,0) = D*d_a(k,0)+1.0;
+      d_a(k,1) = D*d_a(k,1)+omega;
+    }
+  }
+
+
+  // method for "one shot" computation without storing data in this class
+  //  Nw: number of different words
+  //  kappa: forgetting rate
+  //  uint32_t T=10; // truncation on document level
+  //  uint32_t K=100; // truncation on corpus level
+  vector<Col<uint32_t> > densityEst(const vector<Mat<uint32_t> >& x, uint32_t Nw, 
+      double kappa=0.75, uint32_t K=100, uint32_t T=10)
+  {
+
+    // From: Online Variational Inference for the HDP
+    // TODO: think whether it makes sense to use columns and Mat here
+    //double mAlpha = 1;
+    //double mGamma = 1;
+    //double nu = ((Dir*)(&mH))->mAlpha0; // get nu from vbase measure (Dir)
+    //double kappa = 0.75;
+
+    // T-1 gamma draws determine a T dim multinomial
+    // T = T-1;
+
+    Mat<double> a(K,2);
+    a.ones();
+    a.col(1) *= mOmega; 
+    //Col<double> a(K); a.ones();
+    //Col<double> b(K); b.ones(); b*=mOmega;
+    uint32_t D=x.size();
+
+    // initialize lambda
+    GammaRnd gammaRnd(1.0,1.0);
+    Mat<double> lambda(K,Nw);
+    for (uint32_t k=0; k<K; ++k){
+      for (uint32_t w=0; w<Nw; ++w) lambda(k,w) = gammaRnd.draw();
+      lambda.row(k) *= double(D)*100.0/double(K*Nw);
+      lambda.row(k) += ((Dir*)(&mH))->mAlphas;
+    }
+
+    mZeta.resize(D,Mat<double>());
+    mPhi.resize(D,Mat<double>());
+    mGamma.resize(D,Mat<double>());
+    //mGammaB.resize(D,Col<double>());
+
+    vector<Col<uint32_t> > z_dn(D);
+    Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
+    for (uint32_t dd=0; dd<D; ++dd)
+    {
+      uint32_t d=ind[dd];  
+      uint32_t N=x[d].n_rows;
+      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
+      cout<<"----------------- dd="<<dd<<" -----------------"<<endl;
+      cout<<"a=\t"<<a.t();
+      //cout<<"b=\t"<<b.t();
+      for (uint32_t k=0; k<K; ++k)
+      {
+        cout<<"@"<<k<<" lambda=\t"<<lambda.row(k);
+      }
+
+      Mat<double> zeta(T,K);
+      initZeta(zeta,lambda,x[d]);
+      Mat<double> phi(N,T);
+      initPhi(phi,zeta,lambda,x[d]);
 
       // ------------------------ doc level updates --------------------
       bool converged = false;
-      Col<double> gamma_1(T); 
-      Col<double> gamma_2(T);
+      Mat<double> gamma(T,2);
+      //Col<double> gamma_1(T); 
+      //Col<double> gamma_2(T);
   
-      Col<double> gamma_1_prev(T);
-      Col<double> gamma_2_prev(T);
-      gamma_1_prev.ones();
-      gamma_2_prev.ones(); gamma_2_prev *= mAlpha;
+      Mat<double> gamma_prev(T,2);
+      //Col<double> gamma_1_prev(T);
+      //Col<double> gamma_2_prev(T);
+      gamma_prev.ones();
+      gamma_prev.col(1) += mAlpha;
+      //gamma_1_prev.ones();
+      //gamma_2_prev.ones(); gamma_2_prev *= mAlpha;
 
       uint32_t o=0;
       while(!converged){
         cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
         // gammas -------------------------
-        gamma_1.ones();
-        gamma_2.ones(); gamma_2 *= mAlpha;
-        for (uint32_t i=0; i<T; ++i) 
-        {
-          for (uint32_t n=0; n<N; ++n){
-            gamma_1(i)+=phi(n,i);
-            for (uint32_t j=i+1; j<T; ++j) {
-              gamma_2(i) += phi(n,j);
-            }
-          }  
-          cout<<gamma_1(i)<<" "<<gamma_2(i)<<endl;
-        }
+        updateGamma(gamma,phi);
         // zeta --------------------------
-        for (uint32_t i=0; i<T; ++i){
-          //zeta(i,k)=0.0;
-          for (uint32_t k=0; k<K; ++k) {
-            zeta(i,k) = ElogSigma(a,b,k);
-            //cout<<zeta(i,k)<<endl;
-            for (uint32_t n=0; n<N; ++n){
-              zeta(i,k) += phi(n,i)*ElogBeta(lambda,k, x[d](n));
-            }
-          }
-          normalizeLogDistribution(zeta.row(i));
-//          if(normalizeLogDistribution(zeta.row(i)))
-//          {
-//            cerr<<"zeta normally computed"<<endl;
-//          }else{
-//            cerr<<"zeta thresholded"<<endl;
-//          }
-
-//          zeta.row(i)=exp(zeta.row(i));
-//          double denom = sum(zeta.row(i));
-//          if(denom > EPS) zeta.row(i)/=denom; // avoid division by 0
-        }
-
+        updateZeta(zeta,phi,a,lambda,x[d]);
         // phi ------------------------
-        for (uint32_t n=0; n<N; ++n){
-          //phi(n,i)=0.0;
-          for (uint32_t i=0; i<T; ++i) {
-            phi(n,i) = ElogSigma(gamma_1,gamma_2,i);
-            for (uint32_t k=0; k<K; ++k) {
-              phi(n,i) += zeta(i,k)*ElogBeta(lambda,k,x[d](n)) ;
-            }
-          }
-          normalizeLogDistribution(phi.row(n));
-//          if(normalizeLogDistribution(phi.row(n)))
-//          {
-//            cerr<<"phi normally computed"<<endl;
-//          }else{
-//            cerr<<"phi thresholded"<<endl;
-//          }
-          //          phi.row(n)=exp(phi.row(n));
-          //          double denom = sum(phi.row(n));
-//          if(denom > EPS) phi.row(n)/=denom; // avoid division by 0
-        }
+        updatePhi(phi,zeta,gamma,lambda,x[d]);
 
-        converged = ((sum(gamma_1_prev != gamma_1)==0) && (sum(gamma_2_prev != gamma_2)==0)) || o>60 ;
+        converged = (accu(gamma_prev != gamma))==0 || o>60 ;
         
         //cout<<gamma_1_prev<<endl<<gamma_1<<endl<<" sum="<<sum(gamma_1_prev != gamma_1)<<endl;
         //cout<<gamma_2_prev<<endl<<gamma_2<<endl<<" sum="<<sum(gamma_2_prev != gamma_2)<<endl;
 
-        gamma_1_prev = gamma_1;
-        gamma_2_prev = gamma_2;
+        gamma_prev = gamma;
+        //gamma_1_prev = gamma_1;
+        //gamma_2_prev = gamma_2;
         //cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
         //cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
         ++o;
@@ -645,8 +740,10 @@ public:
 
       mZeta[d] = Mat<double>(zeta);
       mPhi[d] = Mat<double>(phi);
-      mGammaA[d] = Col<double>(gamma_1);
-      mGammaB[d] = Col<double>(gamma_2);
+      mGamma[d] = Mat<double>(gamma);
+      //mGammaA[d] = Col<double>(gamma_1);
+      //mGammaB[d] = Col<double>(gamma_2);
+      cout<<"---------"<<endl<<mGamma[d]<<endl;
 
       cout<<"z_dn: "<<endl;
       z_dn[d].set_size(N);
@@ -664,55 +761,33 @@ public:
       cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
 
       cout<<" --------------------- natural gradients --------------------------- "<<endl;
-      cout<<"\tD="<<D<<" gamma="<<mGamma<<endl;
-      vector<Col<double> > lambda_kv(K,Col<double>(Nw));
-      for (uint32_t k=0; k<K; ++k){
-        lambda_kv[k].zeros();
-      }
-      Col<double> a_k(K); a_k.zeros();
-      Col<double> b_k(K); b_k.zeros();
-      for (uint32_t k=0; k<K; ++k) { // for all K corpus level topics
-        for (uint32_t i=0; i<T; ++i) {
-          Col<double> _lambda(Nw); _lambda.zeros();
-          for (uint32_t n=0; n<N; ++n){
-            _lambda(x[d](n))+=phi(n,i);
-          }
-          lambda_kv[k]+=zeta(i,k)*_lambda;
-          a_k(k)+=zeta(i,k);
-          for (uint32_t l=k+1; l<K; ++l) {
-            b_k(k)+=zeta(i,l);
-          }
-        }
-        lambda_kv[k] = D*lambda_kv[k];
-        //cout<<"lambda-nu="<<lambda_kv[k].t()<<endl;
-        lambda_kv[k] += ((Dir*)(&mH))->mAlphas.t();
-        //cout<<"lambda="<<lambda_kv[k].t()<<endl;
-        a_k(k) = D*a_k(k)+1.0;
-        b_k(k) = D*b_k(k)+mGamma;
-      }
+      cout<<"\tD="<<D<<" omega="<<mOmega<<endl;
+
+      Mat<double> d_lambda(K,Nw);
+      Mat<double> d_a(K,2); 
+      computeNaturalGradients(d_lambda, d_a, zeta, phi, mOmega, D, x[d]);
 
       cout<<" ------------------- global parameter updates: ---------------"<<endl;
-      cout<<"delta a= "<<a_k.t()<<endl;
-      cout<<"delta b= "<<b_k.t()<<endl;
+      cout<<"delta a= "<<d_a.t()<<endl;
       for (uint32_t k=0; k<K; ++k)
-        cout<<"delta lambda_"<<k<<" min="<<min(lambda_kv[k])<<" max="<< max(lambda_kv[k])<<" #greater 0.1="<<sum(lambda_kv[k]>0.1)<<endl;
+        cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
 
       // ----------------------- update global params -----------------------
       double ro = exp(-kappa*log(1+double(dd+1)));
       cout<<"\tro="<<ro<<endl;
 
-      for (uint32_t k=0; k<K; ++k)
-        lambda[k] = (1.0-ro)*lambda[k] + ro*lambda_kv[k];
-      a = (1.0-ro)*a + ro*a_k;
-      b = (1.0-ro)*b + ro*b_k;
-
+      //for (uint32_t k=0; k<K; ++k)
+      //  lambda[k] = (1.0-ro)*lambda[k] + ro*d_lambda[k];
+      lambda = (1.0-ro)*lambda + ro*d_lambda;
+      a = (1.0-ro)*a + ro*d_a;
+      //b = (1.0-ro)*b + ro*b_k;
     }
 
-
     mA=a;
-    mB=b;
-    for (uint32_t k=0; k<K; ++k)
-      mLambda.push_back(lambda[k]);
+    //mB=b;
+    mLambda = lambda;
+    //for (uint32_t k=0; k<K; ++k)
+    //  mLambda.push_back(lambda[k]);
 
     return z_dn;
   };
@@ -731,19 +806,19 @@ public:
 
   void getA(Col<double>& a)
   {
-    a=mA;
+    a=mA.col(0);
   };
 
   void getB(Col<double>& b)
   {
-    b=mB;
+    b=mA.col(1);
   };
 
   bool getLambda(Col<double>& lambda, uint32_t k)
   {
-    if(mLambda.size() > 0 && k < mLambda.size())
+    if(mLambda.n_rows > 0 && k < mLambda.n_rows)
     {
-      lambda=mLambda[k];
+      lambda=mLambda.row(k).t();
       return true;
     }else{
       return false;
@@ -792,8 +867,8 @@ public:
 
   bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d)
   {
-    uint32_t K = mLambda.size(); // corp level topics
-    uint32_t T = mGammaA[0].n_elem; // doc level topics
+    uint32_t K = mLambda.n_rows; // corp level topics
+    uint32_t T = mGamma[0].n_rows; // doc level topics
 
     sigPi.set_size(T+1);
     pi.set_size(T);
@@ -804,8 +879,12 @@ public:
 //      return false;
 //    }
 
-    betaMode(pi,mGammaA[d],mGammaB[d]);
+    //cout<<"K="<<K<<" T="<<T<<endl;
+    betaMode(pi,mGamma[d].col(0),mGamma[d].col(1));
     stickBreaking(sigPi,pi);
+    //cout<<"pi="<<pi<<endl;
+    //cout<<"sigPi="<<sigPi<<endl;
+    //cout<<"mGamma="<<mGamma[d]<<endl;
     for (uint32_t i=0; i<T; ++i){
       c[i] = multinomialMode(mZeta[d].row(i));
     }
@@ -833,17 +912,17 @@ public:
 //      return false;
 //    }
 
-    betaMode(v, mA,mB);
+    betaMode(v, mA.col(0), mA.col(1));
     stickBreaking(sigV,v);
     return true;
   }
 
   bool getCorpTopic(Col<double>& topic, uint32_t k)
   {
-    if(mLambda.size() > 0 && k < mLambda.size())
+    if(mLambda.n_rows > 0 && k < mLambda.n_rows)
     {
-      double norm = 1.0/(sum(mLambda[k]) - mLambda[k].n_elem);
-      topic = (mLambda[k]-1)*norm;
+      double norm = 1.0/(sum(mLambda.row(k)) - mLambda.n_cols);
+      topic = (mLambda.row(k).t()-1.0)*norm;
       return true;
     }else{
       return false;
@@ -899,13 +978,13 @@ public:
   };
 
 protected:
-  vector<Col<double> > mLambda; // corpus level topics (Dirichlet)
-  Col<double> mA; // corpus level Beta process alpha parameter for stickbreaking
-  Col<double> mB; // corpus level Beta process beta parameter for stickbreaking
+  Mat<double> mLambda; // corpus level topics (Dirichlet)
+  Mat<double> mA; // corpus level Beta process alpha parameter for stickbreaking
+  //Col<double> mB; // corpus level Beta process beta parameter for stickbreaking
   vector<Mat<double> > mZeta; // document level topic indices/pointers to corpus level topics (Multinomial) 
   vector<Mat<double> > mPhi; // document level word to doc level topic assignment (Multinomial)
-  vector<Col<double> > mGammaA; // document level Beta distribution alpha parameter for stickbreaking
-  vector<Col<double> > mGammaB; // document level Beta distribution beta parameter for stickbreaking
+  vector<Mat<double> > mGamma; // document level Beta distribution alpha parameter for stickbreaking
+  //vector<Col<double> > mGammaB; // document level Beta distribution beta parameter for stickbreaking
 
 };
 
