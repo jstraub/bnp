@@ -86,10 +86,10 @@ if __name__ == '__main__':
     #hdp_var.loadHDPSample(x,topic,docTopicInd,z,v,sigV,pi,sigPi,omega,alpha,dirAlphas)
     hdp_var.loadHDPSample(x=x,hdp=hdp)
 
-    logP_gt = hdp_sample.logP_fullJoint()
-    logP_var = hdp_var.logP_fullJoint()
-    kl_pq = hdp_sample.KLdivergence(hdp_var)
-    kl_qp = hdp_var.KLdivergence(hdp_sample)
+    #logP_gt = hdp_sample.logP_fullJoint()
+    #logP_var = hdp_var.logP_fullJoint()
+    kl_pq, logP_gt, logP_var = hdp_sample.KLdivergence(hdp_var)
+    #kl_qp = hdp_var.KLdivergence(hdp_sample)
 
     hdp_sample.checkSticks()
     hdp_var.checkSticks()
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     print('logP of full joint of groundtruth = {}'.format(logP_gt))
     print('logP of full joint of variational = {}'.format(logP_var))
     print('KL(p||q) = {}'.format(kl_pq))
-    print('KL(q||p) = {}'.format(kl_qp))
+    #print('KL(q||p) = {}'.format(kl_qp))
 
     fig1=plt.figure()
     plt.imshow(hdp_sample.docTopicsImg(),interpolation='nearest', cmap = cm.hot)

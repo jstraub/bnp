@@ -183,14 +183,19 @@ class HDP_sample:
       print('sigPi = {}; {}'.format(self.sigPi[d],np.sum(self.sigPi[d])))
       
   def KLdivergence(self,q):
-    kl = .0;
+    kl = 0.0
+    logP_joint = 0.0
+    logQ_joint = 0.0
     D=len(self.x)
     for d in range(0,D):
       N=self.x[d].size
       for n in range(0,N):
-        kl += (self.logP_wordJoint(d,n) - q.logP_wordJoint(d,n))* np.exp(self.logP_wordJoint(d,n))
-    return kl
-
+        logP = self.logP_wordJoint(d,n)
+        logQ = q.logP_wordJoint(d,n)
+        logP_joint += logP
+        logQ_joint += logQ
+        kl += (logP - logQ)* np.exp(logP)
+    return kl, logP_joint, logQ_joint
 
   def docTopicsImg(self):
     D = len(self.x)

@@ -7,12 +7,12 @@ cmake_minimum_required(VERSION 2.6)
 
 set(CMAKE_COLOR_MAKEFILE ON)
 IF(NOT CMAKE_BUILD_TYPE)
-  #set(CMAKE_BUILD_TYPE Release) # Release; debug; ...
-  set(CMAKE_BUILD_TYPE Debug) # Release; debug; ...
+  set(CMAKE_BUILD_TYPE Release) # Release; debug; ...
+  #set(CMAKE_BUILD_TYPE Debug) # Release; debug; ...
 ENDIF()
 
 # add flags depending on build type
-set(CMAKE_CXX_FLAGS_RELEASE "-g -Wall -O2 -finline-functions -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "-g -Wall -O2 -finline-functions -DNDEBUG -fopenmp")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
 # add flags in general

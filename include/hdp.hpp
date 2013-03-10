@@ -680,6 +680,8 @@ public:
 
     vector<Col<uint32_t> > z_dn(D);
     Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
+    #pragma omp parallel for ordered schedule(dynamic) 
+    //num_threads(6)
     for (uint32_t dd=0; dd<D; ++dd)
     {
       uint32_t d=ind[dd];  
@@ -723,19 +725,19 @@ public:
       mPhi[d] = Mat<double>(phi);
       mGamma[d] = Mat<double>(gamma);
 
-      cout<<"z_dn: "<<endl;
-      z_dn[d].set_size(N);
-      for (uint32_t n=0; n<N; ++n){
-        uint32_t z=as_scalar(find(phi.row(n) == max(phi.row(n)),1));
-        uint32_t c_di=as_scalar(find(zeta.row(z) == max(zeta.row(z)),1));
-        z_dn[d](n) = c_di;
-        cout<<z_dn[d](n)<<" ("<<max(phi.row(n))<<"@"<< z<<" -> "<<max(zeta.row(z))<<"@"<<c_di<<") "<<endl ;
-        if (max(phi.row(n))>1.0)
-          cout<<phi.row(n)<<endl;
-      }; cout<<endl;
+//      cout<<"z_dn: "<<endl;
+//      z_dn[d].set_size(N);
+//      for (uint32_t n=0; n<N; ++n){
+//        uint32_t z=as_scalar(find(phi.row(n) == max(phi.row(n)),1));
+//        uint32_t c_di=as_scalar(find(zeta.row(z) == max(zeta.row(z)),1));
+//        z_dn[d](n) = c_di;
+//        cout<<z_dn[d](n)<<" ("<<max(phi.row(n))<<"@"<< z<<" -> "<<max(zeta.row(z))<<"@"<<c_di<<") "<<endl ;
+//        if (max(phi.row(n))>1.0)
+//          cout<<phi.row(n)<<endl;
+//      }; cout<<endl;
   
-      cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
-      cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
+      //cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
+      //cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
 
       cout<<" --------------------- natural gradients --------------------------- "<<endl;
       cout<<"\tD="<<D<<" omega="<<mOmega<<endl;
@@ -745,16 +747,18 @@ public:
       computeNaturalGradients(d_lambda, d_a, zeta, phi, mOmega, D, x[d]);
 
       cout<<" ------------------- global parameter updates: ---------------"<<endl;
-      cout<<"delta a= "<<d_a.t()<<endl;
-      for (uint32_t k=0; k<K; ++k)
-        cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
+      //cout<<"delta a= "<<d_a.t()<<endl;
+      //for (uint32_t k=0; k<K; ++k)
+      //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
 
       // ----------------------- update global params -----------------------
-      double ro = exp(-kappa*log(1+double(dd+1)));
-      cout<<"\tro="<<ro<<endl;
-
-      lambda = (1.0-ro)*lambda + ro*d_lambda;
-      a = (1.0-ro)*a + ro*d_a;
+      #pragma omp ordered
+      {
+        double ro = exp(-kappa*log(1+double(dd+1)));
+        cout<<"\tro="<<ro<<endl;
+        lambda = (1.0-ro)*lambda + ro*d_lambda;
+        a = (1.0-ro)*a + ro*d_a;
+      }
     }
 
     mA=a;
