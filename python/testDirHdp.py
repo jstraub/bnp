@@ -41,7 +41,7 @@ if __name__ == '__main__':
   variational = True
 
   if useSynthetic:
-    D = 3 #number of documents to process
+    D = 100 #number of documents to process
     N_d = 100 # max number of words per doc
     Nw = 40 # how many different symbols are in the alphabet
     ro = 0.9 # forgetting rate

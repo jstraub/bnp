@@ -200,9 +200,9 @@ class HDP_sample:
       for t in range(0,self.T):
         k=self.c[d][t]
         vT[k,d] += self.sigPi[d][t]
-    print('vT={}'.format(vT))
-    print('vT_norm={}'.format(np.sum(vT,0)))
-    print('sigPi_d={}'.format(self.sigPi[d]))
+#    print('vT={}'.format(vT))
+#    print('vT_norm={}'.format(np.sum(vT,0)))
+#    print('sigPi_d={}'.format(self.sigPi[d]))
     return vT
 
   def generateDirHDPSample(self,D,N):
