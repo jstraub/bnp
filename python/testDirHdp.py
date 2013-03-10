@@ -54,6 +54,8 @@ if __name__ == '__main__':
     hdp_sample = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
     x, gtCorpProp, gtTopic, pi, c = hdp_sample.generateDirHDPSample(D,N_d)
 
+    hdp_sample.save('sample.mat')
+
   else:
     D = 1000 #number of documents to process
     N_d = 10 # max number of words per doc

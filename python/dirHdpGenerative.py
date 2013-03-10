@@ -2,7 +2,7 @@
 import numpy as np
 import libbnp as bnp
 import scipy.special as scisp
-import pdb
+import scipy.io as sio
 
 def stickBreaking(v):
   N = v.size
@@ -118,6 +118,26 @@ class HDP_sample:
     + logBeta(self.pi[d], 1.0, self.alpha) \
     + logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)
 
+  def save(s,path):
+    print('len(x)={}'.format(len(s.x)))
+    sio.savemat(path,{'K':s.K,'T':s.T,'Nw':s.Nw,'omega':s.omega,'alpha':s.alpha,'Lambda':s.Lambda,'c':s.c,'z':s.z,'beta':s.beta,'v':s.v,'sigV':s.sigV,'pi':s.pi,'sigPi':s.sigPi,'x':s.x})
+  
+
+  def load(s,path):
+    mat=sio.loadmat(path)
+    s.K=mat['K'][0][0]
+    s.T=mat['T'][0][0]
+    s.Nw=mat['Nw'][0][0]
+    s.omega=mat['omega'][0][0]
+    s.alpha=mat['alpha'][0][0]
+    s.Lambda=mat['Lambda']
+    s.beta=mat['beta']
+    s.sigV=mat['sigV']
+    s.v=mat['v']
+    # TODO: how to handle the x?
+
+    
+
   def logP_fullJoint(self):
     logP = 0.0
     D = len(self.x)
@@ -181,7 +201,7 @@ class HDP_sample:
     for d in range(0,D):
       np.sum(self.sigPi[d])
       print('sigPi = {}; {}'.format(self.sigPi[d],np.sum(self.sigPi[d])))
-      
+
   def KLdivergence(self,q):
     kl = 0.0
     logP_joint = 0.0
@@ -249,4 +269,5 @@ class HDP_sample:
 #      print('d={}: {}'.format(d,self.x[d]))
   
     return self.x, self.sigV, self.beta, self.pi, self.c
+
   
