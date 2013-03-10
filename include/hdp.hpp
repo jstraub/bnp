@@ -663,8 +663,6 @@ public:
     Mat<double> a(K,2);
     a.ones();
     a.col(1) *= mOmega; 
-    //Col<double> a(K); a.ones();
-    //Col<double> b(K); b.ones(); b*=mOmega;
     uint32_t D=x.size();
 
     // initialize lambda
@@ -679,7 +677,6 @@ public:
     mZeta.resize(D,Mat<double>());
     mPhi.resize(D,Mat<double>());
     mGamma.resize(D,Mat<double>());
-    //mGammaB.resize(D,Col<double>());
 
     vector<Col<uint32_t> > z_dn(D);
     Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
@@ -690,7 +687,6 @@ public:
       cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
       cout<<"----------------- dd="<<dd<<" -----------------"<<endl;
       cout<<"a=\t"<<a.t();
-      //cout<<"b=\t"<<b.t();
       for (uint32_t k=0; k<K; ++k)
       {
         cout<<"@"<<k<<" lambda=\t"<<lambda.row(k);
@@ -704,35 +700,20 @@ public:
       // ------------------------ doc level updates --------------------
       bool converged = false;
       Mat<double> gamma(T,2);
-      //Col<double> gamma_1(T); 
-      //Col<double> gamma_2(T);
-  
       Mat<double> gamma_prev(T,2);
-      //Col<double> gamma_1_prev(T);
-      //Col<double> gamma_2_prev(T);
       gamma_prev.ones();
       gamma_prev.col(1) += mAlpha;
-      //gamma_1_prev.ones();
-      //gamma_2_prev.ones(); gamma_2_prev *= mAlpha;
 
       uint32_t o=0;
       while(!converged){
         cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
-        // gammas -------------------------
         updateGamma(gamma,phi);
-        // zeta --------------------------
         updateZeta(zeta,phi,a,lambda,x[d]);
-        // phi ------------------------
         updatePhi(phi,zeta,gamma,lambda,x[d]);
 
         converged = (accu(gamma_prev != gamma))==0 || o>60 ;
-        
-        //cout<<gamma_1_prev<<endl<<gamma_1<<endl<<" sum="<<sum(gamma_1_prev != gamma_1)<<endl;
-        //cout<<gamma_2_prev<<endl<<gamma_2<<endl<<" sum="<<sum(gamma_2_prev != gamma_2)<<endl;
 
         gamma_prev = gamma;
-        //gamma_1_prev = gamma_1;
-        //gamma_2_prev = gamma_2;
         //cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
         //cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
         ++o;
@@ -741,14 +722,10 @@ public:
       mZeta[d] = Mat<double>(zeta);
       mPhi[d] = Mat<double>(phi);
       mGamma[d] = Mat<double>(gamma);
-      //mGammaA[d] = Col<double>(gamma_1);
-      //mGammaB[d] = Col<double>(gamma_2);
-      cout<<"---------"<<endl<<mGamma[d]<<endl;
 
       cout<<"z_dn: "<<endl;
       z_dn[d].set_size(N);
       for (uint32_t n=0; n<N; ++n){
-        //cout<<phi.row(n);
         uint32_t z=as_scalar(find(phi.row(n) == max(phi.row(n)),1));
         uint32_t c_di=as_scalar(find(zeta.row(z) == max(zeta.row(z)),1));
         z_dn[d](n) = c_di;
@@ -776,18 +753,12 @@ public:
       double ro = exp(-kappa*log(1+double(dd+1)));
       cout<<"\tro="<<ro<<endl;
 
-      //for (uint32_t k=0; k<K; ++k)
-      //  lambda[k] = (1.0-ro)*lambda[k] + ro*d_lambda[k];
       lambda = (1.0-ro)*lambda + ro*d_lambda;
       a = (1.0-ro)*a + ro*d_a;
-      //b = (1.0-ro)*b + ro*b_k;
     }
 
     mA=a;
-    //mB=b;
     mLambda = lambda;
-    //for (uint32_t k=0; k<K; ++k)
-    //  mLambda.push_back(lambda[k]);
 
     return z_dn;
   };
