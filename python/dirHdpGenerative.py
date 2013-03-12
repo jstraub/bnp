@@ -4,6 +4,8 @@ import libbnp as bnp
 import scipy.special as scisp
 import scipy.io as sio
 
+import matplotlib.pyplot as plt
+
 def stickBreaking(v):
   N = v.size
   prop = np.zeros(N+1)
@@ -17,8 +19,6 @@ def stickBreaking(v):
   return prop
 
 def logCat(x, pi):
-
-  #print('\t\tpi = {}'.format(pi))
   logP = 0.0
   if x < pi.size:
     logP += np.log(pi[x])
@@ -77,9 +77,9 @@ def logDir(x, alpha):
 
 class HDP_sample:
 
-  K=T=Nw=0
+  K=0; T=0; Nw=0
   # hyper parameters
-  omega = alpha = 0 
+  omega = 0; alpha = 0 
   Lambda = np.zeros(1)
   # parameters
   c = []
@@ -92,14 +92,17 @@ class HDP_sample:
   # data
   x = []
   
-  def __init__(self, K,T,Nw,omega,alpha,Lambda):
-    self.K = K
-    self.T = T
-    self.Nw = Nw
-    self.omega = omega
-    self.alpha = alpha
-    self.Lambda = Lambda
-
+  def __init__(self, K=None,T=None,Nw=None,omega=None,alpha=None,Lambda=None, pathToModel=None):
+    if pathToModel is None:
+      self.K = K
+      self.T = T
+      self.Nw = Nw
+      self.omega = omega
+      self.alpha = alpha
+      self.Lambda = Lambda
+    else:
+      self.load(pathToModel)
+  
   def logP_wordJoint(self, d, n):
     #print('d={}, n={}'.format(d,n))
     #print('x={}; x.len={}; x[d].size={}; c.len={}; z.len={}; v.size={}; sigV.size={}; pi.len={}; sigPi.len={}'.format(self.x[d][n],len(self.x),self.x[d].size,len(self.c),len(self.z),self.v.size,self.sigV.size,len(self.pi),len(self.sigPi)))
@@ -121,22 +124,45 @@ class HDP_sample:
   def save(s,path):
     print('len(x)={}'.format(len(s.x)))
     sio.savemat(path,{'K':s.K,'T':s.T,'Nw':s.Nw,'omega':s.omega,'alpha':s.alpha,'Lambda':s.Lambda,'c':s.c,'z':s.z,'beta':s.beta,'v':s.v,'sigV':s.sigV,'pi':s.pi,'sigPi':s.sigPi,'x':s.x})
-  
 
   def load(s,path):
-    mat=sio.loadmat(path)
+    try:
+      mat=sio.loadmat(path)
+      print('Found model under {}'.format(path))
+    except Exception, err:
+      print('Did not find model under {}'.format(path))
+      return False
     s.K=mat['K'][0][0]
+    print('loaded K\t {}'.format(s.K))
     s.T=mat['T'][0][0]
+    print('loaded T\t {}'.format(s.T))
     s.Nw=mat['Nw'][0][0]
+    print('loaded Nw\t {}'.format(s.Nw))
     s.omega=mat['omega'][0][0]
+    print('loaded omega\t {}'.format(s.omega))
     s.alpha=mat['alpha'][0][0]
+    print('loaded alpha\t {}'.format(s.alpha))
     s.Lambda=mat['Lambda']
+    print('loaded Lambda\t {}'.format(s.Lambda.shape))
     s.beta=mat['beta']
+    print('loaded beta\t {}'.format(s.beta.shape))
     s.sigV=mat['sigV']
+    print('loaded sigV\t {}'.format(s.sigV.shape))
     s.v=mat['v']
-    # TODO: how to handle the x?
-
-    
+    print('loaded v\t {}'.format(s.v.shape))
+    s.x=[]; s.z=[]; s.c=[]; s.pi=[]; s.sigPi=[]
+    for d in range(0,mat['x'].shape[0]):
+      s.x.append(mat['x'][d][0])
+      #print('loaded x[{}]\t {}'.format(d,s.x[d].shape))
+      s.z.append(mat['z'][d][0])
+      #print('loaded z[{}]\t {}'.format(d,s.z[d].shape))
+      s.c.append(mat['c'][d,:])
+      #print('loaded c[{}]\t {}'.format(d,s.c[d].shape))
+      s.pi.append(mat['pi'][d,:])
+      #print('loaded pi[{}]\t {}'.format(d,s.pi[d].shape))
+      s.sigPi.append(mat['sigPi'][d,:])
+      #print('loaded sigPi[{}]\t {}'.format(d,s.sigPi[d].shape))
+    return True
 
   def logP_fullJoint(self):
     logP = 0.0
@@ -217,12 +243,19 @@ class HDP_sample:
         kl += (logP - logQ)* np.exp(logP)
     return kl, logP_joint, logQ_joint
 
+  # x is the heldout data i.e. a document from the same dataset as was trained on
+  def Perplexity(self,x)
+    N=x.size
+    for i in range(0,N):
+      x[i] 
+
   def docTopicsImg(self):
     D = len(self.x)
     # create image for topic
     vT = np.zeros((self.K,D))
     for d in range(0,D):
       for t in range(0,self.T):
+        #print('{} {} c.shape={}'.format(d,t,self.c[d].shape))
         k=self.c[d][t]
         vT[k,d] += self.sigPi[d][t]
 #    print('vT={}'.format(vT))
@@ -230,8 +263,40 @@ class HDP_sample:
 #    print('sigPi_d={}'.format(self.sigPi[d]))
     return vT
 
+  def plotTopics(self,minSupport=None):
+    D = len(self.x)
+    ks=np.zeros(D)
+    for d in range(0,D):
+      t_max=np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))[0][0]
+      k_max = self.c[d][t_max]
+      ks[d]=k_max
+    ks=np.unique(ks)
+    if minSupport is not None:
+      Np = ks.size # numer of subplots
+      print('D{} Np{}'.format(D,Np))
+      sup = np.zeros(ks.size)
+      for d in range(0,D):
+        t_max=np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))[0][0]
+        k_max = self.c[d][t_max]
+        sup[np.nonzero(ks==k_max)[0]] += 1
+      print('sup={} sum(sup)={}'.format(sup,np.sum(sup)))
+      delete = np.zeros(ks.size,dtype=np.bool)
+      for i in range(0,Np):
+        if sup[i] < minSupport:
+          delete[i]=True
+      ks = ks[~delete] 
+    Np = ks.size # numer of subplots
+    print('D{} Np{}'.format(D,Np))
+    Nrow = np.ceil(np.sqrt(Np))
+    Ncol = np.ceil(np.sqrt(Np))
+    fig=plt.figure()
+    for i in range(0,Np):
+      plt.subplot(Ncol,Nrow,i+1)
+      plt.plot(self.beta[ks[i]])
+      plt.xlabel('topic '+str(ks[i]))
+    return fig
+
   def generateDirHDPSample(self,D,N):
-    
     # doc level
     self.x=[]
     # draw K topics from Dirichlet
