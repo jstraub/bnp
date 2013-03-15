@@ -681,7 +681,6 @@ public:
     vector<Col<uint32_t> > z_dn(D);
     Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
     #pragma omp parallel for ordered schedule(dynamic) 
-    //num_threads(6)
     for (uint32_t dd=0; dd<D; ++dd)
     {
       uint32_t d=ind[dd];  
@@ -779,6 +778,139 @@ public:
     }
   };
 
+  // after an initial densitiy estimate has been made using densityEst()
+  // can use this to update the estimate with information from additional x 
+bool  updateEst(const Mat<uint32_t>& x, double kappa=0.75)
+{
+  if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
+    uint32_t N = x.n_rows;
+    uint32_t T = mZeta[0].n_rows;
+    uint32_t K = mZeta[0].n_cols;
+    mX.push_back(x);
+    mZeta.push_back(Mat<double>(T,K));
+    mPhi.push_back(Mat<double>(N,T));
+    //    mZeta.set_size(T,K);
+    //    mPhi.set_size(N,T);
+    mGamma.push_back(Mat<double>(T,2));
+    uint32_t d = mX.size()-1;
+
+    return updateEst(mX[d],mZeta[d],mPhi[d],mGamma[d],mA,mLambda,mOmega,d,kappa);
+  }else{
+    return false;
+  }
+};
+
+bool  preplexity(const Mat<uint32_t>& x, double kappa=0.75)
+{
+  if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
+    uint32_t N = x.n_rows;
+    uint32_t Nw = mLambda.n_cols;
+    uint32_t T = mZeta[0].n_rows;
+    uint32_t K = mZeta[0].n_cols;
+
+    Mat<double> zeta = Mat<double>(T,K);
+    Mat<double> phi = Mat<double>(N,T);
+    Mat<double> gamma = Mat<double>(T,2);
+    uint32_t d = mX.size()-1;
+
+    Mat<double> a = mA; // TODO: make deep copy here!
+    Mat<double> lambda = mLambda;
+    double omega = mOmega;
+
+    updateEst(x,zeta,phi,gamma,a,lambda,omega,d,kappa);
+    // find most likely pi_di and c_di
+    Col<double> pi;
+    Col<double> sigPi; 
+    Col<uint32_t> c(T);
+    getDocTopics(pi, sigPi, c, gamma, zeta);
+    // find most likely z_dn
+    Col<uint32_t> z(N);
+    getWordTopics(z, phi);
+    // find most likely topics 
+    Mat<double> topics;
+    getCorpTopic(topics, lambda);
+
+    double perp = 0.0;
+    for (uint32_t n=0; n<x.n_elem; ++n){
+      perp -= logCat(topics[c[z[i]]],beta) 
+    } 
+    
+    perp /= double(x.n_elem);
+//        return logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
+//    + logCat(self.c[d][ self.z[d][n]], self.sigV) \
+//    + logBeta(self.v, 1.0, self.omega) \
+//    + logCat(self.z[d][n], self.sigPi[d]) \
+//    + logBeta(self.pi[d], 1.0, self.alpha) \
+//    + logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)
+//
+   
+    
+  }else{
+    return false;
+  }
+};
+
+
+  
+bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double> lambda, double omega, uint32_t d, double kappa= 0.75)
+{
+    uint32_t D = d+1; // assume that doc d is appended to the end  
+    uint32_t N = x.n_rows;
+    uint32_t Nw = lambda.n_cols;
+    uint32_t T = zeta.n_rows;
+    uint32_t K = zeta.n_cols;
+
+    cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
+    cout<<"a=\t"<<a.t();
+    for (uint32_t k=0; k<K; ++k)
+    {
+      cout<<"@"<<k<<" lambda=\t"<<lambda.row(k);
+    }
+
+    initZeta(zeta,lambda,x);
+    initPhi(phi,zeta,lambda,x);
+
+    // ------------------------ doc level updates --------------------
+    bool converged = false;
+    Mat<double> gamma_prev(T,2);
+    gamma_prev.ones();
+
+    uint32_t o=0;
+    while(!converged){
+      cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
+      updateGamma(gamma,phi);
+      updateZeta(zeta,phi,a,lambda,x);
+      updatePhi(phi,zeta,gamma,lambda,x);
+
+      converged = (accu(gamma_prev != gamma))==0 || o>60 ;
+
+      gamma_prev = gamma;
+      //cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
+      //cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
+      ++o;
+    }
+
+    cout<<" --------------------- natural gradients --------------------------- "<<endl;
+    cout<<"\tD="<<D<<" omega="<<omega<<endl;
+
+    Mat<double> d_lambda(K,Nw);
+    Mat<double> d_a(K,2); 
+    computeNaturalGradients(d_lambda, d_a, zeta, phi, omega, D, x);
+
+    cout<<" ------------------- global parameter updates: ---------------"<<endl;
+    //cout<<"delta a= "<<d_a.t()<<endl;
+    //for (uint32_t k=0; k<K; ++k)
+    //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
+
+    // ----------------------- update global params -----------------------
+    double ro = exp(-kappa*log(1+double(d+1)));
+    cout<<"\tro="<<ro<<endl;
+    lambda = (1.0-ro)*lambda + ro*d_lambda;
+    a = (1.0-ro)*a+ ro*d_a;
+
+  return true;
+};
+
   void getA(Col<double>& a)
   {
     a=mA.col(0);
@@ -840,10 +972,24 @@ public:
     return ind;
   };
 
+static void dirMode(Row<double>& mode, const Row<double>& alpha)
+{
+  mode = (alpha-1.0)/sum(alpha-1.0);
+};
+
+static void dirMode(Col<double>& mode, const Col<double>& alpha)
+{
+  mode = (alpha-1.0)/sum(alpha-1.0);
+};
+
   bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d)
   {
-    uint32_t K = mLambda.n_rows; // corp level topics
-    uint32_t T = mGamma[0].n_rows; // doc level topics
+    return getDocTopics(pi,sigPi,c,mGamma[d],mZeta[d]);
+  };
+
+  bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, const Mat<double>& gamma, const Mat<doubel>& zeta)
+  {
+    uint32_t T = gamma.n_rows; // doc level topics
 
     sigPi.set_size(T+1);
     pi.set_size(T);
@@ -855,29 +1001,39 @@ public:
 //    }
 
     //cout<<"K="<<K<<" T="<<T<<endl;
-    betaMode(pi,mGamma[d].col(0),mGamma[d].col(1));
+    betaMode(pi,gamma.col(0),gamma.col(1));
     stickBreaking(sigPi,pi);
     //cout<<"pi="<<pi<<endl;
     //cout<<"sigPi="<<sigPi<<endl;
     //cout<<"mGamma="<<mGamma[d]<<endl;
     for (uint32_t i=0; i<T; ++i){
-      c[i] = multinomialMode(mZeta[d].row(i));
+      c[i] = multinomialMode(zeta.row(i));
     }
     return true;
-  }
+  };
+
 
   bool getWordTopics(Col<uint32_t>& z, uint32_t d){
-    z.set_size(mX[d].n_elem);
+    return getWordTopics(z,mPhi[d]);
+  };
 
+  bool getWordTopics(Col<uint32_t>& z, const Mat<double>& phi){
+    z.set_size(phi.n_rows);
     for (uint32_t i=0; i<z.n_elem; ++i){
-      z[i] = multinomialMode(mPhi[d].row(i));
+      z[i] = multinomialMode(phi.row(i));
     }
     return true;
   };
 
   bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV)
   {
-    uint32_t K = mLambda.size(); // corp level topics
+    return getCorpTopicProportions(v,sigV,mA);
+  };
+
+  // a are the parameters of the beta distribution from which v is drawn
+  bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV, const Mat<double>& a)
+  {
+    uint32_t K = a.n_rows; // corp level topics
 
     sigV.set_size(K+1);
     v.set_size(K);
@@ -887,25 +1043,44 @@ public:
 //      return false;
 //    }
 
-    betaMode(v, mA.col(0), mA.col(1));
+    betaMode(v, a.col(0), a.col(1));
     stickBreaking(sigV,v);
     return true;
-  }
+  };
+
 
   bool getCorpTopic(Col<double>& topic, uint32_t k)
   {
     if(mLambda.n_rows > 0 && k < mLambda.n_rows)
     {
-      double norm = 1.0/(sum(mLambda.row(k)) - mLambda.n_cols);
-      topic = (mLambda.row(k).t()-1.0)*norm;
-      return true;
+      return getCorpTopic(topic,mLambda.row(k));
     }else{
       return false;
     }
   };
 
+  bool getCorpTopic(Col<double>& topic, const Row<double>& lambda)
+  {
+      // mode of dirichlet (MAP estimate)
+      dirMode(topic, lambda.t())
+      return true;
+  };
+  
+bool getCorpTopic(Mat<double>& topics, const Mat<double>& lambda)
+{
+  uint32_t K = lambda.n_rows;
+  uint32_t Nw = lambda.n_cols;
+  topics.set_size(K,Nw);
+  for (uint32_t k=0; k<K; k++){
+    // mode of dirichlet (MAP estimate)
+    dirMode(topics.row(k), lambda.row(k))
+  }
+  return true;
+};
+
+
   // cateorical distribution (Multionomial for one word)
-  static double Cat(Row<double> pi, uint32_t x)
+  static double Cat(uint32_t x, Row<double> pi)
   {
     assert(x<pi.n_elem);
     double p = pi[x];
@@ -915,7 +1090,7 @@ public:
   };
 
   // log cateorical distribution (Multionomial for one word)
-  static double logCat(Row<double> pi, uint32_t x)
+  static double logCat(uint32_t x, Row<double> pi)
   {
     assert(x<pi.n_elem);
     double p = log(pi[x]);
@@ -924,18 +1099,30 @@ public:
     return p;
   };
 
-  static double Beta(double alpha, double beta, double x)
+  static double Beta(double x, double alpha, double beta)
   {
     return (1.0/boost::math::beta(alpha,beta)) * pow(x,alpha-1.0) * pow(1.0-x,beta-1.0);
   };
 
-  static double logBeta(double alpha, double beta, double x)
-  {
-    return boost::math::lgamma(alpha+beta) - boost::math::lgamma(alpha) 
-      - boost::math::lgamma(beta) + log(x)*(alpha-1.0) + log(1.0-x)*(beta-1.0);
-  };
+static double betaln(double alpha, double beta)
+{
+  return -boost::math::lgamma(alpha+beta) + boost::math::lgamma(alpha) + boost::math::lgamma(beta);
+};
 
-  static double logDir(Row<double> alpha, Row<double> x)
+static double logBeta(double x, double alpha, double beta)
+{
+    if (alpha == 1.0) {
+      return  -betaln(alpha, beta) + log(1.0-x)*(beta-1.0);
+    }else if (beta == 1.0){
+      return -betaln(alpha,beta) + log(x)*(alpha-1.0);
+    }else if(alpha == 1.0 && beta == 1.0){
+      return -betaln(alpha,beta); 
+    }else{
+      return -betaln(alpha,beta) + log(x)*(alpha-1.0) + log(1.0-x)*(beta-1.0);
+    }
+};
+
+  static double logDir(const Row<double>& x, const Row<double>& alpha)
   { 
     assert(alpha.n_elem == x.n_elem);
     double logP=boost::math::lgamma(sum(alpha));

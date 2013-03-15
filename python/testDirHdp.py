@@ -35,6 +35,15 @@ def dataFromBOFs(pathToData):
   return x
 
 
+class HDPvar(bnp.HDP_onl):
+
+  def initialEstimate(self,x,Nw,ro,K,T):
+    D = len(x)
+    for x_i in x[0:D]:
+      self.addDoc(np.vstack(x_i[0:N_d]))
+    return self.densityEst(Nw,ro,K,T)
+
+
 if __name__ == '__main__':
 
   useSynthetic = True
@@ -78,11 +87,13 @@ if __name__ == '__main__':
   print("Dir created")
 
   if variational:
-    hdp=bnp.HDP_onl(dirichlet,alpha,omega)
-    for x_i in x[0:D]:
-      hdp.addDoc(np.vstack(x_i[0:N_d]))
-    result=hdp.densityEst(Nw,ro,K,T)
-
+    hdp = HDPvar(dirichlet,alpha,omega)
+    hdp.initialEstimate(x,Nw,ro,K,T)
+#    hdp=bnp.HDP_onl(dirichlet,alpha,omega)
+#    for x_i in x[0:D]:
+#      hdp.addDoc(np.vstack(x_i[0:N_d]))
+#    result=hdp.densityEst(Nw,ro,K,T)
+#
 
     hdp_var = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
     #hdp_var.loadHDPSample(x,topic,docTopicInd,z,v,sigV,pi,sigPi,omega,alpha,dirAlphas)

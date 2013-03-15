@@ -244,10 +244,15 @@ class HDP_sample:
     return kl, logP_joint, logQ_joint
 
   # x is the heldout data i.e. a document from the same dataset as was trained on
-  def Perplexity(self,x)
-    N=x.size
-    for i in range(0,N):
-      x[i] 
+  #def Perplexity(self,x):
+
+  def CrossEntropy(self,x):
+    H=0
+    N = x.size
+    for w in range(0,self.Nw):
+      n_w = np.sum(x==w)
+      q = 0.5 # TODO: computation of q given x 
+      H -= (n_w/N) * np.log(q)
 
   def docTopicsImg(self):
     D = len(self.x)

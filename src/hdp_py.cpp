@@ -234,9 +234,9 @@ public:
   bool densityEst(uint32_t Nw, double ro=0.75, uint32_t K=100, uint32_t T=10)
   {
     cout<<"mX.size()="<<HDP_onl::mX.size()<<endl;
-    for (uint32_t i=0; i<HDP_onl::mX.size(); ++i)
-      cout<<"  x_"<<i<<": "<<HDP_onl::mX[i].n_rows<<"x"<<HDP_onl::mX[i].n_cols<<endl;
-
+//    for (uint32_t i=0; i<HDP_onl::mX.size(); ++i)
+//      cout<<"  x_"<<i<<": "<<HDP_onl::mX[i].n_rows<<"x"<<HDP_onl::mX[i].n_cols<<endl;
+//
     return HDP_onl::densityEst(Nw,ro,K,T);
   }
 
@@ -246,6 +246,16 @@ public:
     Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
     return HDP_onl::addDoc(x_i_mat);
   };
+
+
+  // after an initial densitiy estimate has been made using addDoc() and densityEst()
+  // can use this to update the estimate with information from additional x 
+  bool updateEst(const numeric::array& x, double ro=0.75)
+  {
+    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
+    return HDP_onl::updateEst(x_mat,ro);
+  }
+
 
   // works on the data in z_i -> size has to be correct in order for this to work!
   // makes a copy of the internal labels vector
@@ -391,6 +401,7 @@ BOOST_PYTHON_MODULE(libbnp)
 
 	class_<HDP_onl_py>("HDP_onl",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_onl_py::densityEst)
+        .def("updateEst",&HDP_onl_py::updateEst)
         .def("getClassLabels",&HDP_onl_py::getClassLabels)
         .def("addDoc",&HDP_onl_py::addDoc)
         .def("getA",&HDP_onl_py::getA)
