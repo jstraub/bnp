@@ -90,21 +90,23 @@ if __name__ == '__main__':
     hdp = HDPvar(dirichlet,alpha,omega)
     hdp.initialEstimate(x[0:D-10],Nw,ro,K,T)
 
-    print('{}'.format(D))
 #    hdp=bnp.HDP_onl(dirichlet,alpha,omega)
 #    for x_i in x[0:D]:
 #      hdp.addDoc(np.vstack(x_i[0:N_d]))
 #    result=hdp.densityEst(Nw,ro,K,T)
 
-#    perp = np.zeros(D-10)
-#    hdp.getPreplexity(perp)
-#    print('Perplexity of iterations: {}'.format(perp))
+    perp = np.zeros(D-10)
+    hdp.getPerplexity(perp)
+    print('Perplexity of iterations: {}'.format(perp))
+    
+    raw_input('Press enter to continue')
 
     for d in range(D-10,D):
       print('{}'.format(d))
       perp_d=hdp.perplexity(x[d],ro)
       print('Perplexity of heldout ({}):\t{}'.format(d,perp_d))
     
+    raw_input('Press enter to continue')
 
     hdp_var = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
     #hdp_var.loadHDPSample(x,topic,docTopicInd,z,v,sigV,pi,sigPi,omega,alpha,dirAlphas)
