@@ -303,6 +303,15 @@ public:
         b_wrap.at(i)=HDP_onl::mA.at(1,i);
   };
 
+  void getPerplexity(numeric::array& perp)
+  {
+    Col<double> perp_wrap=np2col<double>(perp); 
+     for (uint32_t i=0; i<perp_wrap.n_rows; ++i)
+        perp_wrap.at(i)=HDP_onl::mPerp.at(i);
+  };
+
+
+
   bool getDocTopics(numeric::array& pi, numeric::array& prop, numeric::array& topicInd, uint32_t d)
   {
     Col<double> prop_col;
@@ -371,6 +380,12 @@ public:
     }
   };
 
+  double perplexity(numeric::array& x, double kappa)
+  {
+    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
+    return HDP_onl::perplexity(x_mat,kappa);
+  };
+
 };
 
 BOOST_PYTHON_MODULE(libbnp)
@@ -402,8 +417,10 @@ BOOST_PYTHON_MODULE(libbnp)
 	class_<HDP_onl_py>("HDP_onl",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_onl_py::densityEst)
         .def("updateEst",&HDP_onl_py::updateEst)
+        .def("perplexity",&HDP_onl_py::perplexity)
         .def("getClassLabels",&HDP_onl_py::getClassLabels)
         .def("addDoc",&HDP_onl_py::addDoc)
+        .def("getPerplexity",&HDP_onl_py::getPerplexity)
         .def("getA",&HDP_onl_py::getA)
         .def("getB",&HDP_onl_py::getB)
         .def("getLambda",&HDP_onl_py::getLambda)

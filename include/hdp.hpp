@@ -677,6 +677,7 @@ public:
     mZeta.resize(D,Mat<double>());
     mPhi.resize(D,Mat<double>());
     mGamma.resize(D,Mat<double>());
+    mPerp.set_size(D);
 
     vector<Col<uint32_t> > z_dn(D);
     Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
@@ -757,6 +758,9 @@ public:
         cout<<"\tro="<<ro<<endl;
         lambda = (1.0-ro)*lambda + ro*d_lambda;
         a = (1.0-ro)*a + ro*d_a;
+        
+        mPerp[d] = perplexity(mX[d], mZeta[d], mPhi[d], mGamma[d], lambda);
+        cout<<"Perplexity="<<mPerp[d]<<endl;
       }
     }
 
@@ -793,18 +797,26 @@ bool  updateEst(const Mat<uint32_t>& x, double kappa=0.75)
     //    mPhi.set_size(N,T);
     mGamma.push_back(Mat<double>(T,2));
     uint32_t d = mX.size()-1;
+    mPerp.resize(d+1);
 
-    return updateEst(mX[d],mZeta[d],mPhi[d],mGamma[d],mA,mLambda,mOmega,d,kappa);
+    if(updateEst(mX[d],mZeta[d],mPhi[d],mGamma[d],mA,mLambda,mOmega,d,kappa))
+    {
+      mPerp[d] = perplexity(mX[d], mZeta[d], mPhi[d], mGamma[d], mLambda);
+      return true; 
+    }else{
+      return false;
+    } 
   }else{
     return false;
   }
 };
 
-bool  preplexity(const Mat<uint32_t>& x, double kappa=0.75)
+// compute the perplexity of a given document x
+double perplexity(const Mat<uint32_t>& x, double kappa=0.75)
 {
   if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
     uint32_t N = x.n_rows;
-    uint32_t Nw = mLambda.n_cols;
+    //uint32_t Nw = mLambda.n_cols;
     uint32_t T = mZeta[0].n_rows;
     uint32_t K = mZeta[0].n_cols;
 
@@ -818,6 +830,19 @@ bool  preplexity(const Mat<uint32_t>& x, double kappa=0.75)
     double omega = mOmega;
 
     updateEst(x,zeta,phi,gamma,a,lambda,omega,d,kappa);
+
+    return perplexity(x, zeta, phi, gamma, lambda);
+  }else{
+    return 1.0/0.0;
+  }
+};
+
+// compute the perplexity given a document x and the model paremeters of it (after incorporating x)
+double perplexity(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& lambda)
+{
+    cout<<"Computing Perplexity"<<endl;
+    uint32_t N = x.n_rows;
+    uint32_t T = mZeta[0].n_rows;
     // find most likely pi_di and c_di
     Col<double> pi;
     Col<double> sigPi; 
@@ -828,14 +853,17 @@ bool  preplexity(const Mat<uint32_t>& x, double kappa=0.75)
     getWordTopics(z, phi);
     // find most likely topics 
     Mat<double> topics;
+
+    //cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
     getCorpTopic(topics, lambda);
 
     double perp = 0.0;
-    for (uint32_t n=0; n<x.n_elem; ++n){
-      perp -= logCat(topics[c[z[i]]],beta) 
+    for (uint32_t n=0; n<x.n_rows; ++n){
+      cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x.n_rows<<" x_n="<<x[n]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols<<endl;
+      perp -= logCat(x[n],topics.row(c[z[n]]));
     } 
-    
     perp /= double(x.n_elem);
+
 //        return logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
 //    + logCat(self.c[d][ self.z[d][n]], self.sigV) \
 //    + logBeta(self.v, 1.0, self.omega) \
@@ -844,15 +872,11 @@ bool  preplexity(const Mat<uint32_t>& x, double kappa=0.75)
 //    + logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)
 //
    
-    
-  }else{
-    return false;
-  }
-};
-
+    return perp;
+}
 
   
-bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double> lambda, double omega, uint32_t d, double kappa= 0.75)
+bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa= 0.75)
 {
     uint32_t D = d+1; // assume that doc d is appended to the end  
     uint32_t N = x.n_rows;
@@ -987,18 +1011,13 @@ static void dirMode(Col<double>& mode, const Col<double>& alpha)
     return getDocTopics(pi,sigPi,c,mGamma[d],mZeta[d]);
   };
 
-  bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, const Mat<double>& gamma, const Mat<doubel>& zeta)
+  bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, const Mat<double>& gamma, const Mat<double>& zeta)
   {
     uint32_t T = gamma.n_rows; // doc level topics
 
     sigPi.set_size(T+1);
     pi.set_size(T);
     c.set_size(T);
-
-//    if (T != sigPi.n_elem || T != c.n_elem){
-//      cerr<<"getDocTopics:: proportions was not properly preallocated "<<T<<"!="<<sigPi.n_elem<<" and "<<c.n_elem<<endl;
-//      return false;
-//    }
 
     //cout<<"K="<<K<<" T="<<T<<endl;
     betaMode(pi,gamma.col(0),gamma.col(1));
@@ -1038,11 +1057,6 @@ static void dirMode(Col<double>& mode, const Col<double>& alpha)
     sigV.set_size(K+1);
     v.set_size(K);
 
-//    if (K != sigV.n_elem){
-//      cerr<<"getCorpTopicProportions:: proportions was not properly preallocated "<<K<<" != "<<sigV.n_elem<<endl;
-//      return false;
-//    }
-
     betaMode(v, a.col(0), a.col(1));
     stickBreaking(sigV,v);
     return true;
@@ -1062,7 +1076,7 @@ static void dirMode(Col<double>& mode, const Col<double>& alpha)
   bool getCorpTopic(Col<double>& topic, const Row<double>& lambda)
   {
       // mode of dirichlet (MAP estimate)
-      dirMode(topic, lambda.t())
+      dirMode(topic, lambda.t());
       return true;
   };
   
@@ -1073,7 +1087,9 @@ bool getCorpTopic(Mat<double>& topics, const Mat<double>& lambda)
   topics.set_size(K,Nw);
   for (uint32_t k=0; k<K; k++){
     // mode of dirichlet (MAP estimate)
-    dirMode(topics.row(k), lambda.row(k))
+
+    topics.row(k) = (lambda.row(k)-1.0)/sum(lambda.row(k)-1.0);
+    //dirMode(topics.row(k), lambda.row(k));
   }
   return true;
 };
@@ -1147,6 +1163,8 @@ protected:
   vector<Mat<double> > mPhi; // document level word to doc level topic assignment (Multinomial)
   vector<Mat<double> > mGamma; // document level Beta distribution alpha parameter for stickbreaking
   //vector<Col<double> > mGammaB; // document level Beta distribution beta parameter for stickbreaking
+
+  Col<double> mPerp; // perplexity for each document
 
 };
 
