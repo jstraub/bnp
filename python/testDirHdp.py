@@ -44,6 +44,7 @@ class HDPvar(bnp.HDP_onl):
       self.addDoc(np.vstack(x_i))
       #self.addDoc(np.vstack(x_i[0:N_d]))
     for x_ho_i in x_ho:
+      print("adding held out")
       self.addHeldOut(np.vstack(x_ho_i))
       #self.addHeldOut(np.vstack(x_ho_i[0:N_d]))
     return self.densityEst(Nw,ro,K,T)
@@ -112,7 +113,7 @@ if __name__ == '__main__':
     perp_d=np.zeros(10)
     for d in range(D-10,D):
       print('{}'.format(d))
-      perp_d[d-D+10]=hdp.perplexity(x[d],ro)
+      perp_d[d-D+10]=hdp.perplexity(x[d],D-10,ro)
       print('Perplexity of heldout ({}):\t{}'.format(d,perp_d))
 
     fig01=plt.figure()
@@ -124,13 +125,14 @@ if __name__ == '__main__':
     #hdp_var.loadHDPSample(x,topic,docTopicInd,z,v,sigV,pi,sigPi,omega,alpha,dirAlphas)
     hdp_var.loadHDPSample(x=x,hdp=hdp)
 
+    print('Computing KLdivergence of variational model')
     #logP_gt = hdp_sample.logP_fullJoint()
     #logP_var = hdp_var.logP_fullJoint()
     kl_pq, logP_gt, logP_var = hdp_sample.KLdivergence(hdp_var)
     #kl_qp = hdp_var.KLdivergence(hdp_sample)
 
-    hdp_sample.checkSticks()
-    hdp_var.checkSticks()
+    #hdp_sample.checkSticks()
+    #hdp_var.checkSticks()
 
     print('\n-----------------------------\n')
     print('logP of full joint of groundtruth = {}'.format(logP_gt))

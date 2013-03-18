@@ -234,6 +234,7 @@ public:
   bool densityEst(uint32_t Nw, double ro=0.75, uint32_t K=100, uint32_t T=10)
   {
     cout<<"mX.size()="<<HDP_onl::mX.size()<<endl;
+    cout<<"mX_ho.size()="<<HDP_onl::mX_ho.size()<<endl;
 //    for (uint32_t i=0; i<HDP_onl::mX.size(); ++i)
 //      cout<<"  x_"<<i<<": "<<HDP_onl::mX[i].n_rows<<"x"<<HDP_onl::mX[i].n_cols<<endl;
 //
@@ -316,8 +317,6 @@ public:
         perp_wrap.at(i)=HDP_onl::mPerp.at(i);
   };
 
-
-
   bool getDocTopics(numeric::array& pi, numeric::array& prop, numeric::array& topicInd, uint32_t d)
   {
     Col<double> prop_col;
@@ -386,10 +385,10 @@ public:
     }
   };
 
-  double perplexity(numeric::array& x, double kappa)
+  double perplexity(numeric::array& x, uint32_t d, double kappa)
   {
     Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
-    return HDP_onl::perplexity(x_mat,kappa);
+    return HDP_onl::perplexity(x_mat,d,kappa);
   };
 
 };

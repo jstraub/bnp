@@ -317,6 +317,7 @@ public:
   // interface mainly for python
   uint32_t addHeldOut(const Mat<U>& x_i)
   {
+    //cout<<"added heldout doc with "<<x_i.size()<<" words"<<endl;
     mX_ho.push_back(x_i);
     return mX_ho.size();
   };
@@ -399,7 +400,7 @@ class HDP_onl : public HDP<uint32_t>
 public:
 
   HDP_onl(const BaseMeasure<uint32_t>& base, double alpha, double omega)
-  : HDP<uint32_t>(base, alpha, omega)
+  : HDP<uint32_t>(base, alpha, omega), mT(0), mK(0), mNw(0)
   {};
   
   ~HDP_onl()
@@ -409,7 +410,7 @@ public:
   {
     //http://en.wikipedia.org/wiki/Digamma_function#Computation_and_approximation
     if(x<1e-50){
-      cerr<<"\tdigamma param x near zero: "<<x<<" cutting of"<<endl;
+      //cerr<<"\tdigamma param x near zero: "<<x<<" cutting of"<<endl;
       x=1e-50;
     }
     //double x_sq = x*x;
@@ -658,6 +659,10 @@ public:
     // T-1 gamma draws determine a T dim multinomial
     // T = T-1;
 
+    mT = T;
+    mK = K;
+    mNw = Nw;
+
     Mat<double> a(K,2);
     a.ones();
     a.col(1) *= mOmega; 
@@ -751,22 +756,32 @@ public:
       // ----------------------- update global params -----------------------
       #pragma omp ordered
       {
-        cout<<" ------------------- global parameter updates "<<dd<<" ---------------"<<endl;
+        cout<<" ------------------- global parameter updates dd="<<dd<<" d="<<d<<" ---------------"<<endl;
         double ro = exp(-kappa*log(1+double(dd+1)));
         //cout<<"\tro="<<ro<<endl;
         lambda = (1.0-ro)*lambda + ro*d_lambda;
         a = (1.0-ro)*a + ro*d_a;
 
+        mA=a;
+        mLambda = lambda;
+
         mPerp[d] = 0.0;
-        for (uint32_t i=0; i<mX_ho.size(); ++i)
-          mPerp[d] += perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
-        mPerp[d] /= double(mX_ho.size());
-        //cout<<"Perplexity="<<mPerp[d]<<endl;
+        if (dd > 10){
+          cout<<"computing "<<mX_ho.size()<<" perplexities"<<endl;
+          for (uint32_t i=0; i<mX_ho.size(); ++i)
+          {
+            double perp_i =  perplexity(mX_ho[i],dd,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
+            cout<<"perp_"<<i<<"="<<perp_i<<endl;
+            mPerp[d] += perp_i;
+          }
+          mPerp[d] /= double(mX_ho.size());
+          //cout<<"Perplexity="<<mPerp[d]<<endl;
+        }else{
+          cout<<"skipping "<<dd<<endl;
+        }
       }
     }
 
-    mA=a;
-    mLambda = lambda;
 
     return z_dn;
   };
@@ -789,8 +804,8 @@ bool  updateEst(const Mat<uint32_t>& x, double kappa=0.75)
 {
   if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
     uint32_t N = x.n_rows;
-    uint32_t T = mZeta[0].n_rows;
-    uint32_t K = mZeta[0].n_cols;
+    uint32_t T = mT; //mZeta[0].n_rows;
+    uint32_t K = mK; //mZeta[0].n_cols;
     mX.push_back(x);
     mZeta.push_back(Mat<double>(T,K));
     mPhi.push_back(Mat<double>(N,T));
@@ -817,24 +832,26 @@ bool  updateEst(const Mat<uint32_t>& x, double kappa=0.75)
 };
 
 // compute the perplexity of a given document x
-double perplexity(const Mat<uint32_t>& x, double kappa=0.75)
+double perplexity(const Mat<uint32_t>& x, uint32_t d, double kappa=0.75)
 {
   if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
     uint32_t N = x.n_rows;
     //uint32_t Nw = mLambda.n_cols;
-    uint32_t T = mZeta[0].n_rows;
-    uint32_t K = mZeta[0].n_cols;
+    uint32_t T = mT; //mZeta[0].n_rows; // TODO: most likely seg fault because of this
+    uint32_t K = mK; //mZeta[0].n_cols;
 
     Mat<double> zeta = Mat<double>(T,K);
     Mat<double> phi = Mat<double>(N,T);
     Mat<double> gamma = Mat<double>(T,2);
-    uint32_t d = mX.size()-1;
+    //uint32_t d = mX.size()-1;
 
     Mat<double> a = mA; // TODO: make deep copy here!
     Mat<double> lambda = mLambda;
     double omega = mOmega;
-
+    
+    //cout<<"updating copied model with x"<<endl;
     updateEst(x,zeta,phi,gamma,a,lambda,omega,d,kappa);
+    //cout<<"computing perplexity under updated model"<<endl;
 
     return perplexity(x, zeta, phi, gamma, lambda);
   }else{
@@ -847,7 +864,7 @@ double perplexity(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, M
 {
     //cout<<"Computing Perplexity"<<endl;
     uint32_t N = x.n_rows;
-    uint32_t T = mZeta[0].n_rows;
+    uint32_t T = mT; //mZeta[0].n_rows;
     // find most likely pi_di and c_di
     Col<double> pi;
     Col<double> sigPi; 
@@ -885,7 +902,7 @@ double perplexity(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, M
 bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa= 0.75)
 {
     uint32_t D = d+1; // assume that doc d is appended to the end  
-    uint32_t N = x.n_rows;
+    //uint32_t N = x.n_rows;
     uint32_t Nw = lambda.n_cols;
     uint32_t T = zeta.n_rows;
     uint32_t K = zeta.n_cols;
@@ -1171,6 +1188,10 @@ protected:
   //vector<Col<double> > mGammaB; // document level Beta distribution beta parameter for stickbreaking
 
   Col<double> mPerp; // perplexity for each document
+
+  uint32_t mT; // Doc level truncation
+  uint32_t mK; // Corp level truncation
+  uint32_t mNw; // size of dictionary
 
 };
 
