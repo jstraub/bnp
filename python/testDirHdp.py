@@ -37,10 +37,15 @@ def dataFromBOFs(pathToData):
 
 class HDPvar(bnp.HDP_onl):
 
-  def initialEstimate(self,x,Nw,ro,K,T):
+  # x are data for training; x_ho is held out data
+  def initialEstimate(self,x,x_ho,Nw,ro,K,T):
     D = len(x)
-    for x_i in x[0:D]:
-      self.addDoc(np.vstack(x_i[0:N_d]))
+    for x_i in x:
+      self.addDoc(np.vstack(x_i))
+      #self.addDoc(np.vstack(x_i[0:N_d]))
+    for x_ho_i in x_ho:
+      self.addHeldOut(np.vstack(x_ho_i))
+      #self.addHeldOut(np.vstack(x_ho_i[0:N_d]))
     return self.densityEst(Nw,ro,K,T)
 
 
@@ -88,7 +93,7 @@ if __name__ == '__main__':
 
   if variational:
     hdp = HDPvar(dirichlet,alpha,omega)
-    hdp.initialEstimate(x[0:D-10],Nw,ro,K,T)
+    hdp.initialEstimate(x[0:D-10],x[D-10:D],Nw,ro,K,T)
 
 #    hdp=bnp.HDP_onl(dirichlet,alpha,omega)
 #    for x_i in x[0:D]:
@@ -99,13 +104,20 @@ if __name__ == '__main__':
     hdp.getPerplexity(perp)
     print('Perplexity of iterations: {}'.format(perp))
     
+    fig00=plt.figure()
+    plt.plot(perp)
+    fig00.show()
     raw_input('Press enter to continue')
 
+    perp_d=np.zeros(10)
     for d in range(D-10,D):
       print('{}'.format(d))
-      perp_d=hdp.perplexity(x[d],ro)
+      perp_d[d-D+10]=hdp.perplexity(x[d],ro)
       print('Perplexity of heldout ({}):\t{}'.format(d,perp_d))
-    
+
+    fig01=plt.figure()
+    plt.plot(perp_d)
+    fig01.show()
     raw_input('Press enter to continue')
 
     hdp_var = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)

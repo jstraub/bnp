@@ -247,6 +247,12 @@ public:
     return HDP_onl::addDoc(x_i_mat);
   };
 
+  uint32_t addHeldOut(const numeric::array& x_i)
+  {
+    Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
+    return HDP_onl::addHeldOut(x_i_mat);
+  };
+
 
   // after an initial densitiy estimate has been made using addDoc() and densityEst()
   // can use this to update the estimate with information from additional x 
@@ -420,6 +426,7 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("perplexity",&HDP_onl_py::perplexity)
         .def("getClassLabels",&HDP_onl_py::getClassLabels)
         .def("addDoc",&HDP_onl_py::addDoc)
+        .def("addHeldOut",&HDP_onl_py::addHeldOut)
         .def("getPerplexity",&HDP_onl_py::getPerplexity)
         .def("getA",&HDP_onl_py::getA)
         .def("getB",&HDP_onl_py::getB)

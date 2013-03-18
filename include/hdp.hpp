@@ -314,6 +314,13 @@ public:
     return mX.size();
   };
 
+  // interface mainly for python
+  uint32_t addHeldOut(const Mat<U>& x_i)
+  {
+    mX_ho.push_back(x_i);
+    return mX_ho.size();
+  };
+
   // after computing the labels we can use this to get them.
   bool getClassLabels(Col<uint32_t>& z_i, uint32_t i)
   {
@@ -330,7 +337,8 @@ public:
 
 protected:
 
-  vector<Mat<U> > mX;
+  vector<Mat<U> > mX; // training data
+  vector<Mat<U> > mX_ho; //  held out data
   vector<Col<uint32_t> > mZ;
 
 private:
@@ -468,12 +476,12 @@ public:
     uint32_t N = x_d.n_rows;
     uint32_t T = zeta.n_rows;
     uint32_t K = zeta.n_cols;
-      cerr<<"\tinit zeta"<<endl;
+      //cerr<<"\tinit zeta"<<endl;
       for (uint32_t i=0; i<T; ++i) {
         for (uint32_t k=0; k<K; ++k) {
           zeta(i,k)=0.0;
           for (uint32_t n=0; n<N; ++n) {
-            if(i==0 && k==0) cout<<zeta(i,k)<<" -> ";
+            //if(i==0 && k==0) cout<<zeta(i,k)<<" -> ";
             zeta(i,k) += ElogBeta(lambda, k, x_d(n));
           }
         }
@@ -487,8 +495,8 @@ public:
 
         //cout<<" normalized="<<zeta(0,0)<<endl;
       }
-      cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
-      cerr<<"normalization check:"<<endl<<sum(zeta,1).t()<<endl; // sum over rows
+      //cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
+      //cerr<<"normalization check:"<<endl<<sum(zeta,1).t()<<endl; // sum over rows
   };
 
   void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
@@ -496,7 +504,7 @@ public:
     uint32_t N = x_d.n_rows;
     uint32_t T = zeta.n_rows;
     uint32_t K = zeta.n_cols;
-    cout<<"\tinit phi"<<endl;
+    //cout<<"\tinit phi"<<endl;
     for (uint32_t n=0; n<N; ++n){
       for (uint32_t i=0; i<T; ++i) {
         phi(n,i)=0.0;
@@ -521,7 +529,7 @@ public:
       //          cout<<"Phi Init: denominator too small -> no division!
       //        }
     }
-    cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
+    //cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
   };
 
   void updateGamma(Mat<double>& gamma, const Mat<double>& phi)
@@ -531,21 +539,16 @@ public:
 
     gamma.ones();
     gamma.col(1) *= mAlpha;
-    //gamma_1.ones();
-    //gamma_2.ones(); gamma_2 *= mAlpha;
     for (uint32_t i=0; i<T; ++i) 
     {
       for (uint32_t n=0; n<N; ++n){
-        //gamma_1(i)+=phi(n,i);
         gamma(i,0) += phi(n,i);
         for (uint32_t j=i+1; j<T; ++j) {
           gamma(i,1) += phi(n,j);
-          //gamma_2(i) += phi(n,j);
         }
       }
-      //cout<<gamma_1(i)<<" "<<gamma_2(i)<<endl;
     }
-    cout<<gamma.t()<<endl;
+    //cout<<gamma.t()<<endl;
   };
 
   void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& a, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
@@ -613,12 +616,7 @@ public:
     uint32_t K = zeta.n_cols;
 
     d_lambda.zeros();
-      //for (uint32_t k=0; k<K; ++k){
-      //  d_lambda[k].zeros();
-      //}
-      d_a.zeros();
-    //Col<double> d_a(K); d_a.zeros();
-    //Col<double> b_k(K); b_k.zeros();
+    d_a.zeros();
     for (uint32_t k=0; k<K; ++k) { // for all K corpus level topics
       for (uint32_t i=0; i<T; ++i) {
         Row<double> _lambda(Nw); _lambda.zeros();
@@ -686,14 +684,14 @@ public:
     {
       uint32_t d=ind[dd];  
       uint32_t N=x[d].n_rows;
-      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
+//      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
       cout<<"----------------- dd="<<dd<<" -----------------"<<endl;
-      cout<<"a=\t"<<a.t();
-      for (uint32_t k=0; k<K; ++k)
-      {
-        cout<<"@"<<k<<" lambda=\t"<<lambda.row(k);
-      }
-
+//      cout<<"a=\t"<<a.t();
+//      for (uint32_t k=0; k<K; ++k)
+//      {
+//        cout<<"@"<<k<<" lambda=\t"<<lambda.row(k);
+//      }
+//
       Mat<double> zeta(T,K);
       initZeta(zeta,lambda,x[d]);
       Mat<double> phi(N,T);
@@ -708,7 +706,7 @@ public:
 
       uint32_t o=0;
       while(!converged){
-        cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
+//        cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
         updateGamma(gamma,phi);
         updateZeta(zeta,phi,a,lambda,x[d]);
         updatePhi(phi,zeta,gamma,lambda,x[d]);
@@ -739,14 +737,13 @@ public:
       //cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
       //cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
 
-      cout<<" --------------------- natural gradients --------------------------- "<<endl;
-      cout<<"\tD="<<D<<" omega="<<mOmega<<endl;
-
+//      cout<<" --------------------- natural gradients --------------------------- "<<endl;
+//      cout<<"\tD="<<D<<" omega="<<mOmega<<endl;
+//
       Mat<double> d_lambda(K,Nw);
       Mat<double> d_a(K,2); 
       computeNaturalGradients(d_lambda, d_a, zeta, phi, mOmega, D, x[d]);
 
-      cout<<" ------------------- global parameter updates: ---------------"<<endl;
       //cout<<"delta a= "<<d_a.t()<<endl;
       //for (uint32_t k=0; k<K; ++k)
       //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
@@ -754,13 +751,17 @@ public:
       // ----------------------- update global params -----------------------
       #pragma omp ordered
       {
+        cout<<" ------------------- global parameter updates "<<dd<<" ---------------"<<endl;
         double ro = exp(-kappa*log(1+double(dd+1)));
-        cout<<"\tro="<<ro<<endl;
+        //cout<<"\tro="<<ro<<endl;
         lambda = (1.0-ro)*lambda + ro*d_lambda;
         a = (1.0-ro)*a + ro*d_a;
-        
-        mPerp[d] = perplexity(mX[d], mZeta[d], mPhi[d], mGamma[d], lambda);
-        cout<<"Perplexity="<<mPerp[d]<<endl;
+
+        mPerp[d] = 0.0;
+        for (uint32_t i=0; i<mX_ho.size(); ++i)
+          mPerp[d] += perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
+        mPerp[d] /= double(mX_ho.size());
+        //cout<<"Perplexity="<<mPerp[d]<<endl;
       }
     }
 
@@ -801,7 +802,11 @@ bool  updateEst(const Mat<uint32_t>& x, double kappa=0.75)
 
     if(updateEst(mX[d],mZeta[d],mPhi[d],mGamma[d],mA,mLambda,mOmega,d,kappa))
     {
-      mPerp[d] = perplexity(mX[d], mZeta[d], mPhi[d], mGamma[d], mLambda);
+      mPerp[d] = 0.0;
+      for (uint32_t i=0; i<mX_ho.size(); ++i)
+        mPerp[d] += perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], mLambda);
+      mPerp[d] /= double(mX_ho.size());
+      cout<<"Perplexity="<<mPerp[d]<<endl;
       return true; 
     }else{
       return false;
@@ -840,7 +845,7 @@ double perplexity(const Mat<uint32_t>& x, double kappa=0.75)
 // compute the perplexity given a document x and the model paremeters of it (after incorporating x)
 double perplexity(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& lambda)
 {
-    cout<<"Computing Perplexity"<<endl;
+    //cout<<"Computing Perplexity"<<endl;
     uint32_t N = x.n_rows;
     uint32_t T = mZeta[0].n_rows;
     // find most likely pi_di and c_di
@@ -859,10 +864,11 @@ double perplexity(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, M
 
     double perp = 0.0;
     for (uint32_t n=0; n<x.n_rows; ++n){
-      cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x.n_rows<<" x_n="<<x[n]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols<<endl;
+      //cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x.n_rows<<" x_n="<<x[n]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols<<endl;
       perp -= logCat(x[n],topics.row(c[z[n]]));
     } 
     perp /= double(x.n_elem);
+    perp = pow(2.0,perp);
 
 //        return logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
 //    + logCat(self.c[d][ self.z[d][n]], self.sigV) \
@@ -884,12 +890,12 @@ bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<
     uint32_t T = zeta.n_rows;
     uint32_t K = zeta.n_cols;
 
-    cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
-    cout<<"a=\t"<<a.t();
-    for (uint32_t k=0; k<K; ++k)
-    {
-      cout<<"@"<<k<<" lambda=\t"<<lambda.row(k);
-    }
+//    cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
+//    cout<<"a=\t"<<a.t();
+//    for (uint32_t k=0; k<K; ++k)
+//    {
+//      cout<<"@"<<k<<" lambda=\t"<<lambda.row(k);
+//    }
 
     initZeta(zeta,lambda,x);
     initPhi(phi,zeta,lambda,x);
@@ -901,7 +907,7 @@ bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<
 
     uint32_t o=0;
     while(!converged){
-      cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
+//      cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
       updateGamma(gamma,phi);
       updateZeta(zeta,phi,a,lambda,x);
       updatePhi(phi,zeta,gamma,lambda,x);
@@ -914,21 +920,21 @@ bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<
       ++o;
     }
 
-    cout<<" --------------------- natural gradients --------------------------- "<<endl;
-    cout<<"\tD="<<D<<" omega="<<omega<<endl;
+//    cout<<" --------------------- natural gradients --------------------------- "<<endl;
+//    cout<<"\tD="<<D<<" omega="<<omega<<endl;
 
     Mat<double> d_lambda(K,Nw);
     Mat<double> d_a(K,2); 
     computeNaturalGradients(d_lambda, d_a, zeta, phi, omega, D, x);
 
-    cout<<" ------------------- global parameter updates: ---------------"<<endl;
+//    cout<<" ------------------- global parameter updates: ---------------"<<endl;
     //cout<<"delta a= "<<d_a.t()<<endl;
     //for (uint32_t k=0; k<K; ++k)
     //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
 
     // ----------------------- update global params -----------------------
     double ro = exp(-kappa*log(1+double(d+1)));
-    cout<<"\tro="<<ro<<endl;
+//    cout<<"\tro="<<ro<<endl;
     lambda = (1.0-ro)*lambda + ro*d_lambda;
     a = (1.0-ro)*a+ ro*d_a;
 
