@@ -885,6 +885,7 @@ double perplexity(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, M
       perp -= logCat(x[n],topics.row(c[z[n]]));
     } 
     perp /= double(x.n_elem);
+    perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
     perp = pow(2.0,perp);
 
 //        return logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
