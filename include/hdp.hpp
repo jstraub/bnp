@@ -770,7 +770,7 @@ class HDP_onl : public HDP<uint32_t>
           cout<<"computing "<<mX_ho.size()<<" perplexities"<<endl;
           for (uint32_t i=0; i<mX_ho.size(); ++i)
           {
-            double perp_i =  perplexity(mX_ho[i],dd,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
+            double perp_i =  perplexity(mX_ho[i],dd+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
             cout<<"perp_"<<i<<"="<<perp_i<<endl;
             mPerp[dd] += perp_i;
           }
@@ -778,8 +778,6 @@ class HDP_onl : public HDP<uint32_t>
           //cout<<"Perplexity="<<mPerp[d]<<endl;
         }
       }
-
-
       return z_dn;
     };
 
@@ -877,10 +875,12 @@ class HDP_onl : public HDP<uint32_t>
       getCorpTopic(topics, lambda);
 
       double perp = 0.0;
-      for (uint32_t n=0; n<x.n_rows; ++n){
+      cout<<"x: "<<x.n_rows<<"x"<<x.n_cols<<endl;
+      for (uint32_t n=0; n<x.n_elem; ++n){
         //cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x.n_rows<<" x_n="<<x[n]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols<<endl;
         perp -= logCat(x[n],topics.row(c[z[n]]));
-      } 
+        cout<<perp<<" ";
+      } cout<<endl;
       perp /= double(x.n_elem);
       perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
       perp = pow(2.0,perp);
