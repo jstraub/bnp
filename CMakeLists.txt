@@ -45,7 +45,7 @@ link_directories(
 
 # define the sources
 set(SRC
- src/hdp.cpp
+  src/probabilityHelpers.cpp
   )
 
 set(LIBS
@@ -54,10 +54,10 @@ set(LIBS
  )
 
 # add executable that should be compiled
-add_executable(testHdp ./src/testHdp.cpp)
+add_executable(testHdp ./src/testHdp.cpp ${SRC})
 target_link_libraries(testHdp ${LIBS} stdc++)
 
-add_executable(hdpCluster ./src/hdpCluster.cpp)
+add_executable(hdpCluster ./src/hdpCluster.cpp ${SRC}) 
 target_link_libraries(hdpCluster ${LIBS} stdc++)
 
 add_executable(testRandom ./src/testRandom.cpp)
@@ -66,7 +66,7 @@ target_link_libraries(testRandom ${LIBS} stdc++)
 add_executable(testArmadillo ./src/testArmadillo.cpp)
 target_link_libraries(testArmadillo ${LIBS} stdc++)
 
-ADD_LIBRARY(bnp SHARED src/hdp_py.cpp)
+ADD_LIBRARY(bnp SHARED src/hdp_py.cpp ${SRC})
 TARGET_LINK_LIBRARIES(bnp ${LIBS} boost_python  python2.7)
 INSTALL(TARGETS bnp LIBRARY DESTINATION /home/jstraub/workspace_research/bnp/python)
 

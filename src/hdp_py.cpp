@@ -387,7 +387,7 @@ public:
 
   double perplexity(numeric::array& x, uint32_t d, double kappa)
   {
-    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
+    Mat<uint32_t> x_mat=np2col<uint32_t>(x); // can do this since x_mat gets copied inside    
     return HDP_onl::perplexity(x_mat,d,kappa);
   };
 

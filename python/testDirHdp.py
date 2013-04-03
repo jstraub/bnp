@@ -57,6 +57,7 @@ if __name__ == '__main__':
 
   if useSynthetic:
     D = 100 #number of documents to process
+    D_ho = 1 # (ho= held out) number of docs used for testing (perplexity)
     N_d = 100 # max number of words per doc
     Nw = 40 # how many different symbols are in the alphabet
     ro = 0.9 # forgetting rate
@@ -68,6 +69,8 @@ if __name__ == '__main__':
 
     hdp_sample = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
     x, gtCorpProp, gtTopic, pi, c = hdp_sample.generateDirHDPSample(D,N_d)
+    x_train = x[0:D-D_ho]
+    x_ho = x[D-D_ho:D]
 
     hdp_sample.save('sample.mat')
 
@@ -94,14 +97,14 @@ if __name__ == '__main__':
 
   if variational:
     hdp = HDPvar(dirichlet,alpha,omega)
-    hdp.initialEstimate(x[0:D-10],x[D-10:D],Nw,ro,K,T)
+    hdp.initialEstimate(x_train,x_ho,Nw,ro,K,T)
 
 #    hdp=bnp.HDP_onl(dirichlet,alpha,omega)
 #    for x_i in x[0:D]:
 #      hdp.addDoc(np.vstack(x_i[0:N_d]))
 #    result=hdp.densityEst(Nw,ro,K,T)
 
-    perp = np.zeros(D-10)
+    perp = np.zeros(D-D_ho)
     hdp.getPerplexity(perp)
     print('Perplexity of iterations: {}'.format(perp))
     
@@ -110,10 +113,10 @@ if __name__ == '__main__':
     fig00.show()
     raw_input('Press enter to continue')
 
-    perp_d=np.zeros(10)
-    for d in range(D-10,D):
+    perp_d=np.zeros(D_ho)
+    for d in range(0,D_ho):
       print('{}'.format(d))
-      perp_d[d-D+10]=hdp.perplexity(x[d],D-10,ro)
+      perp_d[d]=hdp.perplexity(x_ho[d],D-D_ho+1,ro)
       print('Perplexity of heldout ({}):\t{}'.format(d,perp_d))
 
     fig01=plt.figure()
