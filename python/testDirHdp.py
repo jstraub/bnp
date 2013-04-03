@@ -10,23 +10,14 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 
+import time
 import cProfile
 
 import libbnp as bnp
 
-if __name__ == '__main__':
+from dirHdpGenerative import *
 
-  D = 1000 #number of documents to process
-  N_d = 10 # max number of words per doc
-  Nw = 256 # how many different symbols are in the alphabet
-  ro = 0.75 # forgetting rate
-  K = 40 # top level truncation
-  T = 10 # low level truncation
-  alpha = 1. # concentration on G_i
-  gamma = 10. # concentration on G_0
-  dirAlphas = np.ones(Nw)*1.0e-5 # alphas for dirichlet base measure
-
-  pathToData = "../../data/bof/bofs249.txt"
+def dataFromBOFs(pathToData):
   x=[];
   sceneType=[]
   f = open(pathToData,'r')
@@ -41,6 +32,58 @@ if __name__ == '__main__':
     #print(np.max(x_i))
     #if len(x) == 9 :
     #  print(x_i.T)
+  return x
+
+
+class HDPvar(bnp.HDP_onl):
+
+  # x are data for training; x_ho is held out data
+  def initialEstimate(self,x,x_ho,Nw,ro,K,T):
+    D = len(x)
+    for x_i in x:
+      self.addDoc(np.vstack(x_i))
+      #self.addDoc(np.vstack(x_i[0:N_d]))
+    for x_ho_i in x_ho:
+      print("adding held out")
+      self.addHeldOut(np.vstack(x_ho_i))
+      #self.addHeldOut(np.vstack(x_ho_i[0:N_d]))
+    return self.densityEst(Nw,ro,K,T)
+
+
+if __name__ == '__main__':
+
+  useSynthetic = True
+  variational = True
+
+  if useSynthetic:
+    D = 100 #number of documents to process
+    N_d = 100 # max number of words per doc
+    Nw = 40 # how many different symbols are in the alphabet
+    ro = 0.9 # forgetting rate
+    K = 30 # top level truncation
+    T = 10 # low level truncation
+    alpha = 1. # concentration on G_i
+    omega = 10. # concentration on G_0
+    dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
+
+    hdp_sample = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
+    x, gtCorpProp, gtTopic, pi, c = hdp_sample.generateDirHDPSample(D,N_d)
+
+    hdp_sample.save('sample.mat')
+
+  else:
+    D = 1000 #number of documents to process
+    N_d = 10 # max number of words per doc
+    Nw = 256 # how many different symbols are in the alphabet
+    ro = 0.75 # forgetting rate
+    K = 40 # top level truncation
+    T = 10 # low level truncation
+    alpha = 1.1 # concentration on G_i
+    omega = 10. # concentration on G_0
+    dirAlphas = np.ones(Nw)*1.0e-5 # alphas for dirichlet base measure
+ 
+    pathToData = "../../data/bof/bofs249.txt"
+    x = dataFromBOFs(pathToData)
 
   D=min(D,len(x))
 
@@ -49,57 +92,67 @@ if __name__ == '__main__':
   dirichlet=bnp.Dir(dirAlphas)
   print("Dir created")
 
-  variational = False
   if variational:
-    hdp=bnp.HDP_onl(dirichlet,alpha,gamma)
-    for x_i in x[0:D]:
-      hdp.addDoc(np.vstack(x_i[0:N_d]))
-    result=hdp.densityEst(Nw,ro,K,T)
+    hdp = HDPvar(dirichlet,alpha,omega)
+    hdp.initialEstimate(x[0:D-10],x[D-10:D],Nw,ro,K,T)
+
+#    hdp=bnp.HDP_onl(dirichlet,alpha,omega)
+#    for x_i in x[0:D]:
+#      hdp.addDoc(np.vstack(x_i[0:N_d]))
+#    result=hdp.densityEst(Nw,ro,K,T)
+
+    perp = np.zeros(D-10)
+    hdp.getPerplexity(perp)
+    print('Perplexity of iterations: {}'.format(perp))
+    
+    fig00=plt.figure()
+    plt.plot(perp)
+    fig00.show()
+    raw_input('Press enter to continue')
+
+    perp_d=np.zeros(10)
+    for d in range(D-10,D):
+      print('{}'.format(d))
+      perp_d[d-D+10]=hdp.perplexity(x[d],D-10,ro)
+      print('Perplexity of heldout ({}):\t{}'.format(d,perp_d))
+
+    fig01=plt.figure()
+    plt.plot(perp_d)
+    fig01.show()
+    raw_input('Press enter to continue')
+
+    hdp_var = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
+    #hdp_var.loadHDPSample(x,topic,docTopicInd,z,v,sigV,pi,sigPi,omega,alpha,dirAlphas)
+    hdp_var.loadHDPSample(x=x,hdp=hdp)
+
+    print('Computing KLdivergence of variational model')
+    #logP_gt = hdp_sample.logP_fullJoint()
+    #logP_var = hdp_var.logP_fullJoint()
+    kl_pq, logP_gt, logP_var = hdp_sample.KLdivergence(hdp_var)
+    #kl_qp = hdp_var.KLdivergence(hdp_sample)
+
+    #hdp_sample.checkSticks()
+    #hdp_var.checkSticks()
+
+    print('\n-----------------------------\n')
+    print('logP of full joint of groundtruth = {}'.format(logP_gt))
+    print('logP of full joint of variational = {}'.format(logP_var))
+    print('KL(p||q) = {}'.format(kl_pq))
+    #print('KL(q||p) = {}'.format(kl_qp))
+
+    fig1=plt.figure()
+    plt.imshow(hdp_sample.docTopicsImg(),interpolation='nearest', cmap = cm.hot)
+    fig1.show()
+    fig2=plt.figure()
+    plt.imshow(hdp_var.docTopicsImg(),interpolation='nearest', cmap = cm.hot)
+    fig2.show()
+    raw_input()
+
   else:
-    hdp=bnp.HDP_Dir(dirichlet,alpha,gamma)
+    hdp=bnp.HDP_Dir(dirichlet,alpha,omega)
     for x_i in x[0:D]:
       hdp.addDoc(np.vstack(x_i[0:N_d]))
     result=hdp.densityEst(10,10,10)
 
 
-  print("---------------------- DONE -------------------------");
 
-#  #z_di=[]
-#  lamb=[]
-#  for k in range(0,K):
-#    lamb.append(np.zeros(Nw,dtype=np.double))
-#    hdp.getLambda(lamb[k],k)
-#    print(lamb[k])
-#    #z_di.append(np.zeros(len(x[d]),dtype=np.uint32))
-#    #hdp.getClassLabels(z_di[d],d)
-#    #print(z_di[d])
-#  a=np.zeros(K,dtype=np.double)
-#  b=np.zeros(K,dtype=np.double)
-#  hdp.getA(a)
-#  hdp.getB(b)
-#
-#  plt.figure(1)
-#  for k in range(0,40):
-#    plt.subplot(7,6,k+1)
-#    plt.plot(lamb[k])
-#    plt.xlabel('topic '+str(k))
-#
-#  plt.subplot(7,6,41)
-#  plt.plot(a)
-#  plt.xlabel('A')
-#  plt.subplot(7,6,42)
-#  plt.plot(b)
-#  plt.xlabel('B')
-#  plt.show(1)
-#
-  
-#  plt.figure(1)
-#  for d in range(0,J):
-#    plt.subplot(1,J,d)
-#    for k in range(0,K):
-#      plt.plot(x[d][z_di[d]==k,0],x[d][z_di[d]==k,1],'xk',color=cm.spectral(float(k)/(K-1)),hold=True)
-#      print(cm.spectral(float(k)/K))
-#      plt.xlim([-12,12])
-#      plt.ylim([-12,12])
-#  plt.show(1)
-#

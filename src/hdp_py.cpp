@@ -234,9 +234,10 @@ public:
   bool densityEst(uint32_t Nw, double ro=0.75, uint32_t K=100, uint32_t T=10)
   {
     cout<<"mX.size()="<<HDP_onl::mX.size()<<endl;
-    for (uint32_t i=0; i<HDP_onl::mX.size(); ++i)
-      cout<<"  x_"<<i<<": "<<HDP_onl::mX[i].n_rows<<"x"<<HDP_onl::mX[i].n_cols<<endl;
-
+    cout<<"mX_ho.size()="<<HDP_onl::mX_ho.size()<<endl;
+//    for (uint32_t i=0; i<HDP_onl::mX.size(); ++i)
+//      cout<<"  x_"<<i<<": "<<HDP_onl::mX[i].n_rows<<"x"<<HDP_onl::mX[i].n_cols<<endl;
+//
     return HDP_onl::densityEst(Nw,ro,K,T);
   }
 
@@ -246,6 +247,22 @@ public:
     Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
     return HDP_onl::addDoc(x_i_mat);
   };
+
+  uint32_t addHeldOut(const numeric::array& x_i)
+  {
+    Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
+    return HDP_onl::addHeldOut(x_i_mat);
+  };
+
+
+  // after an initial densitiy estimate has been made using addDoc() and densityEst()
+  // can use this to update the estimate with information from additional x 
+  bool updateEst(const numeric::array& x, double ro=0.75)
+  {
+    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
+    return HDP_onl::updateEst(x_mat,ro);
+  }
+
 
   // works on the data in z_i -> size has to be correct in order for this to work!
   // makes a copy of the internal labels vector
@@ -283,27 +300,38 @@ public:
   {
     Col<double> a_wrap=np2col<double>(a); 
      for (uint32_t i=0; i<a_wrap.n_rows; ++i)
-        a_wrap.at(i)=HDP_onl::mA.at(i);
+        a_wrap.at(i)=HDP_onl::mA.at(0,i);
   };
 
   void getB(numeric::array& b)
   {
     Col<double> b_wrap=np2col<double>(b); 
      for (uint32_t i=0; i<b_wrap.n_rows; ++i)
-        b_wrap.at(i)=HDP_onl::mB.at(i);
+        b_wrap.at(i)=HDP_onl::mA.at(1,i);
   };
 
-  bool getDocTopics(numeric::array& prop, numeric::array& topicInd, uint32_t d)
+  void getPerplexity(numeric::array& perp)
+  {
+    Col<double> perp_wrap=np2col<double>(perp); 
+     for (uint32_t i=0; i<perp_wrap.n_rows; ++i)
+        perp_wrap.at(i)=HDP_onl::mPerp.at(i);
+  };
+
+  bool getDocTopics(numeric::array& pi, numeric::array& prop, numeric::array& topicInd, uint32_t d)
   {
     Col<double> prop_col;
+    Col<double> pi_col;
     Col<uint32_t> topicInd_col;
-    if(!HDP_onl::getDocTopics(prop_col, topicInd_col, d)){return false;} // works on the data in _mat
+    if(!HDP_onl::getDocTopics(pi_col, prop_col, topicInd_col, d)){return false;} // works on the data in _mat
     Col<double> prop_wrap=np2col<double>(prop); 
+    Col<double> pi_wrap=np2col<double>(pi); 
     Col<uint32_t> topicInd_wrap=np2col<uint32_t>(topicInd); 
-    if((prop_col.n_rows != prop_wrap.n_rows) || (topicInd_col.n_rows != topicInd_wrap.n_rows))
+    if((prop_col.n_rows != prop_wrap.n_rows) || (topicInd_col.n_rows != topicInd_wrap.n_rows) || (pi_col.n_rows != pi_wrap.n_rows))
       return false;
     else{
-      for (uint32_t i=0; i<topicInd_wrap.n_rows; ++i)
+     for (uint32_t i=0; i<pi_col.n_rows; ++i)
+        pi_wrap.at(i)=pi_col.at(i);
+     for (uint32_t i=0; i<topicInd_wrap.n_rows; ++i)
         topicInd_wrap.at(i)=topicInd_col.at(i);
       for (uint32_t i=0; i<prop_wrap.n_rows; ++i)
         prop_wrap.at(i)=prop_col.at(i);
@@ -311,32 +339,56 @@ public:
     }
   };
 
-  bool getCorpTopicProportions(numeric::array& prop)
+  bool getCorpTopicProportions(numeric::array& v, numeric::array& sigV)
   {
-    Col<double> prop_col;
-    if(!HDP_onl::getCorpTopicProportions(prop_col)){return false;} // works on the data in _mat
-    Col<double> prop_wrap=np2col<double>(prop); 
-    if(prop_col.n_rows != prop_wrap.n_rows)
+    Col<double> sigV_col;
+    Col<double> v_col;
+    if(!HDP_onl::getCorpTopicProportions(v_col,sigV_col)){return false;} // works on the data in _mat
+    Col<double> sigV_wrap=np2col<double>(sigV); 
+    Col<double> v_wrap=np2col<double>(v); 
+    if((sigV_col.n_rows != sigV_wrap.n_rows) || (v_col.n_rows != v_wrap.n_rows))
       return false;
     else{
-      for (uint32_t i=0; i<prop_wrap.n_rows; ++i)
-        prop_wrap.at(i)=prop_col.at(i);
+      for (uint32_t i=0; i<v_wrap.n_rows; ++i)
+        v_wrap.at(i)=v_col.at(i);
+      for (uint32_t i=0; i<sigV_wrap.n_rows; ++i)
+        sigV_wrap.at(i)=sigV_col.at(i);
       return true;
     }
   }; 
 
-  bool getCorpTopic(numeric::array& topic, uint32_t k)
+  bool getCorpTopic(numeric::array& beta, uint32_t k)
   {
-    Col<double> topic_col;
-    if(!HDP_onl::getCorpTopic(topic_col, k)){return false;} // works on the data in _mat
-    Col<double> topic_wrap=np2col<double>(topic); 
-    if(topic_col.n_rows != topic_wrap.n_rows)
+    Col<double> beta_col;
+    if(!HDP_onl::getCorpTopic(beta_col, k)){return false;} // works on the data in _mat
+    Col<double> beta_wrap=np2col<double>(beta); 
+    if(beta_col.n_rows != beta_wrap.n_rows)
       return false;
     else{
-      for (uint32_t i=0; i<topic_wrap.n_rows; ++i)
-        topic_wrap.at(i)=topic_col.at(i);
+      for (uint32_t i=0; i<beta_wrap.n_rows; ++i)
+        beta_wrap.at(i)=beta_col.at(i);
       return true;
     }
+  };
+
+  bool getWordTopics(numeric::array& z, uint32_t d)
+  {
+    Col<uint32_t> z_col;
+    if(!HDP_onl::getWordTopics(z_col, d)){return false;} // works on the data in _mat
+    Col<uint32_t> z_wrap=np2col<uint32_t>(z); 
+    if(z_col.n_rows != z_wrap.n_rows)
+      return false;
+    else{
+      for (uint32_t i=0; i<z_wrap.n_rows; ++i)
+        z_wrap.at(i)=z_col.at(i);
+      return true;
+    }
+  };
+
+  double perplexity(numeric::array& x, uint32_t d, double kappa)
+  {
+    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
+    return HDP_onl::perplexity(x_mat,d,kappa);
   };
 
 };
@@ -358,26 +410,31 @@ BOOST_PYTHON_MODULE(libbnp)
 	class_<HDP_Dir>("HDP_Dir",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_Dir::densityEst)
         .def("getClassLabels",&HDP_Dir::getClassLabels)
-        .def("addDoc",&HDP_Dir::addDoc)
-        .def_readonly("mGamma", &HDP_Dir::mGamma);
+        .def("addDoc",&HDP_Dir::addDoc);
+  //      .def_readonly("mGamma", &HDP_Dir::mGamma);
 
 	class_<HDP_INW>("HDP_INW",init<InvNormWishart_py&,double,double>())
         .def("densityEst",&HDP_INW::densityEst)
         .def("getClassLabels",&HDP_INW::getClassLabels)
-        .def("addDoc",&HDP_INW::addDoc)
-        .def_readonly("mGamma", &HDP_INW::mGamma);
+        .def("addDoc",&HDP_INW::addDoc);
+  //      .def_readonly("mGamma", &HDP_INW::mGamma);
 
 	class_<HDP_onl_py>("HDP_onl",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_onl_py::densityEst)
+        .def("updateEst",&HDP_onl_py::updateEst)
+        .def("perplexity",&HDP_onl_py::perplexity)
         .def("getClassLabels",&HDP_onl_py::getClassLabels)
         .def("addDoc",&HDP_onl_py::addDoc)
+        .def("addHeldOut",&HDP_onl_py::addHeldOut)
+        .def("getPerplexity",&HDP_onl_py::getPerplexity)
         .def("getA",&HDP_onl_py::getA)
         .def("getB",&HDP_onl_py::getB)
         .def("getLambda",&HDP_onl_py::getLambda)
         .def("getDocTopics",&HDP_onl_py::getDocTopics)
+        .def("getWordTopics",&HDP_onl_py::getWordTopics)
         .def("getCorpTopicProportions",&HDP_onl_py::getCorpTopicProportions)
-        .def("getCorpTopic",&HDP_onl_py::getCorpTopic)
-        .def_readonly("mGamma", &HDP_onl_py::mGamma);
+        .def("getCorpTopic",&HDP_onl_py::getCorpTopic);
+   //     .def_readonly("mGamma", &HDP_onl_py::mGamma);
 
 }
 
