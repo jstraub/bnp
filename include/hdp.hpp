@@ -832,16 +832,16 @@ class HDP_onl : public HDP<uint32_t>
       if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
         uint32_t N = x.n_rows;
         //uint32_t Nw = mLambda.n_cols;
-        uint32_t T = mT; //mZeta[0].n_rows; // TODO: most likely seg fault because of this
+        uint32_t T = mT; //mZeta[0].n_rows; 
         uint32_t K = mK; //mZeta[0].n_cols;
 
-        Mat<double> zeta = Mat<double>(T,K);
-        Mat<double> phi = Mat<double>(N,T);
-        Mat<double> gamma = Mat<double>(T,2);
+        Mat<double> zeta(T,K);
+        Mat<double> phi(N,T);
+        Mat<double> gamma(T,2);
         //uint32_t d = mX.size()-1;
 
-        Mat<double> a = mA; // TODO: make deep copy here!
-        Mat<double> lambda = mLambda;
+        Mat<double> a(mA);// DONE: make deep copy here!
+        Mat<double> lambda(mLambda);
         double omega = mOmega;
 
         //cout<<"updating copied model with x"<<endl;

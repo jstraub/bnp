@@ -115,7 +115,7 @@ if __name__ == '__main__':
 
     perp_d=np.zeros(D_ho)
     for d in range(0,D_ho):
-      print('{}'.format(d))
+      print('{}: {}'.format(d,x_ho[d]))
       perp_d[d]=hdp.perplexity(x_ho[d],D-D_ho+1,ro)
       print('Perplexity of heldout ({}):\t{}'.format(d,perp_d))
 
