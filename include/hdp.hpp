@@ -638,6 +638,7 @@ class HDP_onl : public HDP<uint32_t>
         d_a(k,0) = D*d_a(k,0)+1.0;
         d_a(k,1) = D*d_a(k,1)+omega;
       }
+      //cout<<"da="<<d_a<<endl;
     }
 
 
@@ -685,97 +686,94 @@ class HDP_onl : public HDP<uint32_t>
 
       vector<Col<uint32_t> > z_dn(D);
       Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
-#pragma omp parallel for ordered schedule(dynamic) 
-      for (uint32_t dd=0; dd<D; ++dd)
+      uint32_t d,dd,N,o,i;
+      double ro,perp_i;
+#pragma omp parallel private(d,dd,N,o,ro,i,perp_i)
+//#pragma omp parallel private(d,dd,N,zeta,phi,converged,gamma,gamma_prev,o,d_lambda,d_a,ro,i,perp_i)
+      //shared(x,mZeta,mPhi,mGamma,mOmega,D,T,K,Nw,mA,mLambda,mPerp,mX_ho)
       {
-        uint32_t d=ind[dd];  
-        uint32_t N=x[d].n_rows;
-        //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
-        cout<<"----------------- dd="<<dd<<" -----------------"<<endl;
-        //      cout<<"a=\t"<<a.t();
-        //      for (uint32_t k=0; k<K; ++k)
-        //      {
-        //        cout<<"@"<<k<<" lambda=\t"<<lambda.row(k);
-        //      }
-        //
-        Mat<double> zeta(T,K);
-        initZeta(zeta,lambda,x[d]);
-        Mat<double> phi(N,T);
-        initPhi(phi,zeta,lambda,x[d]);
-
-        // ------------------------ doc level updates --------------------
-        bool converged = false;
-        Mat<double> gamma(T,2);
-        Mat<double> gamma_prev(T,2);
-        gamma_prev.ones();
-        gamma_prev.col(1) += mAlpha;
-
-        uint32_t o=0;
-        while(!converged){
-          //        cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
-          updateGamma(gamma,phi);
-          updateZeta(zeta,phi,a,lambda,x[d]);
-          updatePhi(phi,zeta,gamma,lambda,x[d]);
-
-          converged = (accu(gamma_prev != gamma))==0 || o>60 ;
-
-          gamma_prev = gamma;
-          //cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
-          //cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
-          ++o;
-        }
-
-        mZeta[d] = Mat<double>(zeta);
-        mPhi[d] = Mat<double>(phi);
-        mGamma[d] = Mat<double>(gamma);
-
-        //      cout<<"z_dn: "<<endl;
-        //      z_dn[d].set_size(N);
-        //      for (uint32_t n=0; n<N; ++n){
-        //        uint32_t z=as_scalar(find(phi.row(n) == max(phi.row(n)),1));
-        //        uint32_t c_di=as_scalar(find(zeta.row(z) == max(zeta.row(z)),1));
-        //        z_dn[d](n) = c_di;
-        //        cout<<z_dn[d](n)<<" ("<<max(phi.row(n))<<"@"<< z<<" -> "<<max(zeta.row(z))<<"@"<<c_di<<") "<<endl ;
-        //        if (max(phi.row(n))>1.0)
-        //          cout<<phi.row(n)<<endl;
-        //      }; cout<<endl;
-
-        //cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
-        //cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
-
-        //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
-        //      cout<<"\tD="<<D<<" omega="<<mOmega<<endl;
-        //
-        Mat<double> d_lambda(K,Nw);
-        Mat<double> d_a(K,2); 
-        computeNaturalGradients(d_lambda, d_a, zeta, phi, mOmega, D, x[d]);
-
-        //cout<<"delta a= "<<d_a.t()<<endl;
-        //for (uint32_t k=0; k<K; ++k)
-        //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
-
-        // ----------------------- update global params -----------------------
-#pragma omp ordered
+#pragma omp for schedule(dynamic)
+        for (dd=0; dd<D; ++dd)
         {
-          cout<<" ------------------- global parameter updates dd="<<dd<<" d="<<d<<" ---------------"<<endl;
-          double ro = exp(-kappa*log(1+double(dd+1)));
-          //cout<<"\tro="<<ro<<endl;
-          lambda = (1.0-ro)*lambda + ro*d_lambda;
-          a = (1.0-ro)*a + ro*d_a;
+          d=ind[dd];  
+          N=x[d].n_rows;
+          //cout<<"delta a= "<<d_a.t()<<endl;
+          //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
+          cout<<"----------------- dd="<<dd<<" -----------------"<<endl;
+          //      cout<<"a=\t"<<a.t();
+          //      for (uint32_t k=0; k<K; ++k)
+          //      {
+          //        cout<<"@"<<k<<" lambda=\t"<<lambda.row(k);
+          //      }
 
-          mA=a;
-          mLambda = lambda;
+          bool converged = false;
+          Mat<double> zeta(T,K);
+          Mat<double> phi(N,T);
+          Mat<double> gamma(T,2);
+          Mat<double> gamma_prev(T,2);
+          Mat<double> d_lambda(K,Nw);
+          Mat<double> d_a(K,2); 
 
-          mPerp[dd] = 0.0;
-          cout<<"computing "<<mX_ho.size()<<" perplexities"<<endl;
-          for (uint32_t i=0; i<mX_ho.size(); ++i)
-          {
-            double perp_i =  perplexity(mX_ho[i],dd+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
-            cout<<"perp_"<<i<<"="<<perp_i<<endl;
-            mPerp[dd] += perp_i;
+          initZeta(zeta,lambda,x[d]);
+          initPhi(phi,zeta,lambda,x[d]);
+
+          //cout<<" ------------------------ doc level updates --------------------"<<endl;
+          converged = false;
+          gamma_prev.ones();
+          gamma_prev.col(1) += mAlpha;
+
+          o=0;
+          while(!converged){
+         //           cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
+            updateGamma(gamma,phi);
+            updateZeta(zeta,phi,a,lambda,x[d]);
+            updatePhi(phi,zeta,gamma,lambda,x[d]);
+
+            converged = (accu(gamma_prev != gamma))==0 || o>60 ;
+            gamma_prev = gamma;
+            //cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
+            //cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
+            ++o;
           }
-          mPerp[dd] /= double(mX_ho.size());
-          //cout<<"Perplexity="<<mPerp[d]<<endl;
+
+          mZeta[d] = Mat<double>(zeta);
+          mPhi[d] = Mat<double>(phi);
+          mGamma[d] = Mat<double>(gamma);
+
+          //cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
+          //cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
+          //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
+          //      cout<<"\tD="<<D<<" omega="<<mOmega<<endl;
+          computeNaturalGradients(d_lambda, d_a, zeta, phi, mOmega, D, x[d]);
+
+          //for (uint32_t k=0; k<K; ++k)
+          //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
+          // ----------------------- update global params -----------------------
+#pragma omp critical
+          {
+            cout<<" ------------------- global parameter updates dd="<<dd<<" d="<<d<<" ---------------"<<endl;
+            //cout<<kappa<<endl;
+            ro = exp(-kappa*log(1+double(dd+1)));
+            //cout<<"\tro="<<ro<<endl;
+
+            //cout<<"d_a="<<d_a<<endl;
+            //cout<<"a="<<a<<endl;
+            lambda = (1.0-ro)*lambda + ro*d_lambda;
+            a = (1.0-ro)*a + ro*d_a;
+            mA=a;
+            mLambda = lambda;
+
+            mPerp[dd] = 0.0;
+            cout<<"computing "<<mX_ho.size()<<" perplexities"<<endl;
+            for (i=0; i<mX_ho.size(); ++i)
+            {
+              perp_i =  perplexity(mX_ho[i],dd+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
+              cout<<"perp_"<<i<<"="<<perp_i<<endl;
+              mPerp[dd] += perp_i;
+            }
+            mPerp[dd] /= double(mX_ho.size());
+            //cout<<"Perplexity="<<mPerp[d]<<endl;
+          }
         }
       }
       return z_dn;
@@ -875,7 +873,7 @@ class HDP_onl : public HDP<uint32_t>
       getCorpTopic(topics, lambda);
 
       double perp = 0.0;
-      cout<<"x: "<<x.n_rows<<"x"<<x.n_cols<<endl;
+      //cout<<"x: "<<x.n_rows<<"x"<<x.n_cols<<endl;
       for (uint32_t n=0; n<x.n_elem; ++n){
         //cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x.n_rows<<" x_n="<<x[n]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols<<endl;
         perp -= logCat(x[n],topics.row(c[z[n]]));
