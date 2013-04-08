@@ -297,7 +297,8 @@ class HDP_sample:
     fig=plt.figure()
     for i in range(0,Np):
       plt.subplot(Ncol,Nrow,i+1)
-      plt.plot(self.beta[ks[i]])
+      x = np.linspace(0,self.beta[ks[i]].size-1,self.beta[ks[i]].size)
+      plt.stem(x,self.beta[ks[i]])
       plt.xlabel('topic '+str(ks[i]))
     return fig
 

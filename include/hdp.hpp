@@ -699,7 +699,7 @@ class HDP_onl : public HDP<uint32_t>
           N=x[d].n_rows;
           //cout<<"delta a= "<<d_a.t()<<endl;
           //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
-          cout<<"----------------- dd="<<dd<<" -----------------"<<endl;
+          cout<<"-- dd="<<dd<<" d="<<d<<" N="<<N<<endl;
           //      cout<<"a=\t"<<a.t();
           //      for (uint32_t k=0; k<K; ++k)
           //      {
@@ -751,9 +751,8 @@ class HDP_onl : public HDP<uint32_t>
           // ----------------------- update global params -----------------------
 #pragma omp critical
           {
-            cout<<" ------------------- global parameter updates dd="<<dd<<" d="<<d<<" ---------------"<<endl;
-            //cout<<kappa<<endl;
             ro = exp(-kappa*log(1+double(dd+1)));
+            cout<<" -- global parameter updates dd="<<dd<<" d="<<d<<" ro="<<ro<<endl;
             //cout<<"\tro="<<ro<<endl;
 
             //cout<<"d_a="<<d_a<<endl;
@@ -764,15 +763,17 @@ class HDP_onl : public HDP<uint32_t>
             mLambda = lambda;
 
             mPerp[dd] = 0.0;
-            cout<<"computing "<<mX_ho.size()<<" perplexities"<<endl;
-            for (i=0; i<mX_ho.size(); ++i)
-            {
-              perp_i =  perplexity(mX_ho[i],dd+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
-              cout<<"perp_"<<i<<"="<<perp_i<<endl;
-              mPerp[dd] += perp_i;
+            if (mX_ho.size() > 0) {
+              cout<<"computing "<<mX_ho.size()<<" perplexities"<<endl;
+              for (i=0; i<mX_ho.size(); ++i)
+              {
+                perp_i =  perplexity(mX_ho[i],dd+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
+                cout<<"perp_"<<i<<"="<<perp_i<<endl;
+                mPerp[dd] += perp_i;
+              }
+              mPerp[dd] /= double(mX_ho.size());
+              //cout<<"Perplexity="<<mPerp[d]<<endl;
             }
-            mPerp[dd] /= double(mX_ho.size());
-            //cout<<"Perplexity="<<mPerp[d]<<endl;
           }
         }
       }
