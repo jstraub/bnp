@@ -231,14 +231,14 @@ public:
     cout<<"Creating "<<typeid(this).name()<<endl;
   };
 
-  bool densityEst(uint32_t Nw, double ro=0.75, uint32_t K=100, uint32_t T=10)
+  bool densityEst(uint32_t Nw, double kappa, uint32_t K, uint32_t T, uint32_t S)
   {
     cout<<"mX.size()="<<HDP_onl::mX.size()<<endl;
     cout<<"mX_ho.size()="<<HDP_onl::mX_ho.size()<<endl;
 //    for (uint32_t i=0; i<HDP_onl::mX.size(); ++i)
 //      cout<<"  x_"<<i<<": "<<HDP_onl::mX[i].n_rows<<"x"<<HDP_onl::mX[i].n_cols<<endl;
 //
-    return HDP_onl::densityEst(Nw,ro,K,T);
+    return HDP_onl::densityEst(Nw,kappa,K,T,S);
   }
 
   // makes no copy of the external data x_i

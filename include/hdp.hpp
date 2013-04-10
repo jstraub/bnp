@@ -644,11 +644,12 @@ class HDP_onl : public HDP<uint32_t>
 
     // method for "one shot" computation without storing data in this class
     //  Nw: number of different words
-    //  kappa: forgetting rate
+    //  kappa=0.9: forgetting rate
     //  uint32_t T=10; // truncation on document level
     //  uint32_t K=100; // truncation on corpus level
+    // S = batch size
     vector<Col<uint32_t> > densityEst(const vector<Mat<uint32_t> >& x, uint32_t Nw, 
-        double kappa=0.75, uint32_t K=100, uint32_t T=10)
+        double kappa, uint32_t K, uint32_t T, uint32_t S)
     {
 
       // From: Online Variational Inference for the HDP
@@ -682,100 +683,92 @@ class HDP_onl : public HDP<uint32_t>
       mZeta.resize(D,Mat<double>());
       mPhi.resize(D,Mat<double>());
       mGamma.resize(D,Mat<double>());
-      mPerp.set_size(D);
+      mPerp.zeros(D);
 
       vector<Col<uint32_t> > z_dn(D);
       Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
-      uint32_t d,dd,N,o,i;
-      double ro,perp_i;
-#pragma omp parallel private(d,dd,N,o,ro,i,perp_i)
+//#pragma omp parallel private(dd,db)
 //#pragma omp parallel private(d,dd,N,zeta,phi,converged,gamma,gamma_prev,o,d_lambda,d_a,ro,i,perp_i)
       //shared(x,mZeta,mPhi,mGamma,mOmega,D,T,K,Nw,mA,mLambda,mPerp,mX_ho)
       {
 //#pragma omp for schedule(dynamic)
-#pragma omp for schedule(dynamic) ordered
-        for (dd=0; dd<D; ++dd)
+//#pragma omp for schedule(dynamic) ordered
+        for (uint32_t dd=0; dd<D; dd += S)
         {
-          d=ind[dd];  
-          N=x[d].n_rows;
-          //cout<<"delta a= "<<d_a.t()<<endl;
-          //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
-          cout<<"-- dd="<<dd<<" d="<<d<<" N="<<N<<endl;
-          //      cout<<"a=\t"<<a.t();
-          //      for (uint32_t k=0; k<K; ++k)
-          //      {
-          //        cout<<"@"<<k<<" lambda=\t"<<lambda.row(k);
-          //      }
+          Mat<double> db_lambda(K,Nw); // batch updates
+          Mat<double> db_a(K,2); 
+#pragma omp parallel for schedule(dynamic) 
+          for (uint32_t db=dd; db<min(dd+S,D); db++)
+          {
+            uint32_t d=ind[db];  
+            uint32_t N=x[d].n_rows;
+            //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
 
-          bool converged = false;
-          Mat<double> zeta(T,K);
-          Mat<double> phi(N,T);
-          Mat<double> gamma(T,2);
-          Mat<double> gamma_prev(T,2);
-          Mat<double> d_lambda(K,Nw);
-          Mat<double> d_a(K,2); 
+            cout<<"-- db="<<db<<" d="<<d<<" N="<<N<<endl;
+            Mat<double> zeta(T,K);
+            Mat<double> phi(N,T);
+            initZeta(zeta,lambda,x[d]);
+            initPhi(phi,zeta,lambda,x[d]);
 
-          initZeta(zeta,lambda,x[d]);
-          initPhi(phi,zeta,lambda,x[d]);
+            //cout<<" ------------------------ doc level updates --------------------"<<endl;
+            Mat<double> gamma(T,2);
+            Mat<double> gamma_prev(T,2);
+            gamma_prev.ones();
+            gamma_prev.col(1) += mAlpha;
+            bool converged = false;
+            uint32_t o=0;
+            while(!converged){
+              //           cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
+              updateGamma(gamma,phi);
+              updateZeta(zeta,phi,a,lambda,x[d]);
+              updatePhi(phi,zeta,gamma,lambda,x[d]);
 
-          //cout<<" ------------------------ doc level updates --------------------"<<endl;
-          converged = false;
-          gamma_prev.ones();
-          gamma_prev.col(1) += mAlpha;
+              converged = (accu(gamma_prev != gamma))==0 || o>60 ;
+              gamma_prev = gamma;
+              ++o;
+            }
 
-          o=0;
-          while(!converged){
-         //           cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
-            updateGamma(gamma,phi);
-            updateZeta(zeta,phi,a,lambda,x[d]);
-            updatePhi(phi,zeta,gamma,lambda,x[d]);
-
-            converged = (accu(gamma_prev != gamma))==0 || o>60 ;
-            gamma_prev = gamma;
-            //cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
-            //cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
-            ++o;
+            mZeta[d] = Mat<double>(zeta);
+            mPhi[d] = Mat<double>(phi);
+            mGamma[d] = Mat<double>(gamma);
+            Mat<double> d_lambda(K,Nw);
+            Mat<double> d_a(K,2); 
+            //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
+            computeNaturalGradients(d_lambda, d_a, zeta, phi, mOmega, D, x[d]);
+ #pragma omp critical
+            {
+              db_lambda += d_lambda;
+              db_a += d_a;
+            }
           }
-
-          mZeta[d] = Mat<double>(zeta);
-          mPhi[d] = Mat<double>(phi);
-          mGamma[d] = Mat<double>(gamma);
-
-          //cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
-          //cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
-          //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
-          //      cout<<"\tD="<<D<<" omega="<<mOmega<<endl;
-          computeNaturalGradients(d_lambda, d_a, zeta, phi, mOmega, D, x[d]);
-
           //for (uint32_t k=0; k<K; ++k)
           //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
           // ----------------------- update global params -----------------------
-//#pragma omp critical
-#pragma omp ordered
-          {
-            ro = exp(-kappa*log(1+double(dd+1)));
-            cout<<" -- global parameter updates dd="<<dd<<" d="<<d<<" ro="<<ro<<endl;
-            //cout<<"\tro="<<ro<<endl;
+          double bS = min(S,D-dd); // necessary for the last batch, which migth not form a complete batch
+          double ro = exp(-kappa*log(1+double(dd)+double(bS)/2.0)); // as "time" use the middle of the batch 
+          cout<<" -- global parameter updates dd="<<dd<<" bS="<<bS<<" ro="<<ro<<endl;
+          //cout<<"d_a="<<d_a<<endl;
+          //cout<<"a="<<a<<endl;
+          lambda = (1.0-ro)*lambda + (ro/S)*db_lambda;
+          a = (1.0-ro)*a + (ro/S)*db_a;
+          mA=a;
+          mLambda = lambda;
 
-            //cout<<"d_a="<<d_a<<endl;
-            //cout<<"a="<<a<<endl;
-            lambda = (1.0-ro)*lambda + ro*d_lambda;
-            a = (1.0-ro)*a + ro*d_a;
-            mA=a;
-            mLambda = lambda;
-
-            mPerp[dd] = 0.0;
-            if (mX_ho.size() > 0) {
-              cout<<"computing "<<mX_ho.size()<<" perplexities"<<endl;
-              for (i=0; i<mX_ho.size(); ++i)
+          mPerp[dd+bS/2] = 0.0;
+          if (mX_ho.size() > 0) {
+            cout<<"computing "<<mX_ho.size()<<" perplexities"<<endl;
+#pragma omp parallel for schedule(dynamic) 
+            for (uint32_t i=0; i<mX_ho.size(); ++i)
+            {
+              double perp_i =  perplexity(mX_ho[i],dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
+              cout<<"perp_"<<i<<"="<<perp_i<<endl;
+#pragma omp critical
               {
-                perp_i =  perplexity(mX_ho[i],dd+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
-                cout<<"perp_"<<i<<"="<<perp_i<<endl;
                 mPerp[dd] += perp_i;
               }
-              mPerp[dd] /= double(mX_ho.size());
-              //cout<<"Perplexity="<<mPerp[d]<<endl;
             }
+            mPerp[dd] /= double(mX_ho.size());
+            //cout<<"Perplexity="<<mPerp[d]<<endl;
           }
         }
       }
@@ -783,11 +776,11 @@ class HDP_onl : public HDP<uint32_t>
     };
 
     // compute density estimate based on data previously fed into the class using addDoc
-    bool densityEst(uint32_t Nw, double kappa=0.75, uint32_t K=100, uint32_t T=10)
+    bool densityEst(uint32_t Nw, double kappa, uint32_t K, uint32_t T, uint32_t S)
     {
       if(mX.size() > 0)
       {
-        mZ = densityEst(mX,Nw,kappa,K,T);
+        mZ = densityEst(mX,Nw,kappa,K,T,S);
         return true;
       }else{
         return false;
@@ -796,7 +789,7 @@ class HDP_onl : public HDP<uint32_t>
 
     // after an initial densitiy estimate has been made using densityEst()
     // can use this to update the estimate with information from additional x 
-    bool  updateEst(const Mat<uint32_t>& x, double kappa=0.75)
+    bool  updateEst(const Mat<uint32_t>& x, double kappa)
     {
       if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
         uint32_t N = x.n_rows;

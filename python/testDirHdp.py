@@ -38,7 +38,7 @@ def dataFromBOFs(pathToData):
 class HDPvar(bnp.HDP_onl):
 
   # x are data for training; x_ho is held out data
-  def initialEstimate(self,x,x_ho,Nw,ro,K,T):
+  def initialEstimate(self,x,x_ho,Nw,kappa,K,T,S):
     D = len(x)
     for x_i in x:
       self.addDoc(np.vstack(x_i))
@@ -47,7 +47,7 @@ class HDPvar(bnp.HDP_onl):
       print("adding held out")
       self.addHeldOut(np.vstack(x_ho_i))
       #self.addHeldOut(np.vstack(x_ho_i[0:N_d]))
-    return self.densityEst(Nw,ro,K,T)
+    return self.densityEst(Nw,kappa,K,T,S)
 
 
 if __name__ == '__main__':
@@ -60,9 +60,10 @@ if __name__ == '__main__':
     D_ho = 1 # (ho= held out) number of docs used for testing (perplexity)
     N_d = 100 # max number of words per doc
     Nw = 40 # how many different symbols are in the alphabet
-    ro = 0.9 # forgetting rate
+    kappa = 0.9 # forgetting rate
     K = 30 # top level truncation
     T = 10 # low level truncation
+    S = 5 # mini batch size
     alpha = 1. # concentration on G_i
     omega = 10. # concentration on G_0
     dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
@@ -78,9 +79,10 @@ if __name__ == '__main__':
     D = 1000 #number of documents to process
     N_d = 10 # max number of words per doc
     Nw = 256 # how many different symbols are in the alphabet
-    ro = 0.75 # forgetting rate
+    kappa = 0.75 # forgetting rate
     K = 40 # top level truncation
     T = 10 # low level truncation
+    S = 10 # mini batch size
     alpha = 1.1 # concentration on G_i
     omega = 10. # concentration on G_0
     dirAlphas = np.ones(Nw)*1.0e-5 # alphas for dirichlet base measure
@@ -97,12 +99,12 @@ if __name__ == '__main__':
 
   if variational:
     hdp = HDPvar(dirichlet,alpha,omega)
-    hdp.initialEstimate(x_train,x_ho,Nw,ro,K,T)
+    hdp.initialEstimate(x_train,x_ho,Nw,kappa,K,T,S)
 
 #    hdp=bnp.HDP_onl(dirichlet,alpha,omega)
 #    for x_i in x[0:D]:
 #      hdp.addDoc(np.vstack(x_i[0:N_d]))
-#    result=hdp.densityEst(Nw,ro,K,T)
+#    result=hdp.densityEst(Nw,kappa,K,T)
 
     perp = np.zeros(D-D_ho)
     hdp.getPerplexity(perp)
@@ -116,7 +118,7 @@ if __name__ == '__main__':
     perp_d=np.zeros(D_ho)
     for d in range(0,D_ho):
       print('{}: {}'.format(d,x_ho[d]))
-      perp_d[d]=hdp.perplexity(x_ho[d],D-D_ho+1,ro)
+      perp_d[d]=hdp.perplexity(x_ho[d],D-D_ho+1,kappa)
       print('Perplexity of heldout ({}):\t{}'.format(d,perp_d))
 
     fig01=plt.figure()
