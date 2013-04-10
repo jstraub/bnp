@@ -56,14 +56,14 @@ if __name__ == '__main__':
   variational = True
 
   if useSynthetic:
-    D = 100 #number of documents to process
-    D_ho = 1 # (ho= held out) number of docs used for testing (perplexity)
+    D = 1000 #number of documents to process
+    D_ho = 10 # (ho= held out) number of docs used for testing (perplexity)
     N_d = 100 # max number of words per doc
     Nw = 40 # how many different symbols are in the alphabet
     kappa = 0.9 # forgetting rate
     K = 30 # top level truncation
     T = 10 # low level truncation
-    S = 5 # mini batch size
+    S = 10 # mini batch size
     alpha = 1. # concentration on G_i
     omega = 10. # concentration on G_0
     dirAlphas = np.ones(Nw) # alphas for dirichlet base measure

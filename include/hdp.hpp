@@ -873,7 +873,7 @@ class HDP_onl : public HDP<uint32_t>
       for (uint32_t n=0; n<x.n_elem; ++n){
         //cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x.n_rows<<" x_n="<<x[n]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols<<endl;
         perp -= logCat(x[n],topics.row(c[z[n]]));
-        cout<<perp<<" ";
+        //cout<<perp<<" ";
       } cout<<endl;
       perp /= double(x.n_elem);
       perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
