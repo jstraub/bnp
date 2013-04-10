@@ -43,15 +43,15 @@ ENDIF()
 # Include directories (.h .hpp files)
 include_directories(
   ./include
-  $ENV{WORKSPACE_HOME}/workspace_research/3rdparty/include
+  $ENV{WORKSPACE_HOME}/research/3rdparty/include
   /usr/share/pyshared/numpy/core/include
-  ${PYTON_INCLUDE_DIRS}
+  ${PYTHON_INCLUDE_DIRS}
   /usr/include
   )
 
 # Include library directories
 link_directories(
-  $ENV{WORKSPACE_HOME}/workspace_research/3rdparty/lib
+  $ENV{WORKSPACE_HOME}/research/3rdparty/lib
   /usr/lib/
   )
 

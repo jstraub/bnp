@@ -14,8 +14,14 @@
 
 #include <boost/python.hpp>
 #include <boost/python/wrapper.hpp>
-#include <python2.7/object.h> // for PyArray_FROM_O
 #include <numpy/ndarrayobject.h> // for PyArrayObject
+
+#ifdef PYTHON_2_6
+  #include <python2.6/object.h> // for PyArray_FROM_O
+#endif 
+#ifdef PYTHON_2_7
+  #include <python2.7/object.h> // for PyArray_FROM_O
+#endif
 
 using namespace boost::python;
 
