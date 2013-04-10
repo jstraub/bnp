@@ -17,10 +17,12 @@ message("Found python include: ${PYTHON_INCLUDE_DIRS}")
 IF( "${PYTHON_INCLUDE_DIRS}" STREQUAL "/usr/include/python2.6" )
   message("  Found python version 2.6")
   SET(PYTHON_V "PYTHON_2_6")
+  SET(PYTHON_LIB "python2.6")
 ENDIF()
 IF( "${PYTHON_INCLUDE_DIRS}" STREQUAL "/usr/include/python2.7" )
   message("  Found python version 2.7")
   SET(PYTHON_V "PYTHON_2_7")
+  SET(PYTHON_LIB "python2.7")
 ENDIF()
 
 # add flags depending on build type
@@ -79,6 +81,6 @@ add_executable(testArmadillo ./src/testArmadillo.cpp)
 target_link_libraries(testArmadillo ${LIBS} stdc++)
 
 ADD_LIBRARY(bnp SHARED src/hdp_py.cpp ${SRC})
-TARGET_LINK_LIBRARIES(bnp ${LIBS} boost_python  python2.7)
+TARGET_LINK_LIBRARIES(bnp ${LIBS} boost_python ${PYTHON_LIB})
 INSTALL(TARGETS bnp LIBRARY DESTINATION /home/jstraub/workspace_research/bnp/python)
 
