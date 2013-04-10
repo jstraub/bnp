@@ -162,7 +162,7 @@ public:
     //        cpVtheta(np2col<double>(vtheta)), cpDelta(np2mat<double>(Delta)),
 //  InvNormWishart(cpVtheta,kappa,cpDelta,nu)
 	{
-	  cout<<"Creating "<<typeid(this).name()<<endl;
+	  //cout<<"Creating "<<typeid(this).name()<<endl;
 	};
 	InvNormWishart_py(const InvNormWishart_py& inw) :
 		InvNormWishart(inw)
@@ -179,7 +179,7 @@ public:
   HDP_py(const BaseMeasure<U>& base, double alpha, double gamma)
   : HDP<U>(base,alpha,gamma)
   {
-    cout<<"Creating "<<typeid(this).name()<<endl;
+    //cout<<"Creating "<<typeid(this).name()<<endl;
   };
 
   bool densityEst(uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
@@ -228,7 +228,7 @@ public:
   HDP_onl_py(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
   : HDP_onl(base,alpha,gamma)
   {
-    cout<<"Creating "<<typeid(this).name()<<endl;
+    //cout<<"Creating "<<typeid(this).name()<<endl;
   };
 
   bool densityEst(uint32_t Nw, double kappa, uint32_t K, uint32_t T, uint32_t S)
