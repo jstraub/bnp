@@ -692,7 +692,8 @@ class HDP_onl : public HDP<uint32_t>
 //#pragma omp parallel private(d,dd,N,zeta,phi,converged,gamma,gamma_prev,o,d_lambda,d_a,ro,i,perp_i)
       //shared(x,mZeta,mPhi,mGamma,mOmega,D,T,K,Nw,mA,mLambda,mPerp,mX_ho)
       {
-#pragma omp for schedule(dynamic)
+//#pragma omp for schedule(dynamic)
+#pragma omp for schedule(dynamic) ordered
         for (dd=0; dd<D; ++dd)
         {
           d=ind[dd];  
@@ -749,7 +750,8 @@ class HDP_onl : public HDP<uint32_t>
           //for (uint32_t k=0; k<K; ++k)
           //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
           // ----------------------- update global params -----------------------
-#pragma omp critical
+//#pragma omp critical
+#pragma omp ordered
           {
             ro = exp(-kappa*log(1+double(dd+1)));
             cout<<" -- global parameter updates dd="<<dd<<" d="<<d<<" ro="<<ro<<endl;
