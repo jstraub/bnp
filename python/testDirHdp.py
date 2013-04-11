@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
     perp = np.zeros(D-D_ho)
     hdp.getPerplexity(perp)
-    print('Perplexity of iterations: {}'.format(perp))
+    print('Perplexity of iterations: {0}'.format(perp))
     
     fig00=plt.figure()
     plt.plot(perp)
@@ -117,9 +117,9 @@ if __name__ == '__main__':
 
     perp_d=np.zeros(D_ho)
     for d in range(0,D_ho):
-      print('{}: {}'.format(d,x_ho[d]))
+      print('{0}: {1}'.format(d,x_ho[d]))
       perp_d[d]=hdp.perplexity(x_ho[d],D-D_ho+1,kappa)
-      print('Perplexity of heldout ({}):\t{}'.format(d,perp_d))
+      print('Perplexity of heldout ({0}):\t{1}'.format(d,perp_d))
 
     fig01=plt.figure()
     plt.plot(perp_d)
@@ -140,10 +140,10 @@ if __name__ == '__main__':
     #hdp_var.checkSticks()
 
     print('\n-----------------------------\n')
-    print('logP of full joint of groundtruth = {}'.format(logP_gt))
-    print('logP of full joint of variational = {}'.format(logP_var))
-    print('KL(p||q) = {}'.format(kl_pq))
-    #print('KL(q||p) = {}'.format(kl_qp))
+    print('logP of full joint of groundtruth = {0}'.format(logP_gt))
+    print('logP of full joint of variational = {0}'.format(logP_var))
+    print('KL(p||q) = {0}'.format(kl_pq))
+    #print('KL(q||p) = {0}'.format(kl_qp))
 
     fig1=plt.figure()
     plt.imshow(hdp_sample.docTopicsImg(),interpolation='nearest', cmap = cm.hot)

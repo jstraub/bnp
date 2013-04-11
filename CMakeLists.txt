@@ -82,5 +82,5 @@ target_link_libraries(testArmadillo ${LIBS} stdc++)
 
 ADD_LIBRARY(bnp SHARED src/hdp_py.cpp ${SRC})
 TARGET_LINK_LIBRARIES(bnp ${LIBS} boost_python ${PYTHON_LIB})
-INSTALL(TARGETS bnp LIBRARY DESTINATION /home/jstraub/workspace_research/bnp/python)
+INSTALL(TARGETS bnp LIBRARY DESTINATION $ENV{WORKSPACE_HOME}/research/bnp/python)
 
