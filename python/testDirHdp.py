@@ -53,7 +53,7 @@ class HDPvar(bnp.HDP_onl):
 
 class HDPgibbs(bnp.HDP_Dir):
   # x are data for training; x_ho is held out data
-  def initialEstimate(self,x,x_ho,Nw,kappa,K,T,S):
+  def initialEstimate(self,x,x_ho,Nw,K0,T0,It):
     D = len(x)
     for x_i in x:
       self.addDoc(np.vstack(x_i))
@@ -82,8 +82,6 @@ if __name__ == '__main__':
   parser.add_argument('-g','--gibbs', action='store_true', help='switch to make the program use gibbs sampling instead of variational')
   args = parser.parse_args()
   print('args: {0}'.format(args))
-
-  raw_input()
 
   variational = ~args.gibbs
 
@@ -170,10 +168,13 @@ if __name__ == '__main__':
     raw_input()
 
   else:
-    hdp=bnp.HDP_Dir(dirichlet,alpha,omega)
-    for x_i in x[0:D]:
-      hdp.addDoc(np.vstack(x_i[0:N_d]))
-    result=hdp.densityEst(10,10,10)
+    hdp = HDPgibbs(dirichlet,alpha,omega)
+    hdp.initialEstimate(x_train,x_ho,Nw,kappa,K,T,S)
+
+#    hdp=bnp.HDP_Dir(dirichlet,alpha,omega)
+#    for x_i in x[0:D]:
+#      hdp.addDoc(np.vstack(x_i[0:N_d]))
+#    result=hdp.densityEst(10,10,10)
 
 
 
