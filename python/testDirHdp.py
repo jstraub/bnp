@@ -12,6 +12,7 @@ import numpy as np
 
 import time
 import cProfile
+import argparse
 
 import libbnp as bnp
 
@@ -35,8 +36,22 @@ def dataFromBOFs(pathToData):
   return x
 
 
-class HDPvar(bnp.HDP_onl):
 
+class HDPvar(bnp.HDP_onl):
+  # x are data for training; x_ho is held out data
+  def initialEstimate(self,x,x_ho,Nw,kappa,K,T,S):
+    D = len(x)
+    for x_i in x:
+      self.addDoc(np.vstack(x_i))
+      #self.addDoc(np.vstack(x_i[0:N_d]))
+    for x_ho_i in x_ho:
+      print("adding held out")
+      self.addHeldOut(np.vstack(x_ho_i))
+      #self.addHeldOut(np.vstack(x_ho_i[0:N_d]))
+    return self.densityEst(Nw,kappa,K,T,S)
+
+
+class HDPgibbs(bnp.HDP_Dir):
   # x are data for training; x_ho is held out data
   def initialEstimate(self,x,x_ho,Nw,kappa,K,T,S):
     D = len(x)
@@ -52,43 +67,44 @@ class HDPvar(bnp.HDP_onl):
 
 if __name__ == '__main__':
 
-  useSynthetic = True
-  variational = True
+  parser = argparse.ArgumentParser(description = 'hdp topic modeling of synthetic data')
+  parser.add_argument('-T', type=int, default=10, help='document level truncation')
+  parser.add_argument('-K', type=int, default=100, help='corpus level truncation')
+  parser.add_argument('-S', type=int, default=10, help='mini batch size')
+  parser.add_argument('-D', type=int, default=500, help='number of documents to synthesize')
+  parser.add_argument('-Ho', type=int, default=10, help='number of held out documents for perplexity computation')
+  parser.add_argument('-N', type=int, default=100, help='number of words per document')
+  parser.add_argument('-Nw', type=int, default=40, help='alphabet size (how many different words)')
+  parser.add_argument('-a','--alpha', type=float, default=1.0, help='concentration parameter for document level')
+  parser.add_argument('-o','--omega', type=float, default=10.0, help='concentration parameter for corpus level')
+  parser.add_argument('-k','--kappa', type=float, default=0.9, help='forgetting rate for stochastic updates')
+  #parser.add_argument('-s', action='store_false', help='switch to make the program use synthetic data')
+  parser.add_argument('-g','--gibbs', action='store_true', help='switch to make the program use gibbs sampling instead of variational')
+  args = parser.parse_args()
+  print('args: {0}'.format(args))
 
-  if useSynthetic:
-    D = 1000 #number of documents to process
-    D_ho = 10 # (ho= held out) number of docs used for testing (perplexity)
-    N_d = 100 # max number of words per doc
-    Nw = 40 # how many different symbols are in the alphabet
-    kappa = 0.9 # forgetting rate
-    K = 30 # top level truncation
-    T = 10 # low level truncation
-    S = 10 # mini batch size
-    alpha = 1. # concentration on G_i
-    omega = 10. # concentration on G_0
-    dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
+  raw_input()
 
-    hdp_sample = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
-    x, gtCorpProp, gtTopic, pi, c = hdp_sample.generateDirHDPSample(D,N_d)
-    x_train = x[0:D-D_ho]
-    x_ho = x[D-D_ho:D]
+  variational = ~args.gibbs
 
-    hdp_sample.save('sample.mat')
+  D = args.D #number of documents to process
+  D_ho = args.Ho # (ho= held out) number of docs used for testing (perplexity)
+  N_d = args.N # max number of words per doc
+  Nw = args.Nw # how many different symbols are in the alphabet
+  kappa = args.kappa # forgetting rate
+  K = args.K # top level truncation
+  T = args.T # low level truncation
+  S = args.S # mini batch size
+  alpha = args.alpha # concentration on G_i
+  omega = args.omega # concentration on G_0
+  dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
 
-  else:
-    D = 1000 #number of documents to process
-    N_d = 10 # max number of words per doc
-    Nw = 256 # how many different symbols are in the alphabet
-    kappa = 0.75 # forgetting rate
-    K = 40 # top level truncation
-    T = 10 # low level truncation
-    S = 10 # mini batch size
-    alpha = 1.1 # concentration on G_i
-    omega = 10. # concentration on G_0
-    dirAlphas = np.ones(Nw)*1.0e-5 # alphas for dirichlet base measure
- 
-    pathToData = "../../data/bof/bofs249.txt"
-    x = dataFromBOFs(pathToData)
+  hdp_sample = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
+  x, gtCorpProp, gtTopic, pi, c = hdp_sample.generateDirHDPSample(D,N_d)
+  x_train = x[0:D-D_ho]
+  x_ho = x[D-D_ho:D]
+
+  hdp_sample.save('sample.mat')
 
   D=min(D,len(x))
 
