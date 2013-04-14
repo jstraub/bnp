@@ -122,34 +122,34 @@ class HDP_sample:
     + logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)
 
   def save(s,path):
-    print('len(x)={}'.format(len(s.x)))
+    print('len(x)={0}'.format(len(s.x)))
     sio.savemat(path,{'K':s.K,'T':s.T,'Nw':s.Nw,'omega':s.omega,'alpha':s.alpha,'Lambda':s.Lambda,'c':s.c,'z':s.z,'beta':s.beta,'v':s.v,'sigV':s.sigV,'pi':s.pi,'sigPi':s.sigPi,'x':s.x})
 
   def load(s,path):
     try:
       mat=sio.loadmat(path)
-      print('Found model under {}'.format(path))
+      print('Found model under {0}'.format(path))
     except Exception, err:
-      print('Did not find model under {}'.format(path))
+      print('Did not find model under {0}'.format(path))
       return False
     s.K=mat['K'][0][0]
-    print('loaded K\t {}'.format(s.K))
+    print('loaded K\t {0}'.format(s.K))
     s.T=mat['T'][0][0]
-    print('loaded T\t {}'.format(s.T))
+    print('loaded T\t {0}'.format(s.T))
     s.Nw=mat['Nw'][0][0]
-    print('loaded Nw\t {}'.format(s.Nw))
+    print('loaded Nw\t {0}'.format(s.Nw))
     s.omega=mat['omega'][0][0]
-    print('loaded omega\t {}'.format(s.omega))
+    print('loaded omega\t {0}'.format(s.omega))
     s.alpha=mat['alpha'][0][0]
-    print('loaded alpha\t {}'.format(s.alpha))
+    print('loaded alpha\t {0}'.format(s.alpha))
     s.Lambda=mat['Lambda']
-    print('loaded Lambda\t {}'.format(s.Lambda.shape))
+    print('loaded Lambda\t {0}'.format(s.Lambda.shape))
     s.beta=mat['beta']
-    print('loaded beta\t {}'.format(s.beta.shape))
+    print('loaded beta\t {0}'.format(s.beta.shape))
     s.sigV=mat['sigV']
-    print('loaded sigV\t {}'.format(s.sigV.shape))
+    print('loaded sigV\t {0}'.format(s.sigV.shape))
     s.v=mat['v']
-    print('loaded v\t {}'.format(s.v.shape))
+    print('loaded v\t {0}'.format(s.v.shape))
     s.x=[]; s.z=[]; s.c=[]; s.pi=[]; s.sigPi=[]
     for d in range(0,mat['x'].shape[0]):
       s.x.append(mat['x'][d][0])
@@ -214,19 +214,19 @@ class HDP_sample:
         self.pi.append(np.zeros(self.T,dtype=np.double))
         self.c.append(np.zeros(self.T,dtype=np.uint32))
         hdp.getDocTopics(self.pi[d],self.sigPi[d],self.c[d],d)
-        print('pi({}): {}'.format(d,self.pi[d]))
-        print('sigPi({}): {}'.format(d,self.sigPi[d]))
-        #print('c({}): {}'.format(d,self.c[d]))
+        print('pi({0}): {1}'.format(d,self.pi[d]))
+        print('sigPi({0}): {1}'.format(d,self.sigPi[d]))
+        #print('c({0}): {1}'.format(d,self.c[d]))
         self.z.append(np.zeros(self.x[d].size,dtype=np.uint32))
         hdp.getWordTopics(self.z[d],d)
 
   def checkSticks(self):
     print('--------------------- Checking Stick pieces -----------------')
-    print('sigV = {}; {}'.format(self.sigV,np.sum(self.sigV)))
+    print('sigV = {0}; {1}'.format(self.sigV,np.sum(self.sigV)))
     D=len(self.x)
     for d in range(0,D):
       np.sum(self.sigPi[d])
-      print('sigPi = {}; {}'.format(self.sigPi[d],np.sum(self.sigPi[d])))
+      print('sigPi = {0}; {1}'.format(self.sigPi[d],np.sum(self.sigPi[d])))
 
   def KLdivergence(self,q):
     kl = 0.0
@@ -260,12 +260,12 @@ class HDP_sample:
     vT = np.zeros((self.K,D))
     for d in range(0,D):
       for t in range(0,self.T):
-        #print('{} {} c.shape={}'.format(d,t,self.c[d].shape))
+        #print('{0} {1} c.shape={2}'.format(d,t,self.c[d].shape))
         k=self.c[d][t]
         vT[k,d] += self.sigPi[d][t]
-#    print('vT={}'.format(vT))
-#    print('vT_norm={}'.format(np.sum(vT,0)))
-#    print('sigPi_d={}'.format(self.sigPi[d]))
+#    print('vT={0}'.format(vT))
+#    print('vT_norm={0}'.format(np.sum(vT,0)))
+#    print('sigPi_d={0}'.format(self.sigPi[d]))
     return vT
 
   def plotTopics(self,minSupport=None):
@@ -278,26 +278,27 @@ class HDP_sample:
     ks=np.unique(ks)
     if minSupport is not None:
       Np = ks.size # numer of subplots
-      print('D{} Np{}'.format(D,Np))
+      print('D{0} Np{1}'.format(D,Np))
       sup = np.zeros(ks.size)
       for d in range(0,D):
         t_max=np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))[0][0]
         k_max = self.c[d][t_max]
         sup[np.nonzero(ks==k_max)[0]] += 1
-      print('sup={} sum(sup)={}'.format(sup,np.sum(sup)))
+      print('sup={0} sum(sup)={1}'.format(sup,np.sum(sup)))
       delete = np.zeros(ks.size,dtype=np.bool)
       for i in range(0,Np):
         if sup[i] < minSupport:
           delete[i]=True
       ks = ks[~delete] 
     Np = ks.size # numer of subplots
-    print('D{} Np{}'.format(D,Np))
+    print('D{0} Np{1}'.format(D,Np))
     Nrow = np.ceil(np.sqrt(Np))
     Ncol = np.ceil(np.sqrt(Np))
     fig=plt.figure()
     for i in range(0,Np):
       plt.subplot(Ncol,Nrow,i+1)
-      plt.plot(self.beta[ks[i]])
+      x = np.linspace(0,self.beta[ks[i]].size-1,self.beta[ks[i]].size)
+      plt.stem(x,self.beta[ks[i]])
       plt.xlabel('topic '+str(ks[i]))
     return fig
 
@@ -336,7 +337,7 @@ class HDP_sample:
       self.x[d] = self.x[d].astype(np.uint32)
   
 #    for d in range(0,D):
-#      print('d={}: {}'.format(d,self.x[d]))
+#      print('d={0}: {1}'.format(d,self.x[d]))
   
     return self.x, self.sigV, self.beta, self.pi, self.c
 

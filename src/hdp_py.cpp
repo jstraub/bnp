@@ -14,8 +14,14 @@
 
 #include <boost/python.hpp>
 #include <boost/python/wrapper.hpp>
-#include <python2.7/object.h> // for PyArray_FROM_O
 #include <numpy/ndarrayobject.h> // for PyArrayObject
+
+#ifdef PYTHON_2_6
+  #include <python2.6/object.h> // for PyArray_FROM_O
+#endif 
+#ifdef PYTHON_2_7
+  #include <python2.7/object.h> // for PyArray_FROM_O
+#endif
 
 using namespace boost::python;
 
@@ -162,7 +168,7 @@ public:
     //        cpVtheta(np2col<double>(vtheta)), cpDelta(np2mat<double>(Delta)),
 //  InvNormWishart(cpVtheta,kappa,cpDelta,nu)
 	{
-	  cout<<"Creating "<<typeid(this).name()<<endl;
+	  //cout<<"Creating "<<typeid(this).name()<<endl;
 	};
 	InvNormWishart_py(const InvNormWishart_py& inw) :
 		InvNormWishart(inw)
@@ -179,7 +185,7 @@ public:
   HDP_py(const BaseMeasure<U>& base, double alpha, double gamma)
   : HDP<U>(base,alpha,gamma)
   {
-    cout<<"Creating "<<typeid(this).name()<<endl;
+    //cout<<"Creating "<<typeid(this).name()<<endl;
   };
 
   bool densityEst(uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
@@ -228,17 +234,17 @@ public:
   HDP_onl_py(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
   : HDP_onl(base,alpha,gamma)
   {
-    cout<<"Creating "<<typeid(this).name()<<endl;
+    //cout<<"Creating "<<typeid(this).name()<<endl;
   };
 
-  bool densityEst(uint32_t Nw, double ro=0.75, uint32_t K=100, uint32_t T=10)
+  bool densityEst(uint32_t Nw, double kappa, uint32_t K, uint32_t T, uint32_t S)
   {
     cout<<"mX.size()="<<HDP_onl::mX.size()<<endl;
     cout<<"mX_ho.size()="<<HDP_onl::mX_ho.size()<<endl;
 //    for (uint32_t i=0; i<HDP_onl::mX.size(); ++i)
 //      cout<<"  x_"<<i<<": "<<HDP_onl::mX[i].n_rows<<"x"<<HDP_onl::mX[i].n_cols<<endl;
 //
-    return HDP_onl::densityEst(Nw,ro,K,T);
+    return HDP_onl::densityEst(Nw,kappa,K,T,S);
   }
 
   // makes no copy of the external data x_i
@@ -387,7 +393,7 @@ public:
 
   double perplexity(numeric::array& x, uint32_t d, double kappa)
   {
-    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
+    Mat<uint32_t> x_mat=np2col<uint32_t>(x); // can do this since x_mat gets copied inside    
     return HDP_onl::perplexity(x_mat,d,kappa);
   };
 

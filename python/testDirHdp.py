@@ -12,6 +12,7 @@ import numpy as np
 
 import time
 import cProfile
+import argparse
 
 import libbnp as bnp
 
@@ -35,10 +36,10 @@ def dataFromBOFs(pathToData):
   return x
 
 
-class HDPvar(bnp.HDP_onl):
 
+class HDPvar(bnp.HDP_onl):
   # x are data for training; x_ho is held out data
-  def initialEstimate(self,x,x_ho,Nw,ro,K,T):
+  def initialEstimate(self,x,x_ho,Nw,kappa,K,T,S):
     D = len(x)
     for x_i in x:
       self.addDoc(np.vstack(x_i))
@@ -47,43 +48,61 @@ class HDPvar(bnp.HDP_onl):
       print("adding held out")
       self.addHeldOut(np.vstack(x_ho_i))
       #self.addHeldOut(np.vstack(x_ho_i[0:N_d]))
-    return self.densityEst(Nw,ro,K,T)
+    return self.densityEst(Nw,kappa,K,T,S)
+
+
+class HDPgibbs(bnp.HDP_Dir):
+  # x are data for training; x_ho is held out data
+  def initialEstimate(self,x,x_ho,Nw,K0,T0,It):
+    D = len(x)
+    for x_i in x:
+      self.addDoc(np.vstack(x_i))
+      #self.addDoc(np.vstack(x_i[0:N_d]))
+    for x_ho_i in x_ho:
+      print("adding held out")
+      self.addHeldOut(np.vstack(x_ho_i))
+      #self.addHeldOut(np.vstack(x_ho_i[0:N_d]))
+    return self.densityEst(Nw,kappa,K,T,S)
 
 
 if __name__ == '__main__':
 
-  useSynthetic = True
-  variational = True
+  parser = argparse.ArgumentParser(description = 'hdp topic modeling of synthetic data')
+  parser.add_argument('-T', type=int, default=10, help='document level truncation')
+  parser.add_argument('-K', type=int, default=100, help='corpus level truncation')
+  parser.add_argument('-S', type=int, default=10, help='mini batch size')
+  parser.add_argument('-D', type=int, default=500, help='number of documents to synthesize')
+  parser.add_argument('-Ho', type=int, default=10, help='number of held out documents for perplexity computation')
+  parser.add_argument('-N', type=int, default=100, help='number of words per document')
+  parser.add_argument('-Nw', type=int, default=40, help='alphabet size (how many different words)')
+  parser.add_argument('-a','--alpha', type=float, default=1.0, help='concentration parameter for document level')
+  parser.add_argument('-o','--omega', type=float, default=10.0, help='concentration parameter for corpus level')
+  parser.add_argument('-k','--kappa', type=float, default=0.9, help='forgetting rate for stochastic updates')
+  #parser.add_argument('-s', action='store_false', help='switch to make the program use synthetic data')
+  parser.add_argument('-g','--gibbs', action='store_true', help='switch to make the program use gibbs sampling instead of variational')
+  args = parser.parse_args()
+  print('args: {0}'.format(args))
 
-  if useSynthetic:
-    D = 100 #number of documents to process
-    N_d = 100 # max number of words per doc
-    Nw = 40 # how many different symbols are in the alphabet
-    ro = 0.9 # forgetting rate
-    K = 30 # top level truncation
-    T = 10 # low level truncation
-    alpha = 1. # concentration on G_i
-    omega = 10. # concentration on G_0
-    dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
+  variational = ~args.gibbs
 
-    hdp_sample = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
-    x, gtCorpProp, gtTopic, pi, c = hdp_sample.generateDirHDPSample(D,N_d)
+  D = args.D #number of documents to process
+  D_ho = args.Ho # (ho= held out) number of docs used for testing (perplexity)
+  N_d = args.N # max number of words per doc
+  Nw = args.Nw # how many different symbols are in the alphabet
+  kappa = args.kappa # forgetting rate
+  K = args.K # top level truncation
+  T = args.T # low level truncation
+  S = args.S # mini batch size
+  alpha = args.alpha # concentration on G_i
+  omega = args.omega # concentration on G_0
+  dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
 
-    hdp_sample.save('sample.mat')
+  hdp_sample = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
+  x, gtCorpProp, gtTopic, pi, c = hdp_sample.generateDirHDPSample(D,N_d)
+  x_train = x[0:D-D_ho]
+  x_ho = x[D-D_ho:D]
 
-  else:
-    D = 1000 #number of documents to process
-    N_d = 10 # max number of words per doc
-    Nw = 256 # how many different symbols are in the alphabet
-    ro = 0.75 # forgetting rate
-    K = 40 # top level truncation
-    T = 10 # low level truncation
-    alpha = 1.1 # concentration on G_i
-    omega = 10. # concentration on G_0
-    dirAlphas = np.ones(Nw)*1.0e-5 # alphas for dirichlet base measure
- 
-    pathToData = "../../data/bof/bofs249.txt"
-    x = dataFromBOFs(pathToData)
+  hdp_sample.save('sample.mat')
 
   D=min(D,len(x))
 
@@ -94,27 +113,27 @@ if __name__ == '__main__':
 
   if variational:
     hdp = HDPvar(dirichlet,alpha,omega)
-    hdp.initialEstimate(x[0:D-10],x[D-10:D],Nw,ro,K,T)
+    hdp.initialEstimate(x_train,x_ho,Nw,kappa,K,T,S)
 
 #    hdp=bnp.HDP_onl(dirichlet,alpha,omega)
 #    for x_i in x[0:D]:
 #      hdp.addDoc(np.vstack(x_i[0:N_d]))
-#    result=hdp.densityEst(Nw,ro,K,T)
+#    result=hdp.densityEst(Nw,kappa,K,T)
 
-    perp = np.zeros(D-10)
+    perp = np.zeros(D-D_ho)
     hdp.getPerplexity(perp)
-    print('Perplexity of iterations: {}'.format(perp))
+    print('Perplexity of iterations: {0}'.format(perp))
     
     fig00=plt.figure()
     plt.plot(perp)
     fig00.show()
     raw_input('Press enter to continue')
 
-    perp_d=np.zeros(10)
-    for d in range(D-10,D):
-      print('{}'.format(d))
-      perp_d[d-D+10]=hdp.perplexity(x[d],D-10,ro)
-      print('Perplexity of heldout ({}):\t{}'.format(d,perp_d))
+    perp_d=np.zeros(D_ho)
+    for d in range(0,D_ho):
+      print('{0}: {1}'.format(d,x_ho[d]))
+      perp_d[d]=hdp.perplexity(x_ho[d],D-D_ho+1,kappa)
+      print('Perplexity of heldout ({0}):\t{1}'.format(d,perp_d))
 
     fig01=plt.figure()
     plt.plot(perp_d)
@@ -135,10 +154,10 @@ if __name__ == '__main__':
     #hdp_var.checkSticks()
 
     print('\n-----------------------------\n')
-    print('logP of full joint of groundtruth = {}'.format(logP_gt))
-    print('logP of full joint of variational = {}'.format(logP_var))
-    print('KL(p||q) = {}'.format(kl_pq))
-    #print('KL(q||p) = {}'.format(kl_qp))
+    print('logP of full joint of groundtruth = {0}'.format(logP_gt))
+    print('logP of full joint of variational = {0}'.format(logP_var))
+    print('KL(p||q) = {0}'.format(kl_pq))
+    #print('KL(q||p) = {0}'.format(kl_qp))
 
     fig1=plt.figure()
     plt.imshow(hdp_sample.docTopicsImg(),interpolation='nearest', cmap = cm.hot)
@@ -149,10 +168,13 @@ if __name__ == '__main__':
     raw_input()
 
   else:
-    hdp=bnp.HDP_Dir(dirichlet,alpha,omega)
-    for x_i in x[0:D]:
-      hdp.addDoc(np.vstack(x_i[0:N_d]))
-    result=hdp.densityEst(10,10,10)
+    hdp = HDPgibbs(dirichlet,alpha,omega)
+    hdp.initialEstimate(x_train,x_ho,Nw,kappa,K,T,S)
+
+#    hdp=bnp.HDP_Dir(dirichlet,alpha,omega)
+#    for x_i in x[0:D]:
+#      hdp.addDoc(np.vstack(x_i[0:N_d]))
+#    result=hdp.densityEst(10,10,10)
 
 
 

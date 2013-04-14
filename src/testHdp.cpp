@@ -51,7 +51,7 @@ int main(int argc, char** argv)
   Dir dir(alphas);
   HDP_onl hdp_onl(dir, alpha, gamma);
 
-  vector<Col<uint32_t> > z_ji = hdp_onl.densityEst(x,4,0.6,10,2);
+  vector<Col<uint32_t> > z_ji = hdp_onl.densityEst(x,4,0.6,10,2,1);
 
   uint32_t J=z_ji.size();
   cout<<"z_ji:"<<endl;
