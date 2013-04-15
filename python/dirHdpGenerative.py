@@ -219,6 +219,8 @@ class HDP_sample:
         #print('c({0}): {1}'.format(d,self.c[d]))
         self.z.append(np.zeros(self.x[d].size,dtype=np.uint32))
         hdp.getWordTopics(self.z[d],d)
+        print('word topics ({}) size: {}'.format(d,self.z[d].shape))
+
 
   def checkSticks(self):
     print('--------------------- Checking Stick pieces -----------------')
