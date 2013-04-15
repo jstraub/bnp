@@ -602,7 +602,12 @@ class HDP_var: public HDP<uint32_t>
 
     bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d)
     {
-      return getDocTopics(pi,sigPi,c,mGamma[d],mZeta[d]);
+      if (d < mGamma.size())
+        return getDocTopics(pi,sigPi,c,mGamma[d],mZeta[d]);
+      else{
+        cout<<"asking for out of range doc "<<d<<" have only "<<mGamma.size()<<endl;
+        return false;
+      }
     };
 
     bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, const Mat<double>& gamma, const Mat<double>& zeta)

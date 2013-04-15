@@ -213,6 +213,7 @@ class HDP_sample:
         self.sigPi.append(np.zeros(self.T+1,dtype=np.double))
         self.pi.append(np.zeros(self.T,dtype=np.double))
         self.c.append(np.zeros(self.T,dtype=np.uint32))
+        print('getting {}'.format(d))
         hdp.getDocTopics(self.pi[d],self.sigPi[d],self.c[d],d)
         print('pi({0}): {1}'.format(d,self.pi[d]))
         print('sigPi({0}): {1}'.format(d,self.sigPi[d]))
@@ -275,6 +276,8 @@ class HDP_sample:
     ks=np.zeros(D)
     for d in range(0,D):
       t_max=np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))[0][0]
+      print('d={}; t_max={}; D={}'.format(d,t_max,D))
+      print('c[{}].shape={};'.format(d,self.c[d]))
       k_max = self.c[d][t_max]
       ks[d]=k_max
     ks=np.unique(ks)
