@@ -18,3 +18,9 @@ double betaln(double alpha, double beta);
 double logBeta(double x, double alpha, double beta);
 double logDir(const Row<double>& x, const Row<double>& alpha);
 
+void betaMode(Col<double>& v, const Col<double>& alpha, const Col<double>& beta)
+// stick breaking proportions;  truncated stickbreaking -> stick breaks will be dim longer than proportions v 
+void stickBreaking(Col<double>& prop, const Col<double>& v)
+uint32_t multinomialMode(const Row<double>& p)
+void dirMode(Row<double>& mode, const Row<double>& alpha)
+void dirMode(Col<double>& mode, const Col<double>& alpha)
