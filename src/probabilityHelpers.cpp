@@ -52,3 +52,52 @@ double logDir(const Row<double>& x, const Row<double>& alpha)
   }
   return logP;
 };
+
+void betaMode(Col<double>& v, const Col<double>& alpha, const Col<double>& beta)
+{
+  assert(alpha.n_elem == beta.n_elem);
+  // breaking proportions
+  v.set_size(alpha.n_elem);
+  for (uint32_t i=0; i<v.n_elem; ++i){
+    if (alpha[i]+beta[i] != 2.0) {
+      v[i] = (alpha[i]-1.0)/(alpha[i]+beta[i]-2.0);
+    }else{
+      v[i] = 1.0;
+    }
+  }
+};
+
+// stick breaking proportions 
+// truncated stickbreaking -> stick breaks will be dim longer than proportions v 
+void stickBreaking(Col<double>& prop, const Col<double>& v)
+{
+  prop.set_size(v.n_elem+1);
+  // stick breaking proportions
+  for (uint32_t i=0; i<prop.n_elem; ++i){
+    if (i == prop.n_elem-1){
+      prop[i] = 1.0;
+    }else{
+      prop[i] = v[i];
+    }
+    for (uint32_t j=0; j<i; ++j){
+      prop[i] *= (1.0 - v[j]);
+    }
+  }
+};
+
+uint32_t multinomialMode(const Row<double>& p )
+{
+  uint32_t ind =0;
+  p.max(ind);
+  return ind;
+};
+
+void dirMode(Row<double>& mode, const Row<double>& alpha)
+{
+  mode = (alpha-1.0)/sum(alpha-1.0);
+};
+
+void dirMode(Col<double>& mode, const Col<double>& alpha)
+{
+  mode = (alpha-1.0)/sum(alpha-1.0);
+};
