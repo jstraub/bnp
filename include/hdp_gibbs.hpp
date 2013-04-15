@@ -106,7 +106,7 @@ class HDP_gibbs : public HDP<U>
               double f_k =  this->mH.predictiveProb(x[j].row(i).t(),x_k_ji);
               //logGaus(x[j].row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());  // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
               f(T[j]+k) = f_k;
-              l(T[j]+k) = log(this->mAlpha*m_k/((n_j+this->mAlpha)*(m_+mOmega))) + f_k; // TODO: shouldnt this be mAlpha of the posterior hdp?
+              l(T[j]+k) = log(this->mAlpha*m_k/((n_j+this->mAlpha)*(m_ + HDP<U>::mOmega))) + f_k; // TODO: shouldnt this be mAlpha of the posterior hdp?
             }
             // handle the case where x_ji sits at a new table with a new dish
             //        cout<<"ji=:"<<j<<" " <<i<<endl;
@@ -117,7 +117,7 @@ class HDP_gibbs : public HDP<U>
             double f_knew = this->mH.predictiveProb(x[j].row(i).t());
             //logGaus(x[j].row(i).t(), mVtheta, mmCov());
             f[T[j]+K] = f_knew;
-            l[T[j]+K] = log(this->mAlpha*mOmega/((n_j+this->mAlpha)*(m_+mOmega))) + f_knew;
+            l[T[j]+K] = log(this->mAlpha*HDP<U>::mOmega/((n_j+this->mAlpha)*(m_+HDP<U>::mOmega))) + f_knew;
 
             //        cout<<"l.n_elem= "<<l.n_elem<<" l="<<l.t()<<endl;
             uint32_t z_i = sampleDiscLogProb(rndDisc,l);
@@ -209,14 +209,14 @@ class HDP_gibbs : public HDP<U>
                 //logGaus(x_jt.row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());
               }
               f(k)=f_k;
-              l(k)=log(m_k/(m_+mOmega)) + f_k;
+              l(k)=log(m_k/(m_ + HDP<U>::mOmega)) + f_k;
             }
             double f_knew=0.0;
             for (uint32_t i=0; i<x_jt.n_rows; ++i) // product over independent x_ji_t
               f_knew += this->mH.predictiveProb(x_jt.row(i).t());
             //logGaus(x_jt.row(i).t(), mVtheta, mmCov());
             f(K)=f_knew;
-            l(K)=log(mOmega/(m_+mOmega)) + f_knew; // update dish at table t in restaurant j
+            l(K)=log(HDP<U>::mOmega/(m_ + HDP<U>::mOmega)) + f_knew; // update dish at table t in restaurant j
             uint32_t z_jt = sampleDiscLogProb(rndDisc, l);
 #ifndef NDEBUG
             cout<<endl<<"l="<<l.t()<<" |l|="<<l.n_elem<<endl;
@@ -299,9 +299,9 @@ class HDP_gibbs : public HDP<U>
     // compute density estimate based on data previously fed into the class using addDoc
     bool densityEst(uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
     {
-      if(mX.size() > 0)
+      if(HDP<U>::mX.size() > 0)
       {
-        mZ = densityEst(mX,K0,T0,It);
+        mZ = densityEst(HDP<U>::mX,K0,T0,It);
         return true;
       }else{
         return false;

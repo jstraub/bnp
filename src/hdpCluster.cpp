@@ -2,7 +2,7 @@
  * Licensed under the MIT license. See LICENSE.txt or 
  * http://www.opensource.org/licenses/mit-license.php */
 
-#include "hdp.hpp"
+#include <hdp_gibbs.hpp>
 
 #include <time.h>
 #include <stdio.h>
@@ -180,7 +180,7 @@ int main(int argc, char** argv)
   alphas *= 1.1;
   double alpha =1.0, gamma=1.0;
   Dir dir(alphas);
-  HDP<uint32_t> hdp(dir, alpha, gamma);
+  HDP_gibbs<uint32_t> hdp(dir, alpha, gamma);
   vector<Col<uint32_t> > z_ji = hdp.densityEst(x_int,10,10,Niter);
 #else
   mat means(J,d);
@@ -202,7 +202,7 @@ int main(int argc, char** argv)
   mat Delta = eye<mat>(d,d)*((x_max-x_min)/6.0)*((x_max-x_min)/6.0); // Variance matrix! not std
   double kappa=1.0, alpha =1., gamma=10000.0, nu=d+1.1;
 
-  HDP<InvNormWish> hdp(vtheta, kappa, Delta, nu, alpha, gamma);
+  HDP_gibbs<InvNormWish> hdp(vtheta, kappa, Delta, nu, alpha, gamma);
   vector<Col<uint32_t> > z_ji = hdp.densityEst(*x,10,10,Niter);
 #endif
 

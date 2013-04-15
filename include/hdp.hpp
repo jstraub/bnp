@@ -49,18 +49,6 @@ class HDP // : public DP<U>
       return mX_ho.size();
     };
 
-    // after computing the labels we can use this to get them.
-    bool getClassLabels(Col<uint32_t>& z_i, uint32_t i)
-    {
-      if(mZ.size() > 0 && i < mZ.size())
-      {
-        z_i=mZ[i];
-        return true;
-      }else{
-        return false;
-      }
-    };
-
 
 protected:
 

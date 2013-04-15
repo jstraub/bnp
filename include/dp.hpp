@@ -74,7 +74,7 @@ public:
         S[k] = digamma(gamma_1[k]) - digamma(gamma_1[k] + gamma_2[k]);
         for(uint32_t kt=0; kt<k-1; ++kt)
           S[k] += digamma(gamma_2[kt]) - digamma(gamma_1[kt] + gamma_2[kt]);
-        S[k] += ; // TODO: two remaingin expected values
+        //S[k] += ; // TODO: two remaingin expected values
         S_sum += S[k];
       }
 

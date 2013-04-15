@@ -3,7 +3,8 @@
  * http://www.opensource.org/licenses/mit-license.php */
 
 #include <baseMeasure.hpp>
-#include <hdp.hpp>
+#include <hdp_gibbs.hpp>
+#include <hdp_var.hpp>
 
 #include <assert.h>
 #include <stddef.h>
@@ -179,11 +180,11 @@ private:
 };
 
 template <class U>
-class HDP_py : public HDP<U>
+class HDP_py : public HDP_gibbs<U>
 {
 public:
   HDP_py(const BaseMeasure<U>& base, double alpha, double gamma)
-  : HDP<U>(base,alpha,gamma)
+  : HDP_gibbs<U>(base,alpha,gamma)
   {
     //cout<<"Creating "<<typeid(this).name()<<endl;
   };
@@ -194,7 +195,7 @@ public:
     for (uint32_t i=0; i<HDP<U>::mX.size(); ++i)
       cout<<"  x_"<<i<<": "<<HDP<U>::mX[i].n_rows<<"x"<<HDP<U>::mX[i].n_cols<<": "<<HDP<U>::mX[i]<<endl;
 
-    return HDP<U>::densityEst(K0, T0, It);
+    return HDP_gibbs<U>::densityEst(K0, T0, It);
   }
 
   // makes no copy of the external data x_i
@@ -203,7 +204,7 @@ public:
     Mat<U> x_i_mat=np2mat<U>(x_i); // can do this since x_i_mat gets copied inside
 
     cout<<"adding  x: "<<x_i_mat.n_rows<<"x"<<x_i_mat.n_cols<<": "<<x_i_mat<<endl;
-    return HDP<U>::addDoc(x_i_mat);
+    return HDP_gibbs<U>::addDoc(x_i_mat);
   };
 
   // works on the data in z_i -> size has to be correct in order for this to work!
@@ -211,7 +212,7 @@ public:
   bool getClassLabels(numeric::array& z_i, uint32_t i)
   {
     Col<uint32_t> z_i_col;
-    if(!HDP<U>::getClassLabels(z_i_col, i)){return false;} // works on the data in z_i_mat
+    if(!HDP_gibbs<U>::getClassLabels(z_i_col, i)){return false;} // works on the data in z_i_mat
     Col<uint32_t> z_i_wrap=np2col<uint32_t>(z_i); // can do this since x_i_mat gets copied inside
     if(z_i_col.n_rows != z_i_wrap.n_rows)
       return false;
@@ -228,36 +229,36 @@ public:
 typedef HDP_py<uint32_t> HDP_Dir;
 typedef HDP_py<double> HDP_INW;
 
-class HDP_onl_py : public HDP_onl
+class HDP_var_py : public HDP_var
 {
 public:
-  HDP_onl_py(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
-  : HDP_onl(base,alpha,gamma)
+  HDP_var_py(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
+  : HDP_var(base,alpha,gamma)
   {
     //cout<<"Creating "<<typeid(this).name()<<endl;
   };
 
   bool densityEst(uint32_t Nw, double kappa, uint32_t K, uint32_t T, uint32_t S)
   {
-    cout<<"mX.size()="<<HDP_onl::mX.size()<<endl;
-    cout<<"mX_ho.size()="<<HDP_onl::mX_ho.size()<<endl;
-//    for (uint32_t i=0; i<HDP_onl::mX.size(); ++i)
-//      cout<<"  x_"<<i<<": "<<HDP_onl::mX[i].n_rows<<"x"<<HDP_onl::mX[i].n_cols<<endl;
+    cout<<"mX.size()="<<HDP_var::mX.size()<<endl;
+    cout<<"mX_ho.size()="<<HDP_var::mX_ho.size()<<endl;
+//    for (uint32_t i=0; i<HDP_var::mX.size(); ++i)
+//      cout<<"  x_"<<i<<": "<<HDP_var::mX[i].n_rows<<"x"<<HDP_var::mX[i].n_cols<<endl;
 //
-    return HDP_onl::densityEst(Nw,kappa,K,T,S);
+    return HDP_var::densityEst(Nw,kappa,K,T,S);
   }
 
   // makes no copy of the external data x_i
   uint32_t addDoc(const numeric::array& x_i)
   {
     Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
-    return HDP_onl::addDoc(x_i_mat);
+    return HDP_var::addDoc(x_i_mat);
   };
 
   uint32_t addHeldOut(const numeric::array& x_i)
   {
     Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
-    return HDP_onl::addHeldOut(x_i_mat);
+    return HDP_var::addHeldOut(x_i_mat);
   };
 
 
@@ -266,32 +267,32 @@ public:
   bool updateEst(const numeric::array& x, double ro=0.75)
   {
     Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
-    return HDP_onl::updateEst(x_mat,ro);
+    return HDP_var::updateEst(x_mat,ro);
   }
 
 
-  // works on the data in z_i -> size has to be correct in order for this to work!
-  // makes a copy of the internal labels vector
-  bool getClassLabels(numeric::array& z_i, uint32_t i)
-  {
-    Col<uint32_t> z_i_col;
-    if(!HDP_onl::getClassLabels(z_i_col, i)){return false;} // works on the data in z_i_mat
-    Col<uint32_t> z_i_wrap=np2col<uint32_t>(z_i); // can do this since x_i_mat gets copied inside
-    if(z_i_col.n_rows != z_i_wrap.n_rows)
-      return false;
-    else{
-      for (uint32_t i=0; i<z_i_wrap.n_rows; ++i)
-        z_i_wrap.at(i)=z_i_col.at(i);
-      return true;
-    }
-  };
+//  // works on the data in z_i -> size has to be correct in order for this to work!
+//  // makes a copy of the internal labels vector
+//  bool getClassLabels(numeric::array& z_i, uint32_t i)
+//  {
+//    Col<uint32_t> z_i_col;
+//    if(!HDP_var::getClassLabels(z_i_col, i)){return false;} // works on the data in z_i_mat
+//    Col<uint32_t> z_i_wrap=np2col<uint32_t>(z_i); // can do this since x_i_mat gets copied inside
+//    if(z_i_col.n_rows != z_i_wrap.n_rows)
+//      return false;
+//    else{
+//      for (uint32_t i=0; i<z_i_wrap.n_rows; ++i)
+//        z_i_wrap.at(i)=z_i_col.at(i);
+//      return true;
+//    }
+//  };
 
   // works on the data in lambda -> size has to be correct in order for this to work!
   // makes a copy of the internal labels vector
   bool getLambda(numeric::array& lambda, uint32_t k)
   {
     Col<double> lambda_col;
-    if(!HDP_onl::getLambda(lambda_col, k)){return false;} // works on the data in _mat
+    if(!HDP_var::getLambda(lambda_col, k)){return false;} // works on the data in _mat
     Col<double> lambda_wrap=np2col<double>(lambda); 
     if(lambda_col.n_rows != lambda_wrap.n_rows)
       return false;
@@ -306,21 +307,21 @@ public:
   {
     Col<double> a_wrap=np2col<double>(a); 
      for (uint32_t i=0; i<a_wrap.n_rows; ++i)
-        a_wrap.at(i)=HDP_onl::mA.at(0,i);
+        a_wrap.at(i)=HDP_var::mA.at(0,i);
   };
 
   void getB(numeric::array& b)
   {
     Col<double> b_wrap=np2col<double>(b); 
      for (uint32_t i=0; i<b_wrap.n_rows; ++i)
-        b_wrap.at(i)=HDP_onl::mA.at(1,i);
+        b_wrap.at(i)=HDP_var::mA.at(1,i);
   };
 
   void getPerplexity(numeric::array& perp)
   {
     Col<double> perp_wrap=np2col<double>(perp); 
      for (uint32_t i=0; i<perp_wrap.n_rows; ++i)
-        perp_wrap.at(i)=HDP_onl::mPerp.at(i);
+        perp_wrap.at(i)=HDP_var::mPerp.at(i);
   };
 
   bool getDocTopics(numeric::array& pi, numeric::array& prop, numeric::array& topicInd, uint32_t d)
@@ -328,7 +329,7 @@ public:
     Col<double> prop_col;
     Col<double> pi_col;
     Col<uint32_t> topicInd_col;
-    if(!HDP_onl::getDocTopics(pi_col, prop_col, topicInd_col, d)){return false;} // works on the data in _mat
+    if(!HDP_var::getDocTopics(pi_col, prop_col, topicInd_col, d)){return false;} // works on the data in _mat
     Col<double> prop_wrap=np2col<double>(prop); 
     Col<double> pi_wrap=np2col<double>(pi); 
     Col<uint32_t> topicInd_wrap=np2col<uint32_t>(topicInd); 
@@ -349,7 +350,7 @@ public:
   {
     Col<double> sigV_col;
     Col<double> v_col;
-    if(!HDP_onl::getCorpTopicProportions(v_col,sigV_col)){return false;} // works on the data in _mat
+    if(!HDP_var::getCorpTopicProportions(v_col,sigV_col)){return false;} // works on the data in _mat
     Col<double> sigV_wrap=np2col<double>(sigV); 
     Col<double> v_wrap=np2col<double>(v); 
     if((sigV_col.n_rows != sigV_wrap.n_rows) || (v_col.n_rows != v_wrap.n_rows))
@@ -366,7 +367,7 @@ public:
   bool getCorpTopic(numeric::array& beta, uint32_t k)
   {
     Col<double> beta_col;
-    if(!HDP_onl::getCorpTopic(beta_col, k)){return false;} // works on the data in _mat
+    if(!HDP_var::getCorpTopic(beta_col, k)){return false;} // works on the data in _mat
     Col<double> beta_wrap=np2col<double>(beta); 
     if(beta_col.n_rows != beta_wrap.n_rows)
       return false;
@@ -380,7 +381,7 @@ public:
   bool getWordTopics(numeric::array& z, uint32_t d)
   {
     Col<uint32_t> z_col;
-    if(!HDP_onl::getWordTopics(z_col, d)){return false;} // works on the data in _mat
+    if(!HDP_var::getWordTopics(z_col, d)){return false;} // works on the data in _mat
     Col<uint32_t> z_wrap=np2col<uint32_t>(z); 
     if(z_col.n_rows != z_wrap.n_rows)
       return false;
@@ -394,7 +395,7 @@ public:
   double perplexity(numeric::array& x, uint32_t d, double kappa)
   {
     Mat<uint32_t> x_mat=np2col<uint32_t>(x); // can do this since x_mat gets copied inside    
-    return HDP_onl::perplexity(x_mat,d,kappa);
+    return HDP_var::perplexity(x_mat,d,kappa);
   };
 
 };
@@ -425,22 +426,21 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("addDoc",&HDP_INW::addDoc);
   //      .def_readonly("mGamma", &HDP_INW::mGamma);
 
-	class_<HDP_onl_py>("HDP_onl",init<Dir_py&,double,double>())
-        .def("densityEst",&HDP_onl_py::densityEst)
-        .def("updateEst",&HDP_onl_py::updateEst)
-        .def("perplexity",&HDP_onl_py::perplexity)
-        .def("getClassLabels",&HDP_onl_py::getClassLabels)
-        .def("addDoc",&HDP_onl_py::addDoc)
-        .def("addHeldOut",&HDP_onl_py::addHeldOut)
-        .def("getPerplexity",&HDP_onl_py::getPerplexity)
-        .def("getA",&HDP_onl_py::getA)
-        .def("getB",&HDP_onl_py::getB)
-        .def("getLambda",&HDP_onl_py::getLambda)
-        .def("getDocTopics",&HDP_onl_py::getDocTopics)
-        .def("getWordTopics",&HDP_onl_py::getWordTopics)
-        .def("getCorpTopicProportions",&HDP_onl_py::getCorpTopicProportions)
-        .def("getCorpTopic",&HDP_onl_py::getCorpTopic);
-   //     .def_readonly("mGamma", &HDP_onl_py::mGamma);
+	class_<HDP_var_py>("HDP_var",init<Dir_py&,double,double>())
+        .def("densityEst",&HDP_var_py::densityEst)
+        .def("updateEst",&HDP_var_py::updateEst)
+        .def("perplexity",&HDP_var_py::perplexity)
+        .def("addDoc",&HDP_var_py::addDoc)
+        .def("addHeldOut",&HDP_var_py::addHeldOut)
+        .def("getPerplexity",&HDP_var_py::getPerplexity)
+        .def("getA",&HDP_var_py::getA)
+        .def("getB",&HDP_var_py::getB)
+        .def("getLambda",&HDP_var_py::getLambda)
+        .def("getDocTopics",&HDP_var_py::getDocTopics)
+        .def("getWordTopics",&HDP_var_py::getWordTopics)
+        .def("getCorpTopicProportions",&HDP_var_py::getCorpTopicProportions)
+        .def("getCorpTopic",&HDP_var_py::getCorpTopic);
+   //     .def_readonly("mGamma", &HDP_var_py::mGamma);
 
 }
 

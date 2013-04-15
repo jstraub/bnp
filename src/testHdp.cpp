@@ -2,7 +2,8 @@
  * Licensed under the MIT license. See LICENSE.txt or 
  * http://www.opensource.org/licenses/mit-license.php */
 
-#include "hdp.hpp"
+#include "hdp_var.hpp"
+#include "hdp_gibbs.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -49,7 +50,7 @@ int main(int argc, char** argv)
   //alphas *= 1.1; // smaller alpha means more uncertainty in the where the good distributions are
   double alpha =1.0, gamma=1000.0;
   Dir dir(alphas);
-  HDP_onl hdp_onl(dir, alpha, gamma);
+  HDP_var hdp_onl(dir, alpha, gamma);
 
   vector<Col<uint32_t> > z_ji = hdp_onl.densityEst(x,4,0.6,10,2,1);
 
@@ -72,7 +73,7 @@ int main(int argc, char** argv)
   return 0;
 
   cout<<" ---------------------------------- Dir base measure ---------------------------" <<endl;
-  HDP<uint32_t> hdp_dir(dir, alpha, gamma);
+  HDP_gibbs<uint32_t> hdp_dir(dir, alpha, gamma);
 
   z_ji = hdp_dir.densityEst(x,10,10,100);
   J=z_ji.size();
@@ -119,7 +120,7 @@ int main(int argc, char** argv)
   alpha=1.0;
   gamma=1.0;
   InvNormWishart inw(vtheta, kappa,Delta, nu);
-  HDP<double> hdp_inw(inw, alpha, gamma);
+  HDP_gibbs<double> hdp_inw(inw, alpha, gamma);
 
   z_ji = hdp_inw.densityEst(xx,10,10,20);
   J=z_ji.size();

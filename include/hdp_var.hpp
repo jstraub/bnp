@@ -8,7 +8,7 @@
 
 #include "random.hpp"
 #include "baseMeasure.hpp"
-#include "dp.hpp"
+//#include "dp.hpp"
 #include "probabilityHelpers.hpp"
 
 #include <stddef.h>
@@ -24,15 +24,15 @@ using namespace std;
 using namespace arma;
 
 
-class HDP_onl : public HDP<uint32_t>
+class HDP_var: public HDP<uint32_t>
 {
   public:
 
-    HDP_onl(const BaseMeasure<uint32_t>& base, double alpha, double omega)
+    HDP_var(const BaseMeasure<uint32_t>& base, double alpha, double omega)
       : HDP<uint32_t>(base, alpha, omega), mT(0), mK(0), mNw(0)
     {};
 
-    ~HDP_onl()
+    ~HDP_var()
     {};
 
     double digamma(double x)
@@ -400,7 +400,7 @@ class HDP_onl : public HDP<uint32_t>
           }
         }
       }
-      return z_dn;
+      return z_dn; //TODO: return p_d(x)
     };
 
     // compute density estimate based on data previously fed into the class using addDoc
@@ -408,7 +408,8 @@ class HDP_onl : public HDP<uint32_t>
     {
       if(mX.size() > 0)
       {
-        mZ = densityEst(mX,Nw,kappa,K,T,S);
+        densityEst(mX,Nw,kappa,K,T,S);
+        //TODO: return p_d(x)
         return true;
       }else{
         return false;
