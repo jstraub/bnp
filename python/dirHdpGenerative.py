@@ -91,6 +91,8 @@ class HDP_sample:
   sigPi = []
   # data
   x = []
+  # results
+  perp = np.zeros(1)
   
   def __init__(self, K=None,T=None,Nw=None,omega=None,alpha=None,Lambda=None, pathToModel=None):
     if pathToModel is None:
@@ -103,27 +105,10 @@ class HDP_sample:
     else:
       self.load(pathToModel)
   
-  def logP_wordJoint(self, d, n):
-    #print('d={}, n={}'.format(d,n))
-    #print('x={}; x.len={}; x[d].size={}; c.len={}; z.len={}; v.size={}; sigV.size={}; pi.len={}; sigPi.len={}'.format(self.x[d][n],len(self.x),self.x[d].size,len(self.c),len(self.z),self.v.size,self.sigV.size,len(self.pi),len(self.sigPi)))
-    #print('z={}; c={}; beta.size {}\n'.format(self.z[d][n], self.c[d][ self.z[d][n]],self.beta.shape))
-
-#    print('\tx|beta =    {}'.format(logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]])))
-#    print('\tc|sigV =    {}'.format(logCat(self.c[d][ self.z[d][n]], self.sigV)))
-#    print('\tv|omega =   {}'.format(logBeta(self.v, 1.0, self.omega)))
-#    print('\tz|sigPi =   {}'.format(logCat(self.z[d][n], self.sigPi[d])))
-#    print('\tpi|alpha =  {}'.format(logBeta(self.pi[d], 1.0, self.alpha)))
-#    print('\tbeta|lambda={}'.format(logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)))
-    return logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
-    + logCat(self.c[d][ self.z[d][n]], self.sigV) \
-    + logBeta(self.v, 1.0, self.omega) \
-    + logCat(self.z[d][n], self.sigPi[d]) \
-    + logBeta(self.pi[d], 1.0, self.alpha) \
-    + logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)
 
   def save(s,path):
     print('len(x)={0}'.format(len(s.x)))
-    sio.savemat(path,{'K':s.K,'T':s.T,'Nw':s.Nw,'omega':s.omega,'alpha':s.alpha,'Lambda':s.Lambda,'c':s.c,'z':s.z,'beta':s.beta,'v':s.v,'sigV':s.sigV,'pi':s.pi,'sigPi':s.sigPi,'x':s.x})
+    sio.savemat(path,{'K':s.K,'T':s.T,'Nw':s.Nw,'omega':s.omega,'alpha':s.alpha,'Lambda':s.Lambda,'c':s.c,'z':s.z,'beta':s.beta,'v':s.v,'sigV':s.sigV,'pi':s.pi,'sigPi':s.sigPi,'x_tr':s.x_tr,'x_ho':s.x_ho,'perp':s.perp})
 
   def load(s,path):
     try:
@@ -150,9 +135,13 @@ class HDP_sample:
     print('loaded sigV\t {0}'.format(s.sigV.shape))
     s.v=mat['v']
     print('loaded v\t {0}'.format(s.v.shape))
-    s.x=[]; s.z=[]; s.c=[]; s.pi=[]; s.sigPi=[]
-    for d in range(0,mat['x'].shape[0]):
-      s.x.append(mat['x'][d][0])
+    s.perp = mat['perp']
+    s.x_tr=[]; s.x_ho=[]; s.z=[]; s.c=[]; s.pi=[]; s.sigPi=[]
+    for d in range(0,mat['x_ho'].shape[0]):
+      s.x_ho.append(mat['x_ho'][d][0])
+
+    for d in range(0,mat['x_tr'].shape[0]):
+      s.x_tr.append(mat['x_tr'][d][0])
       #print('loaded x[{}]\t {}'.format(d,s.x[d].shape))
       s.z.append(mat['z'][d][0])
       #print('loaded z[{}]\t {}'.format(d,s.z[d].shape))
@@ -164,39 +153,19 @@ class HDP_sample:
       #print('loaded sigPi[{}]\t {}'.format(d,s.sigPi[d].shape))
     return True
 
-  def logP_fullJoint(self):
-    logP = 0.0
-    D = len(self.x)
-    for d in range(0,D):
-      N = self.x[d].size
-      for n in range(0,N):
-        logP_w = self.logP_wordJoint(d,n)
-#        print('logP({},{})={}'.format(d,n,logP_w))
-        logP += logP_w
-    return logP
 
-  def loadHDPSample(self,x,beta=None,c=None,z=None,v=None,sigV=None,pi=None,sigPi=None,omega=None,alpha=None,Lambda=None, hdp=None):
-    self.x = x
-    if hdp is None:
-      self.beta = beta
-      self.c = c
-      self.z = z
-      self.v = v
-      self.sigV = sigV
-      self.pi = pi
-      self.sigPi = sigPi
-      self.omega = omega
-      self.alpha = alpha
-      self.Lambda = Lambda
-    else:
-      D=len(self.x)
+  def loadHDPSample(self, x_tr, x_ho, hdp):
+    self.x_tr = x_tr
+    self.x_ho = x_ho
+    if isinstance(hdp,bnp.HDP_var):
+      D=len(self.x_tr)
+      D_ho=len(self.x_ho)
       print("---------------------- Loading from hdp -------------------------");
       self.sigV = np.zeros(self.K+1,dtype=np.double)
       self.v = np.zeros(self.K,dtype=np.double)
       hdp.getCorpTopicProportions(self.v,self.sigV)
       #print('topic proportions: \t{}\t{}'.format(self.sigV,np.sum(self.sigV)))
       #print('GT topic proportions: \t{}\t{}'.format(gtCorpProp,np.sum(gtCorpProp)))
-    
       #print("---------------------- Corpus Topics -------------------------");
       self.beta=[]
       for k in range(0,self.K):
@@ -204,7 +173,6 @@ class HDP_sample:
         hdp.getCorpTopic(self.beta[k],k)
         #print('self.beta_{}=\t{}'.format(k,topic[k]))
         #print('gtTopic_{}=\t{}'.format(k,gtTopic[k,:]))
-    
       self.sigPi=[]
       self.pi=[]
       self.c=[]
@@ -218,15 +186,19 @@ class HDP_sample:
         print('pi({0}): {1}'.format(d,self.pi[d]))
         print('sigPi({0}): {1}'.format(d,self.sigPi[d]))
         #print('c({0}): {1}'.format(d,self.c[d]))
-        self.z.append(np.zeros(self.x[d].size,dtype=np.uint32))
+        self.z.append(np.zeros(self.x_tr[d].size,dtype=np.uint32))
         hdp.getWordTopics(self.z[d],d)
         print('word topics ({}) size: {}'.format(d,self.z[d].shape))
-
+      self.perp = np.zeros(D)
+      hdp.getPerplexity(perp)
+      print('Perplexity of iterations: {}'.format(perp))
+    else:
+      print('Error loading hdp of type {}'.format(type(hdp)))
 
   def checkSticks(self):
     print('--------------------- Checking Stick pieces -----------------')
     print('sigV = {0}; {1}'.format(self.sigV,np.sum(self.sigV)))
-    D=len(self.x)
+    D=len(self.x_tr)
     for d in range(0,D):
       np.sum(self.sigPi[d])
       print('sigPi = {0}; {1}'.format(self.sigPi[d],np.sum(self.sigPi[d])))
@@ -235,9 +207,9 @@ class HDP_sample:
     kl = 0.0
     logP_joint = 0.0
     logQ_joint = 0.0
-    D=len(self.x)
+    D=len(self.x_tr)
     for d in range(0,D):
-      N=self.x[d].size
+      N=self.x_tr[d].size
       for n in range(0,N):
         logP = self.logP_wordJoint(d,n)
         logQ = q.logP_wordJoint(d,n)
@@ -258,7 +230,7 @@ class HDP_sample:
       H -= (n_w/N) * np.log(q)
 
   def docTopicsImg(self):
-    D = len(self.x)
+    D = len(self.x_tr)
     # create image for topic
     vT = np.zeros((self.K,D))
     for d in range(0,D):
@@ -272,7 +244,7 @@ class HDP_sample:
     return vT
 
   def plotTopics(self,minSupport=None):
-    D = len(self.x)
+    D = len(self.x_tr)
     ks=np.zeros(D)
     for d in range(0,D):
       t_max=np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))[0][0]
@@ -313,7 +285,7 @@ class HDP_sample:
 
   def generateDirHDPSample(self,D,N):
     # doc level
-    self.x=[]
+    self.x_tr=[]
     # draw K topics from Dirichlet
     self.beta = np.random.dirichlet(self.Lambda,self.K)
     # draw breaking proportions using Beta
@@ -335,19 +307,47 @@ class HDP_sample:
       self.pi[d] = np.random.beta(1,self.alpha,self.T-1)
       self.sigPi[d] = stickBreaking(self.pi[d])
   
-      self.x.append(np.zeros(N))
+      self.x_tr.append(np.zeros(N))
       # draw topic assignment of word (multinomial)
       self.z.append(np.zeros(N))
       _, self.z[d] = np.nonzero(np.random.multinomial(1,self.sigPi[d],N))
       for i in range(0,N): # for each word
         # draw words
-        _, self.x[d][i] = np.nonzero(np.random.multinomial(1,self.beta[ self.c[d][ self.z[d][i]], :],1))
+        _, self.x_tr[d][i] = np.nonzero(np.random.multinomial(1,self.beta[ self.c[d][ self.z[d][i]], :],1))
   
-      self.x[d] = self.x[d].astype(np.uint32)
+      self.x_tr[d] = self.x_tr[d].astype(np.uint32)
   
 #    for d in range(0,D):
-#      print('d={0}: {1}'.format(d,self.x[d]))
+#      print('d={0}: {1}'.format(d,self.x_tr[d]))
   
-    return self.x, self.sigV, self.beta, self.pi, self.c
+    return self.x_tr, self.sigV, self.beta, self.pi, self.c
 
   
+  def logP_fullJoint(self):
+    logP = 0.0
+    D = len(self.x_tr)
+    for d in range(0,D):
+      N = self.x_tr[d].size
+      for n in range(0,N):
+        logP_w = self.logP_wordJoint(d,n)
+#        print('logP({},{})={}'.format(d,n,logP_w))
+        logP += logP_w
+    return logP
+
+  def logP_wordJoint(self, d, n):
+    #print('d={}, n={}'.format(d,n))
+    #print('x={}; x.len={}; x[d].size={}; c.len={}; z.len={}; v.size={}; sigV.size={}; pi.len={}; sigPi.len={}'.format(self.x[d][n],len(self.x),self.x[d].size,len(self.c),len(self.z),self.v.size,self.sigV.size,len(self.pi),len(self.sigPi)))
+    #print('z={}; c={}; beta.size {}\n'.format(self.z[d][n], self.c[d][ self.z[d][n]],self.beta.shape))
+
+#    print('\tx|beta =    {}'.format(logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]])))
+#    print('\tc|sigV =    {}'.format(logCat(self.c[d][ self.z[d][n]], self.sigV)))
+#    print('\tv|omega =   {}'.format(logBeta(self.v, 1.0, self.omega)))
+#    print('\tz|sigPi =   {}'.format(logCat(self.z[d][n], self.sigPi[d])))
+#    print('\tpi|alpha =  {}'.format(logBeta(self.pi[d], 1.0, self.alpha)))
+#    print('\tbeta|lambda={}'.format(logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)))
+    return logCat(self.x_tr[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
+    + logCat(self.c[d][ self.z[d][n]], self.sigV) \
+    + logBeta(self.v, 1.0, self.omega) \
+    + logCat(self.z[d][n], self.sigPi[d]) \
+    + logBeta(self.pi[d], 1.0, self.alpha) \
+    + logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)
