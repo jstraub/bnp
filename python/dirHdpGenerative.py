@@ -276,35 +276,39 @@ class HDP_sample:
     ks=np.zeros(D)
     for d in range(0,D):
       t_max=np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))[0][0]
-      print('d={}; t_max={}; D={}'.format(d,t_max,D))
-      print('c[{}].shape={};'.format(d,self.c[d]))
-      k_max = self.c[d][t_max]
-      ks[d]=k_max
-    ks=np.unique(ks)
-    if minSupport is not None:
-      Np = ks.size # numer of subplots
-      print('D{0} Np{1}'.format(D,Np))
-      sup = np.zeros(ks.size)
-      for d in range(0,D):
-        t_max=np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))[0][0]
+      print('d={}; D={}'.format(d,D))
+      print('t_max={};'.format(np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))))
+      print('sigPi={}; sum={}'.format(self.sigPi[d],np.sum(self.sigPi[d])))
+      print('c[{}]={};'.format(d,self.c[d]))
+      if t_max < self.c[d].size:
         k_max = self.c[d][t_max]
-        sup[np.nonzero(ks==k_max)[0]] += 1
+      else:
+        k_max = np.nan # this means that we arre not selecting one of the estimated models!! (the last element in sigPi is 1-sum(sigPi(0:end-1)) and represents the "other" models
+      ks[d]=k_max
+    ks_unique=np.unique(ks)
+    ks_unique=ks_unique[~np.isnan(ks_unique)]
+    if minSupport is not None:
+      Np = ks_unique.size # numer of subplots
+      print('D{0} Np{1}'.format(D,Np))
+      sup = np.zeros(ks_unique.size)
+      for d in range(0,D):
+        sup[np.nonzero(ks_unique==ks[d])[0]] += 1
       print('sup={0} sum(sup)={1}'.format(sup,np.sum(sup)))
-      delete = np.zeros(ks.size,dtype=np.bool)
+      delete = np.zeros(ks_unique.size,dtype=np.bool)
       for i in range(0,Np):
         if sup[i] < minSupport:
           delete[i]=True
-      ks = ks[~delete] 
-    Np = ks.size # numer of subplots
+      ks_unique = ks_unique[~delete] 
+    Np = ks_unique.size # numer of subplots
     print('D{0} Np{1}'.format(D,Np))
     Nrow = np.ceil(np.sqrt(Np))
     Ncol = np.ceil(np.sqrt(Np))
     fig=plt.figure()
     for i in range(0,Np):
       plt.subplot(Ncol,Nrow,i+1)
-      x = np.linspace(0,self.beta[int(ks[i])].size-1,self.beta[int(ks[i])].size)
-      plt.stem(x,self.beta[int(ks[i])])
-      plt.xlabel('topic '+str(ks[i]))
+      x = np.linspace(0,self.beta[int(ks_unique[i])].size-1,self.beta[int(ks_unique[i])].size)
+      plt.stem(x,self.beta[int(ks_unique[i])])
+      plt.xlabel('topic '+str(ks_unique[i]))
     return fig
 
   def generateDirHDPSample(self,D,N):
