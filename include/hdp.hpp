@@ -49,6 +49,7 @@ class HDP // : public DP<U>
       return mX_ho.size();
     };
 
+    virtual Row<double> P_x(uint32_t d) const=0;
 
 protected:
 

@@ -90,7 +90,8 @@ class HDP_sample:
   pi = []
   sigPi = []
   # data
-  x = []
+  x_tr = []
+  x_ho = []
   # results
   perp = np.zeros(1)
   
@@ -107,7 +108,7 @@ class HDP_sample:
   
 
   def save(s,path):
-    print('len(x)={0}'.format(len(s.x)))
+    print('len(x_tr)={0}'.format(len(s.x_tr)))
     sio.savemat(path,{'K':s.K,'T':s.T,'Nw':s.Nw,'omega':s.omega,'alpha':s.alpha,'Lambda':s.Lambda,'c':s.c,'z':s.z,'beta':s.beta,'v':s.v,'sigV':s.sigV,'pi':s.pi,'sigPi':s.sigPi,'x_tr':s.x_tr,'x_ho':s.x_ho,'perp':s.perp})
 
   def load(s,path):
@@ -190,8 +191,8 @@ class HDP_sample:
         hdp.getWordTopics(self.z[d],d)
         print('word topics ({}) size: {}'.format(d,self.z[d].shape))
       self.perp = np.zeros(D)
-      hdp.getPerplexity(perp)
-      print('Perplexity of iterations: {}'.format(perp))
+      hdp.getPerplexity(self.perp)
+      print('Perplexity of iterations: {}'.format(self.perp))
     else:
       print('Error loading hdp of type {}'.format(type(hdp)))
 

@@ -37,7 +37,7 @@ def dataFromBOFs(pathToData):
 
 
 
-class HDPvar(bnp.HDP_onl):
+class HDPvar(bnp.HDP_var):
   # x are data for training; x_ho is held out data
   def initialEstimate(self,x,x_ho,Nw,kappa,K,T,S):
     D = len(x)
@@ -98,22 +98,21 @@ if __name__ == '__main__':
   dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
 
   hdp_sample = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
-  x, gtCorpProp, gtTopic, pi, c = hdp_sample.generateDirHDPSample(D,N_d)
-  x_train = x[0:D-D_ho]
+  x, gtCorpProp, gtTopic, pi, c = hdp_sample.generateDirHDPSample(D+D_ho,N_d)
+  x_tr = x[0:D-D_ho]
   x_ho = x[D-D_ho:D]
 
   hdp_sample.save('sample.mat')
+  hdp_sample.load('sample.mat')
 
-  D=min(D,len(x))
-
-  print("---------------- Starting! use " + str(D) +" docs of " + str(len(x)) + "--------------")
+  print("---------------- Starting! use " + str(D) +" docs and " + str(D_ho) + " held out --------------")
 
   dirichlet=bnp.Dir(dirAlphas)
   print("Dir created")
 
   if variational:
     hdp = HDPvar(dirichlet,alpha,omega)
-    hdp.initialEstimate(x_train,x_ho,Nw,kappa,K,T,S)
+    hdp.initialEstimate(x_tr,x_ho,Nw,kappa,K,T,S)
 
 #    hdp=bnp.HDP_onl(dirichlet,alpha,omega)
 #    for x_i in x[0:D]:
@@ -142,7 +141,9 @@ if __name__ == '__main__':
 
     hdp_var = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
     #hdp_var.loadHDPSample(x,topic,docTopicInd,z,v,sigV,pi,sigPi,omega,alpha,dirAlphas)
-    hdp_var.loadHDPSample(x=x,hdp=hdp)
+    hdp_var.loadHDPSample(x_tr=x_tr,x_ho=x_ho,hdp=hdp)
+    hdp_var.save('model.mat')
+    hdp_var.load('model.mat')
 
     print('Computing KLdivergence of variational model')
     #logP_gt = hdp_sample.logP_fullJoint()
@@ -169,7 +170,7 @@ if __name__ == '__main__':
 
   else:
     hdp = HDPgibbs(dirichlet,alpha,omega)
-    hdp.initialEstimate(x_train,x_ho,Nw,kappa,K,T,S)
+    hdp.initialEstimate(x_tr,x_ho,Nw,kappa,K,T,S)
 
 #    hdp=bnp.HDP_Dir(dirichlet,alpha,omega)
 #    for x_i in x[0:D]:

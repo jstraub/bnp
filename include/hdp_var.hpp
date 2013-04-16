@@ -693,6 +693,11 @@ class HDP_var: public HDP<uint32_t>
       return true;
     };
 
+    Row<double> P_x(uint32_t d) const{
+      Row<double> p(mNw);
+      return p;
+    }
+
   protected:
     Mat<double> mLambda; // corpus level topics (Dirichlet)
     Mat<double> mA; // corpus level Beta process alpha parameter for stickbreaking
