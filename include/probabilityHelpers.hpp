@@ -16,6 +16,7 @@ double Beta(double x, double alpha, double beta);
 double betaln(double alpha, double beta);
 // evaluate log beta distribution at x
 double logBeta(double x, double alpha, double beta);
+double logBeta(const Row<double>& x, double alpha, double beta);
 double logDir(const Row<double>& x, const Row<double>& alpha);
 
 void betaMode(Col<double>& v, const Col<double>& alpha, const Col<double>& beta);

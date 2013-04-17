@@ -415,7 +415,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>
           if (mX_ho.n_rows > 0) {
             cout<<"computing "<<mX_ho.n_rows<<" perplexities"<<endl;
 #pragma omp parallel for schedule(dynamic) 
-            for (uint32_t i=0; i<mX_ho.size(); ++i)
+            for (uint32_t i=0; i<mX_ho.n_rows; ++i)
             {
               double perp_i =  perplexity(mX_ho.row(i),dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
               cout<<"perp_"<<i<<"="<<perp_i<<endl;
@@ -429,6 +429,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>
           }
         }
       }
+
       //return z_dn; //TODO: return p_d(x)
     };
 
@@ -502,15 +503,18 @@ class HDP_var_ss: public HDP_ss<uint32_t>
         updateEst(x,zeta,phi,gamma,a,lambda,omega,d,kappa);
         //cout<<"computing perplexity under updated model"<<endl;
 
-        return perplexity(x, zeta, phi, gamma, lambda);
+        return perplexity(x, zeta, phi, gamma, lambda, a);
       }else{
         return 1.0/0.0;
       }
     };
 
     // compute the perplexity given a document x and the model paremeters of it (after incorporating x)
-    double perplexity(const Row<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& lambda)
+    double perplexity(const Row<uint32_t>& x, const Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& gamma, const Mat<double>& lambda, const Mat<double>& a)
     {
+      Row<double> p= P_x(phi, zeta, gamma, lambda, a);
+      //TODO: use p here instead of redoing the computations!
+
       //cout<<"Computing Perplexity"<<endl;
       uint32_t Nw = x.n_cols;
       uint32_t N = sum(x);
@@ -532,9 +536,9 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       double perp = 0.0;
       //cout<<"x: "<<x.n_rows<<"x"<<x.n_cols<<endl;
       for (uint32_t w=0; w<Nw; ++w){
-        //cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x.n_rows<<" x_n="<<x[n]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols<<endl;
+        cout<<"c_z_n = "<<c[z[w]]<<" z_n="<<z[w]<<" w="<<w<<" N="<<N<<" x_w="<<x[w]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols;
         perp -= x[w]*logCat(w,topics.row(c[z[w]]));
-        //cout<<perp<<" ";
+        cout<<"\t perp="<<-x[w]*logCat(w,topics.row(c[z[w]]))<<endl;
       } cout<<endl;
       perp /= double(N);
       perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
@@ -632,7 +636,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       }
     };
 
-    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d)
+    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d) const
     {
       if (d < mGamma.size())
         return getDocTopics(pi,sigPi,c,mGamma[d],mZeta[d]);
@@ -642,7 +646,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       }
     };
 
-    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, const Mat<double>& gamma, const Mat<double>& zeta)
+    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, const Mat<double>& gamma, const Mat<double>& zeta) const
     {
       uint32_t T = gamma.n_rows; // doc level topics
 
@@ -663,11 +667,11 @@ class HDP_var_ss: public HDP_ss<uint32_t>
     };
 
 
-    bool getWordTopics(Col<uint32_t>& z, uint32_t d){
+    bool getWordTopics(Col<uint32_t>& z, uint32_t d) const {
       return getWordTopics(z,mPhi[d]);
     };
 
-    bool getWordTopics(Col<uint32_t>& z, const Mat<double>& phi){
+    bool getWordTopics(Col<uint32_t>& z, const Mat<double>& phi) const {
       z.set_size(phi.n_rows);
       for (uint32_t i=0; i<z.n_elem; ++i){
         z[i] = multinomialMode(phi.row(i));
@@ -675,13 +679,13 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       return true;
     };
 
-    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV)
+    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV) const
     {
       return getCorpTopicProportions(v,sigV,mA);
     };
 
     // a are the parameters of the beta distribution from which v is drawn
-    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV, const Mat<double>& a)
+    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV, const Mat<double>& a) const
     {
       uint32_t K = a.n_rows; // corp level topics
 
@@ -694,7 +698,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>
     };
 
 
-    bool getCorpTopic(Col<double>& topic, uint32_t k)
+    bool getCorpTopic(Col<double>& topic, uint32_t k) const
     {
       if(mLambda.n_rows > 0 && k < mLambda.n_rows)
       {
@@ -704,14 +708,14 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       }
     };
 
-    bool getCorpTopic(Col<double>& topic, const Row<double>& lambda)
+    bool getCorpTopic(Col<double>& topic, const Row<double>& lambda) const
     {
       // mode of dirichlet (MAP estimate)
       dirMode(topic, lambda.t());
       return true;
     };
 
-    bool getCorpTopic(Mat<double>& topics, const Mat<double>& lambda)
+    bool getCorpTopic(Mat<double>& topics, const Mat<double>& lambda) const
     {
       uint32_t K = lambda.n_rows;
       uint32_t Nw = lambda.n_cols;
@@ -725,16 +729,36 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       return true;
     };
 
-    Row<double> P_x(uint32_t d) const{
+    Row<double> P_x(uint32_t d) const {
+      return P_x(mPhi[d],mZeta[d],mGamma[d],mLambda,mA);
+    };
+
+    Row<double> P_x(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Mat<double>& a) const
+    {
       Row<double> p(mNw);
       p.zeros();
 
-//      Col<double> beta = dirMode(topic, lambda.t());
+      Col<double> v;
+      Col<double> sigV;
+      getCorpTopicProportions(v,sigV,a);
+      Col<double> pi;
+      Col<double> sigPi;
+      Col<uint32_t> c;
+      getDocTopics(pi,sigPi,c,gamma,zeta);
+      Col<uint32_t> z(mNw);
+      getWordTopics(z, phi);
+      Mat<double> beta;
+      getCorpTopic(beta,lambda);
 
-//      for (uint32_t w=0; w<mNw; ++w){
-//        p[w] = logCat(w, beta[]
-//      }
-//
+      for (uint32_t w=0; w<mNw; ++w){
+        p[w] = logCat(w, beta.row( c[ z[w] ]).t()) + 
+          logCat(c[ z[w] ], sigV.t()) + 
+          logBeta(v, 1.0, mOmega) + 
+          logCat(z[w], sigPi.t()) +
+          logBeta(pi, 1.0, mAlpha) +
+          logDir(beta.row( c[ z[w] ]).t(), mLambda.t());
+      }
+
       return p;
     }
 

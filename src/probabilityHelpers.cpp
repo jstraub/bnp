@@ -43,6 +43,15 @@ double logBeta(double x, double alpha, double beta)
   }
 };
 
+double logBeta(const Row<double>& x, double alpha, double beta)
+{
+  double p=0.0;
+  for (uint32_t i=0; i<x.n_cols; ++i){
+    p += logBeta(x[i],alpha,beta);
+  }
+  return p;
+};
+
 double logDir(const Row<double>& x, const Row<double>& alpha)
 { 
   assert(alpha.n_elem == x.n_elem);
