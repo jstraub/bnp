@@ -697,7 +697,7 @@ class HDP_var: public HDP<uint32_t>
       Row<double> p(mNw);
       p.zeros();
 
-      Col<double> beta = dirMode(topic, lambda.t());
+      //Col<double> beta = dirMode(topic, lambda.t());
 
 //      for (uint32_t w=0; w<mNw; ++w){
 //        p[w] = logCat(w, beta[]

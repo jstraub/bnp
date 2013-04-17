@@ -5,6 +5,8 @@
 #include <baseMeasure.hpp>
 #include <hdp_gibbs.hpp>
 #include <hdp_var.hpp>
+// using the hdp which utilizes sufficient statistics 
+#include <hdp_var_ss.hpp>
 
 #include <assert.h>
 #include <stddef.h>
@@ -400,6 +402,152 @@ public:
 
 };
 
+
+
+class HDP_var_ss_py : public HDP_var_ss
+{
+public:
+  HDP_var_ss_py(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
+  : HDP_var_ss(base,alpha,gamma)
+  {
+    //cout<<"Creating "<<typeid(this).name()<<endl;
+  };
+
+  bool densityEst(const numeric::array& x, const numeric::array& x_ho, double kappa, uint32_t K, uint32_t T, uint32_t S)
+  {
+    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
+    Mat<uint32_t> x_ho_mat=np2mat<uint32_t>(x_ho); // can do this since x_mat gets copied inside    
+    cout<<"mX.n_rows="<<x_mat.n_rows<<endl;
+    cout<<"mX_ho.n_rows="<<x_ho_mat.n_rows<<endl;
+//    for (uint32_t i=0; i<HDP_var::mX.size(); ++i)
+//      cout<<"  x_"<<i<<": "<<HDP_var::mX[i].n_rows<<"x"<<HDP_var::mX[i].n_cols<<endl;
+//
+    HDP_var_ss::densityEst(x_mat,x_ho_mat,kappa,K,T,S);
+    return true;
+  }
+
+  // after an initial densitiy estimate has been made using addDoc() and densityEst()
+  // can use this to update the estimate with information from additional x 
+  bool updateEst(const numeric::array& x, double ro=0.75)
+  {
+    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
+    return HDP_var_ss::updateEst(x_mat,ro);
+  }
+
+  // works on the data in lambda -> size has to be correct in order for this to work!
+  // makes a copy of the internal labels vector
+  bool getLambda(numeric::array& lambda, uint32_t k)
+  {
+    Col<double> lambda_col;
+    if(!HDP_var_ss::getLambda(lambda_col, k)){return false;} // works on the data in _mat
+    Col<double> lambda_wrap=np2col<double>(lambda); 
+    if(lambda_col.n_rows != lambda_wrap.n_rows)
+      return false;
+    else{
+      for (uint32_t i=0; i<lambda_wrap.n_rows; ++i)
+        lambda_wrap.at(i)=lambda_col.at(i);
+      return true;
+    }
+  };
+
+  void getA(numeric::array& a)
+  {
+    Col<double> a_wrap=np2col<double>(a); 
+     for (uint32_t i=0; i<a_wrap.n_rows; ++i)
+        a_wrap.at(i)=HDP_var_ss::mA.at(0,i);
+  };
+
+  void getB(numeric::array& b)
+  {
+    Col<double> b_wrap=np2col<double>(b); 
+     for (uint32_t i=0; i<b_wrap.n_rows; ++i)
+        b_wrap.at(i)=HDP_var_ss::mA.at(1,i);
+  };
+
+  void getPerplexity(numeric::array& perp)
+  {
+    Col<double> perp_wrap=np2col<double>(perp); 
+     for (uint32_t i=0; i<perp_wrap.n_rows; ++i)
+        perp_wrap.at(i)=HDP_var_ss::mPerp.at(i);
+  };
+
+  bool getDocTopics(numeric::array& pi, numeric::array& prop, numeric::array& topicInd, uint32_t d)
+  {
+    Col<double> prop_col;
+    Col<double> pi_col;
+    Col<uint32_t> topicInd_col;
+    if(!HDP_var_ss::getDocTopics(pi_col, prop_col, topicInd_col, d)){return false;} // works on the data in _mat
+    Col<double> prop_wrap=np2col<double>(prop); 
+    Col<double> pi_wrap=np2col<double>(pi); 
+    Col<uint32_t> topicInd_wrap=np2col<uint32_t>(topicInd); 
+    if((prop_col.n_rows != prop_wrap.n_rows) || (topicInd_col.n_rows != topicInd_wrap.n_rows) || (pi_col.n_rows != pi_wrap.n_rows))
+      return false;
+    else{
+     for (uint32_t i=0; i<pi_col.n_rows; ++i)
+        pi_wrap.at(i)=pi_col.at(i);
+     for (uint32_t i=0; i<topicInd_wrap.n_rows; ++i)
+        topicInd_wrap.at(i)=topicInd_col.at(i);
+      for (uint32_t i=0; i<prop_wrap.n_rows; ++i)
+        prop_wrap.at(i)=prop_col.at(i);
+      return true;
+    }
+  };
+
+  bool getCorpTopicProportions(numeric::array& v, numeric::array& sigV)
+  {
+    Col<double> sigV_col;
+    Col<double> v_col;
+    if(!HDP_var_ss::getCorpTopicProportions(v_col,sigV_col)){return false;} // works on the data in _mat
+    Col<double> sigV_wrap=np2col<double>(sigV); 
+    Col<double> v_wrap=np2col<double>(v); 
+    if((sigV_col.n_rows != sigV_wrap.n_rows) || (v_col.n_rows != v_wrap.n_rows))
+      return false;
+    else{
+      for (uint32_t i=0; i<v_wrap.n_rows; ++i)
+        v_wrap.at(i)=v_col.at(i);
+      for (uint32_t i=0; i<sigV_wrap.n_rows; ++i)
+        sigV_wrap.at(i)=sigV_col.at(i);
+      return true;
+    }
+  }; 
+
+  bool getCorpTopic(numeric::array& beta, uint32_t k)
+  {
+    Col<double> beta_col;
+    if(!HDP_var_ss::getCorpTopic(beta_col, k)){return false;} // works on the data in _mat
+    Col<double> beta_wrap=np2col<double>(beta); 
+    if(beta_col.n_rows != beta_wrap.n_rows)
+      return false;
+    else{
+      for (uint32_t i=0; i<beta_wrap.n_rows; ++i)
+        beta_wrap.at(i)=beta_col.at(i);
+      return true;
+    }
+  };
+
+  bool getWordTopics(numeric::array& z, uint32_t d)
+  {
+    Col<uint32_t> z_col;
+    if(!HDP_var_ss::getWordTopics(z_col, d)){return false;} // works on the data in _mat
+    Col<uint32_t> z_wrap=np2col<uint32_t>(z); 
+    if(z_col.n_rows != z_wrap.n_rows)
+      return false;
+    else{
+      for (uint32_t i=0; i<z_wrap.n_rows; ++i)
+        z_wrap.at(i)=z_col.at(i);
+      return true;
+    }
+  };
+
+  double perplexity(numeric::array& x, uint32_t d, double kappa)
+  {
+    Mat<uint32_t> x_mat=np2col<uint32_t>(x); // can do this since x_mat gets copied inside    
+    return HDP_var_ss::perplexity(x_mat,d,kappa);
+  };
+
+};
+
+
 BOOST_PYTHON_MODULE(libbnp)
 {
 	import_array();
@@ -441,6 +589,20 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("getCorpTopicProportions",&HDP_var_py::getCorpTopicProportions)
         .def("getCorpTopic",&HDP_var_py::getCorpTopic);
    //     .def_readonly("mGamma", &HDP_var_py::mGamma);
+
+
+	class_<HDP_var_ss_py>("HDP_var_ss",init<Dir_py&,double,double>())
+        .def("densityEst",&HDP_var_ss_py::densityEst)
+        .def("updateEst",&HDP_var_ss_py::updateEst)
+        .def("perplexity",&HDP_var_ss_py::perplexity)
+        .def("getPerplexity",&HDP_var_ss_py::getPerplexity)
+        .def("getA",&HDP_var_ss_py::getA)
+        .def("getB",&HDP_var_ss_py::getB)
+        .def("getLambda",&HDP_var_ss_py::getLambda)
+        .def("getDocTopics",&HDP_var_ss_py::getDocTopics)
+        .def("getWordTopics",&HDP_var_ss_py::getWordTopics)
+        .def("getCorpTopicProportions",&HDP_var_ss_py::getCorpTopicProportions)
+        .def("getCorpTopic",&HDP_var_ss_py::getCorpTopic);
 
 }
 

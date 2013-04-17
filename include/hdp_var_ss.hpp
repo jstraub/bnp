@@ -21,17 +21,18 @@
 using namespace std;
 using namespace arma;
 
-
-class HDP // : public DP<U>
+// base HDP for using sufficient statistics
+template <class U>
+class HDP_ss // : public DP<U>
 {
   public:
-    HDP(const BaseMeasure<U>& base, double alpha, double omega)
+    HDP_ss(const BaseMeasure<U>& base, double alpha, double omega)
       : mH(base), mAlpha(alpha), mOmega(omega)
     {
       //    cout<<"Creating "<<typeid(this).name()<<endl;
     };
 
-    ~HDP()
+    ~HDP_ss()
     { };
 
     virtual Row<double> P_x(uint32_t d) const=0;
@@ -50,15 +51,15 @@ protected:
 
 // this one assumes that the number of words per document are bigger than the number of individual words
 // and is optimized for that case
-class HDP_var: public HDP
+class HDP_var_ss: public HDP_ss<uint32_t>
 {
   public:
 
-    HDP_var(const BaseMeasure<uint32_t>& base, double alpha, double omega)
-      : HDP<uint32_t>(base, alpha, omega), mT(0), mK(0), mNw(0)
+    HDP_var_ss(const BaseMeasure<uint32_t>& base, double alpha, double omega)
+      : HDP_ss<uint32_t>(base, alpha, omega), mT(0), mK(0), mNw(0)
     {};
 
-    ~HDP_var()
+    ~HDP_var_ss()
     {};
 
     double digamma(double x)
@@ -163,12 +164,12 @@ class HDP_var: public HDP
       //cout<<"\tinit phi"<<endl;
       for (uint32_t w=0; w<Nw; ++w){
         for (uint32_t i=0; i<T; ++i) {
-          phi(n,i)=0.0;
+          phi(w,i)=0.0;
           for (uint32_t k=0; k<K; ++k) {
-            phi(n,i)+=zeta(i,k)* x_d(w) * ElogBeta(lambda, k, w);
+            phi(w,i)+=zeta(i,k)* x_d(w) * ElogBeta(lambda, k, w);
           }
         }
-        normalizeLogDistribution(phi.row(n));
+        normalizeLogDistribution(phi.row(w));
         //        if(normalizeLogDistribution(phi.row(n)))
         //        {
         //          cerr<<"phi normally computed"<<endl;
@@ -219,7 +220,7 @@ class HDP_var: public HDP
           zeta(i,k) = ElogSigma(a,k);
           //cout<<zeta(i,k)<<endl;
           for (uint32_t w=0; w<Nw; ++w){
-            zeta(i,k) += phi(n,i)*x_d(w)*ElogBeta(lambda,k,w);
+            zeta(i,k) += phi(w,i)*x_d(w)*ElogBeta(lambda,k,w);
           }
         }
         normalizeLogDistribution(zeta.row(i));
@@ -246,12 +247,12 @@ class HDP_var: public HDP
       for (uint32_t w=0; w<Nw; ++w){
         //phi(n,i)=0.0;
         for (uint32_t i=0; i<T; ++i) {
-          phi(n,i) = ElogSigma(gamma,i);
+          phi(w,i) = ElogSigma(gamma,i);
           for (uint32_t k=0; k<K; ++k) {
-            phi(n,i) += zeta(i,k)*x_d(w)*ElogBeta(lambda,k,w) ;
+            phi(w,i) += zeta(i,k)*x_d(w)*ElogBeta(lambda,k,w) ;
           }
         }
-        normalizeLogDistribution(phi.row(n));
+        normalizeLogDistribution(phi.row(w));
         //          if(normalizeLogDistribution(phi.row(n)))
         //          {
         //            cerr<<"phi normally computed"<<endl;
@@ -301,8 +302,7 @@ class HDP_var: public HDP
     //  uint32_t T=10; // truncation on document level
     //  uint32_t K=100; // truncation on corpus level
     // S = batch size
-    vector<Col<uint32_t> > densityEst(Mat<uint32_t>& x, Mat<uint32_t>& x_ho,
-        double kappa, uint32_t K, uint32_t T, uint32_t S)
+    void densityEst(Mat<uint32_t>& x, Mat<uint32_t>& x_ho, double kappa, uint32_t K, uint32_t T, uint32_t S)
     {
 
       // From: Online Variational Inference for the HDP
@@ -316,8 +316,8 @@ class HDP_var: public HDP
       // T-1 gamma draws determine a T dim multinomial
       // T = T-1;
 
-      mX = x
-      mX_ho = x_ho
+      mX = x;
+      mX_ho = x_ho;
 
       mT = T;
       mK = K;
@@ -417,7 +417,7 @@ class HDP_var: public HDP
 #pragma omp parallel for schedule(dynamic) 
             for (uint32_t i=0; i<mX_ho.size(); ++i)
             {
-              double perp_i =  perplexity(mX_row(i),dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
+              double perp_i =  perplexity(mX_ho.row(i),dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
               cout<<"perp_"<<i<<"="<<perp_i<<endl;
 #pragma omp critical
               {
@@ -429,7 +429,7 @@ class HDP_var: public HDP
           }
         }
       }
-      return z_dn; //TODO: return p_d(x)
+      //return z_dn; //TODO: return p_d(x)
     };
 
 //    // compute density estimate based on data previously fed into the class using addDoc
@@ -450,16 +450,18 @@ class HDP_var: public HDP
     bool  updateEst(const Mat<uint32_t>& x, double kappa)
     {
       if (mX.n_rows > 0 && mX.n_rows == mPhi.size()) { // this should indicate that there exists a estimate already
-        uint32_t N = x.n_rows;
+        uint32_t d = mX.n_rows;
+        uint32_t Nw = x.n_cols;
         uint32_t T = mT; //mZeta[0].n_rows;
         uint32_t K = mK; //mZeta[0].n_cols;
-        mX.push_back(x);
+        mX.resize(d+1,mX.n_cols);
+        mX.row(d) = x;
+        uint32_t N = x.n_rows;
         mZeta.push_back(Mat<double>(T,K));
-        mPhi.push_back(Mat<double>(N,T));
+        mPhi.push_back(Mat<double>(Nw,T));
         //    mZeta.set_size(T,K);
         //    mPhi.set_size(N,T);
         mGamma.push_back(Mat<double>(T,2));
-        uint32_t d = mX.n_rows-1;
         mPerp.resize(d+1);
 
         if(updateEst(mX.row(d),mZeta[d],mPhi[d],mGamma[d],mA,mLambda,mOmega,d,kappa))
@@ -479,16 +481,16 @@ class HDP_var: public HDP
     };
 
     // compute the perplexity of a given document x
-    double perplexity(const Mat<uint32_t>& x, uint32_t d, double kappa=0.75)
+    double perplexity(const Row<uint32_t>& x, uint32_t d, double kappa=0.75)
     {
       if (mX.n_rows > 0 && mX.n_rows == mPhi.size()) { // this should indicate that there exists a estimate already
-        uint32_t N = x.n_rows;
+        uint32_t Nw = x.n_cols;
         //uint32_t Nw = mLambda.n_cols;
         uint32_t T = mT; //mZeta[0].n_rows; 
         uint32_t K = mK; //mZeta[0].n_cols;
 
         Mat<double> zeta(T,K);
-        Mat<double> phi(N,T);
+        Mat<double> phi(Nw,T);
         Mat<double> gamma(T,2);
         //uint32_t d = mX.size()-1;
 
@@ -727,7 +729,7 @@ class HDP_var: public HDP
       Row<double> p(mNw);
       p.zeros();
 
-      Col<double> beta = dirMode(topic, lambda.t());
+//      Col<double> beta = dirMode(topic, lambda.t());
 
 //      for (uint32_t w=0; w<mNw; ++w){
 //        p[w] = logCat(w, beta[]
