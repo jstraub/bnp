@@ -695,6 +695,14 @@ class HDP_var: public HDP<uint32_t>
 
     Row<double> P_x(uint32_t d) const{
       Row<double> p(mNw);
+      p.zeros();
+
+      Col<double> beta = dirMode(topic, lambda.t());
+
+//      for (uint32_t w=0; w<mNw; ++w){
+//        p[w] = logCat(w, beta[]
+//      }
+//
       return p;
     }
 
