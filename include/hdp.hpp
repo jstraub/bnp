@@ -4,18 +4,12 @@
 
 #pragma once
 
-#include "random.hpp"
 #include "baseMeasure.hpp"
-//#include "dp.hpp"
-#include "probabilityHelpers.hpp"
 
 #include <stddef.h>
 #include <stdint.h>
 #include <typeinfo>
 
-#include <boost/math/special_functions/gamma.hpp>
-#include <boost/math/special_functions/digamma.hpp>
-#include <boost/math/special_functions/beta.hpp>
 #include <armadillo>
 
 using namespace std;
@@ -58,7 +52,6 @@ protected:
     double mOmega;
     vector<Mat<U> > mX; // training data
     vector<Mat<U> > mX_ho; //  held out data
-    //vector<Col<uint32_t> > mZ;
 
 private:
 

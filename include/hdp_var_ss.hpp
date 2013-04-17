@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "hdp.hpp"
-
 #include "random.hpp"
 #include "baseMeasure.hpp"
 //#include "dp.hpp"
@@ -23,8 +21,36 @@
 using namespace std;
 using namespace arma;
 
-// this one assumes that the number of words per document is smaller than the dictionary size
-class HDP_var: public HDP<uint32_t>
+
+class HDP // : public DP<U>
+{
+  public:
+    HDP(const BaseMeasure<U>& base, double alpha, double omega)
+      : mH(base), mAlpha(alpha), mOmega(omega)
+    {
+      //    cout<<"Creating "<<typeid(this).name()<<endl;
+    };
+
+    ~HDP()
+    { };
+
+    virtual Row<double> P_x(uint32_t d) const=0;
+
+protected:
+
+    const BaseMeasure<U>& mH; // base measure
+    double mAlpha; 
+    double mOmega;
+    Mat<U> mX; // training data
+    Mat<U> mX_ho; //  held out data
+    //vector<Col<uint32_t> > mZ;
+
+};
+
+
+// this one assumes that the number of words per document are bigger than the number of individual words
+// and is optimized for that case
+class HDP_var: public HDP
 {
   public:
 
@@ -47,12 +73,12 @@ class HDP_var: public HDP<uint32_t>
       return boost::math::digamma(x);
     }
 
-    double ElogBeta(const Mat<double>& lambda, uint32_t k, uint32_t w_dn)
+    double ElogBeta(const Mat<double>& lambda, uint32_t k, uint32_t w)
     {
       //if(lambda[k](w_dn)<1e-6){
       //  cout<<"\tlambda[k]("<<w_dn<<") near zero: "<<lambda[k](w_dn)<<endl;
       //}
-      return digamma(lambda(k,w_dn)) - digamma(sum(lambda.row(k)));
+      return digamma(lambda(k,w)) - digamma(sum(lambda.row(k)));
     }
 
     double ElogSigma(const Mat<double>& a, uint32_t k)
@@ -101,18 +127,18 @@ class HDP_var: public HDP<uint32_t>
     //    return e; 
     //  };
     //
-    void initZeta(Mat<double>& zeta, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+    void initZeta(Mat<double>& zeta, const Mat<double>& lambda, const Row<uint32_t>& x_d)
     {
-      uint32_t N = x_d.n_rows;
+      uint32_t Nw = x_d.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
       //cerr<<"\tinit zeta"<<endl;
       for (uint32_t i=0; i<T; ++i) {
         for (uint32_t k=0; k<K; ++k) {
           zeta(i,k)=0.0;
-          for (uint32_t n=0; n<N; ++n) {
+          for (uint32_t w=0; w<Nw; ++w) {
             //if(i==0 && k==0) cout<<zeta(i,k)<<" -> ";
-            zeta(i,k) += ElogBeta(lambda, k, x_d(n));
+            zeta(i,k) += x_d(w) * ElogBeta(lambda, k, w);
           }
         }
         normalizeLogDistribution(zeta.row(i));
@@ -129,17 +155,17 @@ class HDP_var: public HDP<uint32_t>
       //cerr<<"normalization check:"<<endl<<sum(zeta,1).t()<<endl; // sum over rows
     };
 
-    void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+    void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& lambda, const Row<uint32_t>& x_d)
     {
-      uint32_t N = x_d.n_rows;
+      uint32_t Nw = x_d.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
       //cout<<"\tinit phi"<<endl;
-      for (uint32_t n=0; n<N; ++n){
+      for (uint32_t w=0; w<Nw; ++w){
         for (uint32_t i=0; i<T; ++i) {
           phi(n,i)=0.0;
           for (uint32_t k=0; k<K; ++k) {
-            phi(n,i)+=zeta(i,k)* ElogBeta(lambda, k, x_d(n));
+            phi(n,i)+=zeta(i,k)* x_d(w) * ElogBeta(lambda, k, w);
           }
         }
         normalizeLogDistribution(phi.row(n));
@@ -181,9 +207,9 @@ class HDP_var: public HDP<uint32_t>
       //cout<<gamma.t()<<endl;
     };
 
-    void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& a, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+    void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& a, const Mat<double>& lambda, const Row<uint32_t>& x_d)
     {
-      uint32_t N = x_d.n_rows;
+      uint32_t Nw = x_d.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
 
@@ -192,8 +218,8 @@ class HDP_var: public HDP<uint32_t>
         for (uint32_t k=0; k<K; ++k) {
           zeta(i,k) = ElogSigma(a,k);
           //cout<<zeta(i,k)<<endl;
-          for (uint32_t n=0; n<N; ++n){
-            zeta(i,k) += phi(n,i)*ElogBeta(lambda,k,x_d(n));
+          for (uint32_t w=0; w<Nw; ++w){
+            zeta(i,k) += phi(n,i)*x_d(w)*ElogBeta(lambda,k,w);
           }
         }
         normalizeLogDistribution(zeta.row(i));
@@ -211,18 +237,18 @@ class HDP_var: public HDP<uint32_t>
     }
 
 
-    void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+    void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Row<uint32_t>& x_d)
     {
-      uint32_t N = x_d.n_rows;
+      uint32_t Nw = x_d.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
 
-      for (uint32_t n=0; n<N; ++n){
+      for (uint32_t w=0; w<Nw; ++w){
         //phi(n,i)=0.0;
         for (uint32_t i=0; i<T; ++i) {
           phi(n,i) = ElogSigma(gamma,i);
           for (uint32_t k=0; k<K; ++k) {
-            phi(n,i) += zeta(i,k)*ElogBeta(lambda,k,x_d(n)) ;
+            phi(n,i) += zeta(i,k)*x_d(w)*ElogBeta(lambda,k,w) ;
           }
         }
         normalizeLogDistribution(phi.row(n));
@@ -238,10 +264,9 @@ class HDP_var: public HDP<uint32_t>
       }
     }
 
-    void computeNaturalGradients(Mat<double>& d_lambda, Mat<double>& d_a, const Mat<double>& zeta, const Mat<double>&  phi, double omega, uint32_t D, const Mat<uint32_t>& x_d)
+    void computeNaturalGradients(Mat<double>& d_lambda, Mat<double>& d_a, const Mat<double>& zeta, const Mat<double>&  phi, double omega, uint32_t D, const Row<uint32_t>& x_d)
     {
-      uint32_t N = x_d.n_rows;
-      uint32_t Nw = d_lambda.n_cols;
+      uint32_t Nw = x_d.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
 
@@ -250,8 +275,8 @@ class HDP_var: public HDP<uint32_t>
       for (uint32_t k=0; k<K; ++k) { // for all K corpus level topics
         for (uint32_t i=0; i<T; ++i) {
           Row<double> _lambda(Nw); _lambda.zeros();
-          for (uint32_t n=0; n<N; ++n){
-            _lambda(x_d(n)) += phi(n,i);
+          for (uint32_t w=0; w<Nw; ++w){
+            _lambda(w) +=  x_d(w)*phi(w,i);
           }
           d_lambda.row(k) += zeta(i,k) * _lambda;
           d_a(k,0) += zeta(i,k);
@@ -276,7 +301,7 @@ class HDP_var: public HDP<uint32_t>
     //  uint32_t T=10; // truncation on document level
     //  uint32_t K=100; // truncation on corpus level
     // S = batch size
-    vector<Col<uint32_t> > densityEst(const vector<Mat<uint32_t> >& x, uint32_t Nw, 
+    vector<Col<uint32_t> > densityEst(Mat<uint32_t>& x, Mat<uint32_t>& x_ho,
         double kappa, uint32_t K, uint32_t T, uint32_t S)
     {
 
@@ -286,25 +311,29 @@ class HDP_var: public HDP<uint32_t>
       //double mGamma = 1;
       //double nu = ((Dir*)(&mH))->mAlpha0; // get nu from vbase measure (Dir)
       //double kappa = 0.75;
+      // TODO: x is a matrix of counts of words per row. so columns are counts of specific words
 
       // T-1 gamma draws determine a T dim multinomial
       // T = T-1;
 
+      mX = x
+      mX_ho = x_ho
+
       mT = T;
       mK = K;
-      mNw = Nw;
+      mNw = x.n_cols;
+      uint32_t D=x.n_rows;
 
       Mat<double> a(K,2);
       a.ones();
       a.col(1) *= mOmega; 
-      uint32_t D=x.size();
 
       // initialize lambda
       GammaRnd gammaRnd(1.0,1.0);
-      Mat<double> lambda(K,Nw);
+      Mat<double> lambda(K,mNw);
       for (uint32_t k=0; k<K; ++k){
-        for (uint32_t w=0; w<Nw; ++w) lambda(k,w) = gammaRnd.draw();
-        lambda.row(k) *= double(D)*100.0/double(K*Nw);
+        for (uint32_t w=0; w<mNw; ++w) lambda(k,w) = gammaRnd.draw();
+        lambda.row(k) *= double(D)*100.0/double(K*mNw);
         lambda.row(k) += ((Dir*)(&mH))->mAlphas;
       }
 
@@ -323,20 +352,20 @@ class HDP_var: public HDP<uint32_t>
 //#pragma omp for schedule(dynamic) ordered
         for (uint32_t dd=0; dd<D; dd += S)
         {
-          Mat<double> db_lambda(K,Nw); // batch updates
+          Mat<double> db_lambda(K,mNw); // batch updates
           Mat<double> db_a(K,2); 
 #pragma omp parallel for schedule(dynamic) 
           for (uint32_t db=dd; db<min(dd+S,D); db++)
           {
             uint32_t d=ind[db];  
-            uint32_t N=x[d].n_rows;
+            uint32_t N=sum(x.row(d));
             //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
 
             cout<<"-- db="<<db<<" d="<<d<<" N="<<N<<endl;
             Mat<double> zeta(T,K);
-            Mat<double> phi(N,T);
-            initZeta(zeta,lambda,x[d]);
-            initPhi(phi,zeta,lambda,x[d]);
+            Mat<double> phi(mNw,T);
+            initZeta(zeta,lambda,x.row(d));
+            initPhi(phi,zeta,lambda,x.row(d));
 
             //cout<<" ------------------------ doc level updates --------------------"<<endl;
             Mat<double> gamma(T,2);
@@ -348,8 +377,8 @@ class HDP_var: public HDP<uint32_t>
             while(!converged){
               //           cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
               updateGamma(gamma,phi);
-              updateZeta(zeta,phi,a,lambda,x[d]);
-              updatePhi(phi,zeta,gamma,lambda,x[d]);
+              updateZeta(zeta,phi,a,lambda,x.row(d));
+              updatePhi(phi,zeta,gamma,lambda,x.row(d));
 
               converged = (accu(gamma_prev != gamma))==0 || o>60 ;
               gamma_prev = gamma;
@@ -359,10 +388,10 @@ class HDP_var: public HDP<uint32_t>
             mZeta[d] = Mat<double>(zeta);
             mPhi[d] = Mat<double>(phi);
             mGamma[d] = Mat<double>(gamma);
-            Mat<double> d_lambda(K,Nw);
+            Mat<double> d_lambda(K,mNw);
             Mat<double> d_a(K,2); 
             //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
-            computeNaturalGradients(d_lambda, d_a, zeta, phi, mOmega, D, x[d]);
+            computeNaturalGradients(d_lambda, d_a, zeta, phi, mOmega, D, x.row(d));
  #pragma omp critical
             {
               db_lambda += d_lambda;
@@ -383,19 +412,19 @@ class HDP_var: public HDP<uint32_t>
           mLambda = lambda;
 
           mPerp[dd+bS/2] = 0.0;
-          if (mX_ho.size() > 0) {
-            cout<<"computing "<<mX_ho.size()<<" perplexities"<<endl;
+          if (mX_ho.n_rows > 0) {
+            cout<<"computing "<<mX_ho.n_rows<<" perplexities"<<endl;
 #pragma omp parallel for schedule(dynamic) 
             for (uint32_t i=0; i<mX_ho.size(); ++i)
             {
-              double perp_i =  perplexity(mX_ho[i],dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
+              double perp_i =  perplexity(mX_row(i),dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
               cout<<"perp_"<<i<<"="<<perp_i<<endl;
 #pragma omp critical
               {
                 mPerp[dd] += perp_i;
               }
             }
-            mPerp[dd] /= double(mX_ho.size());
+            mPerp[dd] /= double(mX_ho.n_rows);
             //cout<<"Perplexity="<<mPerp[d]<<endl;
           }
         }
@@ -403,24 +432,24 @@ class HDP_var: public HDP<uint32_t>
       return z_dn; //TODO: return p_d(x)
     };
 
-    // compute density estimate based on data previously fed into the class using addDoc
-    bool densityEst(uint32_t Nw, double kappa, uint32_t K, uint32_t T, uint32_t S)
-    {
-      if(mX.size() > 0)
-      {
-        densityEst(mX,Nw,kappa,K,T,S);
-        //TODO: return p_d(x)
-        return true;
-      }else{
-        return false;
-      }
-    };
+//    // compute density estimate based on data previously fed into the class using addDoc
+//    bool densityEst(double kappa, uint32_t K, uint32_t T, uint32_t S)
+//    {
+//      if(mX.n_rows > 0)
+//      {
+//        densityEst(mX,kappa,K,T,S);
+//        //TODO: return p_d(x)
+//        return true;
+//      }else{
+//        return false;
+//      }
+//    };
 
     // after an initial densitiy estimate has been made using densityEst()
     // can use this to update the estimate with information from additional x 
     bool  updateEst(const Mat<uint32_t>& x, double kappa)
     {
-      if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
+      if (mX.n_rows > 0 && mX.n_rows == mPhi.size()) { // this should indicate that there exists a estimate already
         uint32_t N = x.n_rows;
         uint32_t T = mT; //mZeta[0].n_rows;
         uint32_t K = mK; //mZeta[0].n_cols;
@@ -430,15 +459,15 @@ class HDP_var: public HDP<uint32_t>
         //    mZeta.set_size(T,K);
         //    mPhi.set_size(N,T);
         mGamma.push_back(Mat<double>(T,2));
-        uint32_t d = mX.size()-1;
+        uint32_t d = mX.n_rows-1;
         mPerp.resize(d+1);
 
-        if(updateEst(mX[d],mZeta[d],mPhi[d],mGamma[d],mA,mLambda,mOmega,d,kappa))
+        if(updateEst(mX.row(d),mZeta[d],mPhi[d],mGamma[d],mA,mLambda,mOmega,d,kappa))
         {
           mPerp[d] = 0.0;
-          for (uint32_t i=0; i<mX_ho.size(); ++i)
-            mPerp[d] += perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], mLambda);
-          mPerp[d] /= double(mX_ho.size());
+          for (uint32_t i=0; i<mX_ho.n_rows; ++i)
+            mPerp[d] += perplexity(mX_ho.row(i), mZeta[d], mPhi[d], mGamma[d], mLambda);
+          mPerp[d] /= double(mX_ho.n_rows);
           cout<<"Perplexity="<<mPerp[d]<<endl;
           return true; 
         }else{
@@ -452,7 +481,7 @@ class HDP_var: public HDP<uint32_t>
     // compute the perplexity of a given document x
     double perplexity(const Mat<uint32_t>& x, uint32_t d, double kappa=0.75)
     {
-      if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
+      if (mX.n_rows > 0 && mX.n_rows == mPhi.size()) { // this should indicate that there exists a estimate already
         uint32_t N = x.n_rows;
         //uint32_t Nw = mLambda.n_cols;
         uint32_t T = mT; //mZeta[0].n_rows; 
@@ -478,10 +507,11 @@ class HDP_var: public HDP<uint32_t>
     };
 
     // compute the perplexity given a document x and the model paremeters of it (after incorporating x)
-    double perplexity(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& lambda)
+    double perplexity(const Row<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& lambda)
     {
       //cout<<"Computing Perplexity"<<endl;
-      uint32_t N = x.n_rows;
+      uint32_t Nw = x.n_cols;
+      uint32_t N = sum(x);
       uint32_t T = mT; //mZeta[0].n_rows;
       // find most likely pi_di and c_di
       Col<double> pi;
@@ -489,7 +519,7 @@ class HDP_var: public HDP<uint32_t>
       Col<uint32_t> c(T);
       getDocTopics(pi, sigPi, c, gamma, zeta);
       // find most likely z_dn
-      Col<uint32_t> z(N);
+      Col<uint32_t> z(Nw);
       getWordTopics(z, phi);
       // find most likely topics 
       Mat<double> topics;
@@ -499,12 +529,12 @@ class HDP_var: public HDP<uint32_t>
 
       double perp = 0.0;
       //cout<<"x: "<<x.n_rows<<"x"<<x.n_cols<<endl;
-      for (uint32_t n=0; n<x.n_elem; ++n){
+      for (uint32_t w=0; w<Nw; ++w){
         //cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x.n_rows<<" x_n="<<x[n]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols<<endl;
-        perp -= logCat(x[n],topics.row(c[z[n]]));
+        perp -= x[w]*logCat(w,topics.row(c[z[w]]));
         //cout<<perp<<" ";
       } cout<<endl;
-      perp /= double(x.n_elem);
+      perp /= double(N);
       perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
       perp = pow(2.0,perp);
 
@@ -520,11 +550,11 @@ class HDP_var: public HDP<uint32_t>
     }
 
 
-    bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa= 0.75)
+    bool updateEst(const Row<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa= 0.75)
     {
       uint32_t D = d+1; // assume that doc d is appended to the end  
       //uint32_t N = x.n_rows;
-      uint32_t Nw = lambda.n_cols;
+      uint32_t Nw = x.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
 
