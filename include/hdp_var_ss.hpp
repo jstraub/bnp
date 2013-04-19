@@ -513,30 +513,14 @@ class HDP_var_ss: public HDP_ss<uint32_t>
     double perplexity(const Row<uint32_t>& x, const Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& gamma, const Mat<double>& lambda)
     {
       Row<double> logP= logP_w(phi, zeta, gamma, lambda);
-      //TODO: use p here instead of redoing the computations!
 
 //      //cout<<"Computing Perplexity"<<endl;
       uint32_t Nw = x.n_cols;
       uint32_t N = sum(x);
-//      uint32_t T = mT; //mZeta[0].n_rows;
-//      // find most likely pi_di and c_di
-//      Col<double> pi;
-//      Col<double> sigPi; 
-//      Col<uint32_t> c(T);
-//      getDocTopics(pi, sigPi, c, gamma, zeta);
-//      // find most likely z_dn
-//      Col<uint32_t> z(Nw);
-//      getWordTopics(z, phi);
-//      // find most likely topics 
-//      Mat<double> topics;
-//      //cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
-//      getCorpTopics(topics, lambda);
-
       double perp = 0.0;
       //cout<<"x: "<<x.n_rows<<"x"<<x.n_cols<<endl;
       for (uint32_t w=0; w<Nw; ++w){
         //cout<<"c_z_n = "<<c[z[w]]<<" z_n="<<z[w]<<" w="<<w<<" N="<<N<<" x_w="<<x[w]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols;
-        //perp -= x[w]*logCat(w,topics.row(c[z[w]]));
         if (x[w] > 0) {
           perp -= x[w]*logP[w];
           cout<<"w="<<w<<"\tx_w="<<x[w]<<"\tlogP="<<logP[w]<<"\tperp+="<<-double(x[w])*logP[w]<<endl;
@@ -545,14 +529,6 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       perp /= double(N);
       perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
       perp = pow(2.0,perp);
-
-      //        return logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
-      //    + logCat(self.c[d][ self.z[d][n]], self.sigV) \
-      //    + logBeta(self.v, 1.0, self.omega) \
-      //    + logCat(self.z[d][n], self.sigPi[d]) \
-      //    + logBeta(self.pi[d], 1.0, self.alpha) \
-      //    + logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)
-      //
 
       return perp;
     }

@@ -35,8 +35,11 @@ class HDP_gibbs : public HDP<U>
     {	};
 
     // method for "one shot" computation without storing data in this class
-    vector<Col<uint32_t> > densityEst(const vector<Mat<U> >& x, uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
+    vector<Col<uint32_t> > densityEst(const vector<Mat<U> >& x, uint32_t Nw, uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
     {
+
+      mNw = Nw;
+
       RandDisc rndDisc;
       // x is a list of numpy arrays: one array per document
       uint32_t J=x.size(); // number of documents
@@ -294,20 +297,20 @@ class HDP_gibbs : public HDP<U>
         //        cout<<"@"<<k<<": mu="<<mu(0,0)<<" var="<<c(0,0)<<endl;
         //      }
       }
+      mZ = z_ji;
       return z_ji;
     };
     // compute density estimate based on data previously fed into the class using addDoc
-    bool densityEst(uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
+    bool densityEst(uint32_t Nw, uint32_t K0, uint32_t T0, uint32_t It)
     {
       if(HDP<U>::mX.size() > 0)
       {
-        mZ = densityEst(HDP<U>::mX,K0,T0,It);
+        mZ = densityEst(HDP<U>::mX,Nw,K0,T0,It);
         return true;
       }else{
         return false;
       }
     };
-
 
     // after computing the labels we can use this to get them.
     bool getClassLabels(Col<uint32_t>& z_i, uint32_t i)
@@ -321,15 +324,36 @@ class HDP_gibbs : public HDP<U>
       }
     };
 
-    Row<double> logP_w(uint32_t d) const{
-      uint32_t Nw = 10;
-      Row<double> p(Nw);
+
+    //TODO: compute topics from the labeling
+    void recoverTopics() const
+    {
+      uint32_t D=mX.size(); // D=J -> number of documents in corpus; document d/j
+      for (uint32_t d=0; d<D; ++d){
+        
+      }
+      for (uint32_t i=0; i<mZ[d].n_elems; ++i){
+        if (w==mX[i]) p[w] += 0.0;
+      }
+    };
+
+
+    Row<double> logP_w(uint32_t d) const
+    {
+      Row<double> p(mNw);
+      for (uint32_t w=0; w<mNw; ++w){
+        p[w] =0.0;
+        for (uint32_t i=0; i<mZ[d].n_elems; ++i){
+          if (w==mX[i]) p[w] += 
+        }
+      }
       return p;
     };
 
   protected:
 
     vector<Col<uint32_t> > mZ;
+    uint32_t mNw; // number of different words 
 
   private:
 
