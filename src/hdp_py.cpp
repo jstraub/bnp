@@ -203,7 +203,7 @@ public:
   // makes no copy of the external data x_i
   uint32_t addDoc(const numeric::array& x_i)
   {
-    Row<U> x_i_mat=np2row<U>(x_i); // can do this since x_i_mat gets copied inside
+    Mat<U> x_i_mat=np2mat<U>(x_i); // can do this since x_i_mat gets copied inside
 
     cout<<"adding  x: "<<x_i_mat.n_cols<<": "<<x_i_mat<<endl;
     return HDP_gibbs<U>::addDoc(x_i_mat);
@@ -211,7 +211,7 @@ public:
 
   uint32_t addHeldOut(const numeric::array& x_i)
   {
-    Row<uint32_t> x_i_mat=np2row<U>(x_i); // can do this since x_i_mat gets copied inside
+    Mat<uint32_t> x_i_mat=np2mat<U>(x_i); // can do this since x_i_mat gets copied inside
     return HDP_gibbs<U>::addHeldOut(x_i_mat);
   };
 

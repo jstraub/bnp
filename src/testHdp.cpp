@@ -22,7 +22,7 @@ int main(int argc, char** argv)
 //  mat x_rand(90,1);
 //  x_rand.randu();
 //  x_rand += 12.0;
-  vector<Row<uint32_t> > x(12,zeros<Mat<uint32_t> >(90,1));
+  vector<Mat<uint32_t> > x(12,zeros<Mat<uint32_t> >(1,90));
 
   for (uint32_t d=0; d<12; d+=3)
   {

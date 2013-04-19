@@ -36,7 +36,7 @@ class HDP_gibbs : public HDP<U>
 
 
     // method for "one shot" computation without storing data in this class
-    vector<Row<uint32_t> > densityEst(const vector<Row<U> >& x, uint32_t Nw, uint32_t K0, uint32_t T0, uint32_t It)
+    vector<Row<uint32_t> > densityEst(const vector<Mat<U> >& x, uint32_t Nw, uint32_t K0, uint32_t T0, uint32_t It)
     {
       mNw = Nw;
 
@@ -45,8 +45,7 @@ class HDP_gibbs : public HDP<U>
       uint32_t J=x.size(); // number of documents
       vector<uint32_t> N(J,0);
       for (uint32_t j=0; j<J; ++j)
-        N.at(j)=int(x[j].n_rows); // number of datapoints in each document
-      uint32_t d=x[0].n_cols;      // dimension (assumed to be equal among documents
+        N.at(j)=int(x[j].n_cols); // number of datapoints in each document
 
       uint32_t K=K0; // number of clusters/dishes in the franchise
       vector<uint32_t> T(J,0);   // number of tables in each restaurant
@@ -84,10 +83,10 @@ class HDP_gibbs : public HDP<U>
                 l[t]=math::nan();
                 continue;
               }
-              Row<U> x_k_ji = getXinK(x,j,i,k_jt[j](t),k_jt,t_ji);
+              Mat<U> x_k_ji = getXinK(x,j,i,k_jt[j](t),k_jt,t_ji);
               //HDP hdp_x_ji = posterior(x_k_ji); // compute posterior hdp given the data 
-              double f_k_jt = this->mH.predictiveProb(x[j].row(i).t(),x_k_ji);
-              //logGaus(x[j].row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov()); // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
+              double f_k_jt = this->mH.predictiveProb(x[j].col(i),x_k_ji);
+              //logGaus(x[j].col(i), hdp_x_ji.mVtheta, hdp_x_ji.mmCov()); // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
               f(t) = f_k_jt;
               l(t) = log(n_jt/(n_j + this->mAlpha)) + f_k_jt;
               //          if(x_k_ji.n_rows <3)
@@ -104,21 +103,21 @@ class HDP_gibbs : public HDP<U>
                 l[T[j]+k] = math::nan();
                 continue;
               }
-              Row<U> x_k_ji = getXinK(x,j,i,k,k_jt,t_ji,tt==It-1);
+              Mat<U> x_k_ji = getXinK(x,j,i,k,k_jt,t_ji,tt==It-1);
               //HDP hdp_x_ji = posterior(x_k_ji); // compute posterior hdp given the data in 
-              double f_k =  this->mH.predictiveProb(x[j].row(i).t(),x_k_ji);
-              //logGaus(x[j].row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());  // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
+              double f_k =  this->mH.predictiveProb(x[j].col(i),x_k_ji);
+              //logGaus(x[j].col(i), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());  // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
               f(T[j]+k) = f_k;
               l(T[j]+k) = log(this->mAlpha*m_k/((n_j+this->mAlpha)*(m_ + HDP<U>::mOmega))) + f_k; // TODO: shouldnt this be mAlpha of the posterior hdp?
             }
             // handle the case where x_ji sits at a new table with a new dish
             //        cout<<"ji=:"<<j<<" " <<i<<endl;
-            //        cout<<"x_ji=:"<<x[j].row(i)<<endl;
+            //        cout<<"x_ji=:"<<x[j].col(i)<<endl;
             //        cout<<"mVtheta=:"<<mVtheta<<endl;
             //        cout<<"Cov=:"<<mmCov()<<endl;
             //
-            double f_knew = this->mH.predictiveProb(x[j].row(i).t());
-            //logGaus(x[j].row(i).t(), mVtheta, mmCov());
+            double f_knew = this->mH.predictiveProb(x[j].col(i));
+            //logGaus(x[j].col(i), mVtheta, mmCov());
             f[T[j]+K] = f_knew;
             l[T[j]+K] = log(this->mAlpha*HDP<U>::mOmega/((n_j+this->mAlpha)*(m_+HDP<U>::mOmega))) + f_knew;
 
@@ -191,9 +190,9 @@ class HDP_gibbs : public HDP<U>
             for (uint32_t jj=0; jj<J; ++jj)
               m_ += T[jj];
             uvec i_jt=find(t == t_ji[j]);
-            Row<U> x_jt = zeros<Row<U> >(i_jt.n_elem,d);
+            Mat<U> x_jt = zeros<Mat<U> >(i_jt.n_elem);
             for (uint32_t i=0; i<i_jt.n_elem; ++i)
-              x_jt.row(i) = x[j].row(i_jt(i)); //all datapoints which are sitting at table t 
+              x_jt.col(i) = x[j].col(i_jt(i)); //all datapoints which are sitting at table t 
             for (uint32_t k=0; k<K; ++k)
             {
               uint32_t m_k = 0; // number of tables serving dish k 
@@ -204,20 +203,20 @@ class HDP_gibbs : public HDP<U>
                 continue;
               }
               double f_k=0.0;
-              for (uint32_t i=0; i<x_jt.n_rows; ++i)
+              for (uint32_t i=0; i<x_jt.n_cols; ++i)
               { // product over independent x_ji_t
-                Row<U> x_k_ji = getXinK(x,j,i_jt(i),k,k_jt,t_ji); // for posterior computation
+                Mat<U> x_k_ji = getXinK(x,j,i_jt(i),k,k_jt,t_ji); // for posterior computation
                 //HDP hdp_x_ji = posterior(x_k_ji); // compute posterior hdp given the data in 
-                f_k += this->mH.predictiveProb(x_jt.row(i).t(),x_k_ji);
-                //logGaus(x_jt.row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());
+                f_k += this->mH.predictiveProb(x_jt.col(i),x_k_ji);
+                //logGaus(x_jt.col(i), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());
               }
               f(k)=f_k;
               l(k)=log(m_k/(m_ + HDP<U>::mOmega)) + f_k;
             }
             double f_knew=0.0;
-            for (uint32_t i=0; i<x_jt.n_rows; ++i) // product over independent x_ji_t
-              f_knew += this->mH.predictiveProb(x_jt.row(i).t());
-            //logGaus(x_jt.row(i).t(), mVtheta, mmCov());
+            for (uint32_t i=0; i<x_jt.n_cols; ++i) // product over independent x_ji_t
+              f_knew += this->mH.predictiveProb(x_jt.col(i));
+            //logGaus(x_jt.col(i), mVtheta, mmCov());
             f(K)=f_knew;
             l(K)=log(HDP<U>::mOmega/(m_ + HDP<U>::mOmega)) + f_knew; // update dish at table t in restaurant j
             uint32_t z_jt = sampleDiscLogProb(rndDisc, l);
@@ -335,12 +334,12 @@ class HDP_gibbs : public HDP<U>
     /* compute the perplexity of all test docs after gibbs sampling is done
      */
     Row<double> perplexity(){
-      mPerp.set_size(HDP<U>::mX_ho.n_rows);
+      mPerp.set_size(HDP<U>::mX_ho.size());
       for (uint32_t i=0; i<mX_id_test.size(); ++i){
         // iterate over all held out data and compute the perplexity
         uint32_t d=mX_id_test[i];
         Row<double> logP = logP_w(d);
-        mPerp(i) = perplexity(HDP<U>::mX_ho.row(i),logP);
+        mPerp(i) = perplexity(HDP<U>::mX_ho[i],logP);
       }
       return mPerp;
     };
@@ -378,14 +377,13 @@ class HDP_gibbs : public HDP<U>
       }
     };
 
-    Row<U> getXinK(const vector<Row<U> >& x, uint32_t j_x, uint32_t i_x, uint32_t k, 
+    Mat<U> getXinK(const vector<Mat<U> >& x, uint32_t j_x, uint32_t i_x, uint32_t k, 
         const vector<Col<uint32_t> >& k_jt, const vector<Col<uint32_t> >& t_ji, bool disp=false) const
     {
       uint32_t J = k_jt.size();
-      uint32_t d = x[0].n_cols;
-      Row<U> x_k=zeros<Row<U> >(1,d); // datapoints in cluster k
+      Mat<U> x_k; // datapoints in cluster k
 #ifndef NDEBUG
-      if(disp) printf("----------- J=%d; d=%d; j_x=%d; i_x=%d; k=%d; ----------- \n",J,d,j_x,i_x,k);
+      if(disp) printf("----------- J=%d; j_x=%d; i_x=%d; k=%d; ----------- \n",J,j_x,i_x,k);
 #endif
       for (uint32_t j=0; j<J; ++j)
       {
@@ -410,20 +408,20 @@ class HDP_gibbs : public HDP<U>
 #ifndef NDEBUG
           if(disp) cout<<"t_ji[j]="<<t_ji[j].t();
           if(disp) cout<<"id="<<id.t();
-          if(disp) cout<<"x_k_before="<<x_k.t()<<endl;
+          if(disp) cout<<"x_k_before="<<x_k<<endl;
 #endif
-          uint32_t offset=x_k.n_rows;
-          x_k.resize(x_k.n_rows+id.n_elem, x_k.n_cols);
+          uint32_t offset=x_k.n_cols;
+          x_k.resize(x[j].n_rows,x_k.n_cols+id.n_elem);
           for (uint32_t i=0; i<id.n_elem; ++i)
-            x_k.row(offset+i) = x[j].row(id(i)); // append all datapoints which are sitting at a table with dish k
+            x_k.col(offset+i) = x[j].col(id(i)); // append all datapoints which are sitting at a table with dish k
 #ifndef NDEBUG
-          if(disp) cout<<"x_k_after="<<x_k.t()<<endl;
+          if(disp) cout<<"x_k_after="<<x_k<<endl;
 #endif
         }
       }
-      x_k.shed_row(0); // remove first row of zeros
+      //x_k.shed_col(0); // remove first row of zeros
 #ifndef NDEBUG
-      if(disp) cout<<x_k.t()<<endl;
+      if(disp) cout<<x_k<<endl;
 #endif
       return x_k;
     };

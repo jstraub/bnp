@@ -29,7 +29,7 @@ class HDP // : public DP<U>
     {	};
 
     // interface mainly for python
-    uint32_t addDoc(const Row<U>& x_i)
+    uint32_t addDoc(const Mat<U>& x_i)
     {
       mX.push_back(x_i);
       return mX.size();
@@ -37,14 +37,14 @@ class HDP // : public DP<U>
 
 
     // interface mainly for python
-    uint32_t addHeldOut(const Row<U>& x_i)
+    uint32_t addHeldOut(const Mat<U>& x_i)
     {
       //cout<<"added heldout doc with "<<x_i.size()<<" words"<<endl;
       uint32_t N = x_i.n_cols;
       
-      Row<U> x_s = shuffle(x_i,1); // suffle the columns (words)
-      Row<U> x_te = x_s.cols(0,N/2) ; // select first half to train on
-      Row<U> x_ho = x_s.cols(N/2,N) ; // select second half as held out
+      Mat<U> x_s = shuffle(x_i,1); // suffle the columns (words)
+      Mat<U> x_te = x_s.cols(0,N/2) ; // select first half to train on
+      Mat<U> x_ho = x_s.cols(N/2,N) ; // select second half as held out
 
       mX_te.push_back(x_te); // on half of the data we train as usual to get a topic model for the document
       mX_ho.push_back(x_ho); // held out data to evaluate the perplexity
@@ -58,9 +58,9 @@ protected:
     const BaseMeasure<U>& mH; // base measure
     double mAlpha; 
     double mOmega;
-    vector<Row<U> > mX; // training data
-    vector<Row<U> > mX_te; //  test data
-    vector<Row<U> > mX_ho; //  held out data
+    vector<Mat<U> > mX; // training data
+    vector<Mat<U> > mX_te; //  test data
+    vector<Mat<U> > mX_ho; //  held out data
 
     double perplexity(const Row<double>& x_ho, const Row<double>& logP) const
     {

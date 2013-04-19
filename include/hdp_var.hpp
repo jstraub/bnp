@@ -41,7 +41,7 @@ class HDP_var: public HDP<uint32_t>
     //  uint32_t T=10; // truncation on document level
     //  uint32_t K=100; // truncation on corpus level
     // S = batch size
-    void densityEst(const vector<Row<uint32_t> >& x, uint32_t Nw, 
+    void densityEst(const vector<Mat<uint32_t> >& x, uint32_t Nw, 
         double kappa, uint32_t K, uint32_t T, uint32_t S)
     {
 
@@ -181,7 +181,7 @@ class HDP_var: public HDP<uint32_t>
 
     // after an initial densitiy estimate has been made using densityEst()
     // can use this to update the estimate with information from additional x 
-    bool  updateEst(const Row<uint32_t>& x, double kappa)
+    bool  updateEst(const Mat<uint32_t>& x, double kappa)
     {
       if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
         uint32_t N = x.n_cols;
@@ -213,7 +213,7 @@ class HDP_var: public HDP<uint32_t>
     };
 
     // compute the perplexity of a given document split into x_test (to find a topic model for the doc) and x_ho (to evaluate the perplexity)
-    double perplexity(const Row<uint32_t>& x_te, const Row<uint32_t>& x_ho, uint32_t d, double kappa=0.75)
+    double perplexity(const Mat<uint32_t>& x_te, const Mat<uint32_t>& x_ho, uint32_t d, double kappa=0.75)
     {
       if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
         uint32_t N = x_te.n_cols;
@@ -241,7 +241,7 @@ class HDP_var: public HDP<uint32_t>
     };
 
     // compute the perplexity given a the held out data of a document x_ho and the model paremeters of it (after incorporating x)
-    double perplexity(const Row<uint32_t>& x_ho, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& lambda)
+    double perplexity(const Mat<uint32_t>& x_ho, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& lambda)
     {
       uint32_t T = mT; 
       // find most likely pi_di and c_di
@@ -273,7 +273,7 @@ class HDP_var: public HDP<uint32_t>
     }
 
 
-    bool updateEst(const Row<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa= 0.75)
+    bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa= 0.75)
     {
       uint32_t D = d+1; // assume that doc d is appended to the end  
       uint32_t Nw = lambda.n_cols;
@@ -472,7 +472,7 @@ class HDP_var: public HDP<uint32_t>
 
 private:
 
-    void initZeta(Mat<double>& zeta, const Mat<double>& lambda, const Row<uint32_t>& x_d)
+    void initZeta(Mat<double>& zeta, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
     {
       uint32_t N = x_d.n_cols;
       uint32_t T = zeta.n_rows;
@@ -500,7 +500,7 @@ private:
       //cerr<<"normalization check:"<<endl<<sum(zeta,1).t()<<endl; // sum over rows
     };
 
-    void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& lambda, const Row<uint32_t>& x_d)
+    void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
     {
       uint32_t N = x_d.n_cols;
       uint32_t T = zeta.n_rows;
@@ -552,8 +552,11 @@ private:
       //cout<<gamma.t()<<endl;
     };
 
-    void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& a, const Mat<double>& lambda, const Row<uint32_t>& x_d)
+    void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& a, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
     {
+
+      assert(x_d.n_rows == 1);
+
       uint32_t N = x_d.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
@@ -582,8 +585,11 @@ private:
     }
 
 
-    void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Row<uint32_t>& x_d)
+    void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
     {
+
+      assert(x_d.n_rows == 1);
+
       uint32_t N = x_d.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
@@ -609,7 +615,7 @@ private:
       }
     }
 
-    void computeNaturalGradients(Mat<double>& d_lambda, Mat<double>& d_a, const Mat<double>& zeta, const Mat<double>&  phi, double omega, uint32_t D, const Row<uint32_t>& x_d)
+    void computeNaturalGradients(Mat<double>& d_lambda, Mat<double>& d_a, const Mat<double>& zeta, const Mat<double>&  phi, double omega, uint32_t D, const Mat<uint32_t>& x_d)
     {
       uint32_t N = x_d.n_cols;
       uint32_t Nw = d_lambda.n_cols;
