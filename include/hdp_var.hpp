@@ -686,14 +686,13 @@ class HDP_var: public HDP<uint32_t>
       topics.set_size(K,Nw);
       for (uint32_t k=0; k<K; k++){
         // mode of dirichlet (MAP estimate)
-
         topics.row(k) = (lambda.row(k)-1.0)/sum(lambda.row(k)-1.0);
         //dirMode(topics.row(k), lambda.row(k));
       }
       return true;
     };
 
-    Row<double> P_x(uint32_t d) const{
+    Row<double> logP_w(uint32_t d) const{
       Row<double> p(mNw);
       p.zeros();
 

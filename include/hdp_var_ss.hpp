@@ -35,7 +35,7 @@ class HDP_ss // : public DP<U>
     ~HDP_ss()
     { };
 
-    virtual Row<double> P_x(uint32_t d) const=0;
+    virtual Row<double> logP_w(uint32_t d) const=0;
 
 protected:
 
@@ -503,42 +503,44 @@ class HDP_var_ss: public HDP_ss<uint32_t>
         updateEst(x,zeta,phi,gamma,a,lambda,omega,d,kappa);
         //cout<<"computing perplexity under updated model"<<endl;
 
-        return perplexity(x, zeta, phi, gamma, lambda, a);
+        return perplexity(x, zeta, phi, gamma, lambda);
       }else{
         return 1.0/0.0;
       }
     };
 
     // compute the perplexity given a document x and the model paremeters of it (after incorporating x)
-    double perplexity(const Row<uint32_t>& x, const Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& gamma, const Mat<double>& lambda, const Mat<double>& a)
+    double perplexity(const Row<uint32_t>& x, const Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& gamma, const Mat<double>& lambda)
     {
-      Row<double> p= P_x(phi, zeta, gamma, lambda, a);
+      Row<double> logP= logP_w(phi, zeta, gamma, lambda);
       //TODO: use p here instead of redoing the computations!
 
-      //cout<<"Computing Perplexity"<<endl;
+//      //cout<<"Computing Perplexity"<<endl;
       uint32_t Nw = x.n_cols;
       uint32_t N = sum(x);
-      uint32_t T = mT; //mZeta[0].n_rows;
-      // find most likely pi_di and c_di
-      Col<double> pi;
-      Col<double> sigPi; 
-      Col<uint32_t> c(T);
-      getDocTopics(pi, sigPi, c, gamma, zeta);
-      // find most likely z_dn
-      Col<uint32_t> z(Nw);
-      getWordTopics(z, phi);
-      // find most likely topics 
-      Mat<double> topics;
-
-      //cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
-      getCorpTopic(topics, lambda);
+//      uint32_t T = mT; //mZeta[0].n_rows;
+//      // find most likely pi_di and c_di
+//      Col<double> pi;
+//      Col<double> sigPi; 
+//      Col<uint32_t> c(T);
+//      getDocTopics(pi, sigPi, c, gamma, zeta);
+//      // find most likely z_dn
+//      Col<uint32_t> z(Nw);
+//      getWordTopics(z, phi);
+//      // find most likely topics 
+//      Mat<double> topics;
+//      //cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
+//      getCorpTopics(topics, lambda);
 
       double perp = 0.0;
       //cout<<"x: "<<x.n_rows<<"x"<<x.n_cols<<endl;
       for (uint32_t w=0; w<Nw; ++w){
-        cout<<"c_z_n = "<<c[z[w]]<<" z_n="<<z[w]<<" w="<<w<<" N="<<N<<" x_w="<<x[w]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols;
-        perp -= x[w]*logCat(w,topics.row(c[z[w]]));
-        cout<<"\t perp="<<-x[w]*logCat(w,topics.row(c[z[w]]))<<endl;
+        //cout<<"c_z_n = "<<c[z[w]]<<" z_n="<<z[w]<<" w="<<w<<" N="<<N<<" x_w="<<x[w]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols;
+        //perp -= x[w]*logCat(w,topics.row(c[z[w]]));
+        if (x[w] > 0) {
+          perp -= x[w]*logP[w];
+          cout<<"w="<<w<<"\tx_w="<<x[w]<<"\tlogP="<<logP[w]<<"\tperp+="<<-double(x[w])*logP[w]<<endl;
+        }
       } cout<<endl;
       perp /= double(N);
       perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
@@ -684,7 +686,9 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       return getCorpTopicProportions(v,sigV,mA);
     };
 
-    // a are the parameters of the beta distribution from which v is drawn
+    /* a are the parameters of the beta distribution from which v is drawn
+     *
+     */
     bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV, const Mat<double>& a) const
     {
       uint32_t K = a.n_rows; // corp level topics
@@ -697,7 +701,10 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       return true;
     };
 
-
+    /* The mode of the estimate dirichlet distribution parameterized by lambda is used
+     * as an estimate for the Multinomial distribution of the respective topics
+     *
+     */
     bool getCorpTopic(Col<double>& topic, uint32_t k) const
     {
       if(mLambda.n_rows > 0 && k < mLambda.n_rows)
@@ -715,25 +722,29 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       return true;
     };
 
-    bool getCorpTopic(Mat<double>& topics, const Mat<double>& lambda) const
+    bool getCorpTopics(Mat<double>& topics, const Mat<double>& lambda) const
     {
       uint32_t K = lambda.n_rows;
       uint32_t Nw = lambda.n_cols;
       topics.set_size(K,Nw);
       for (uint32_t k=0; k<K; k++){
         // mode of dirichlet (MAP estimate)
-
         topics.row(k) = (lambda.row(k)-1.0)/sum(lambda.row(k)-1.0);
+//        cout<<"lambda_"<<k<<"="<<lambda.row(k)<<endl;
+//        cout<<"topic_"<<k<<"="<<topics.row(k)<<endl;
+//        cout<<"sum over topic_"<<k<<"="<<sum(topics.row(k))<<endl<<endl;
         //dirMode(topics.row(k), lambda.row(k));
       }
       return true;
     };
 
-    Row<double> P_x(uint32_t d) const {
-      return P_x(mPhi[d],mZeta[d],mGamma[d],mLambda,mA);
+    /* TODO: its not realy the joint... or is it?!
+     * joint probability distribution
+     */
+    Row<double> logP_joint(uint32_t d) const {
+      return logP_joint(mPhi[d],mZeta[d],mGamma[d],mLambda,mA);
     };
-
-    Row<double> P_x(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Mat<double>& a) const
+    Row<double> logP_joint(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Mat<double>& a) const
     {
       Row<double> p(mNw);
       p.zeros();
@@ -748,7 +759,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       Col<uint32_t> z(mNw);
       getWordTopics(z, phi);
       Mat<double> beta;
-      getCorpTopic(beta,lambda);
+      getCorpTopics(beta,lambda);
 
       for (uint32_t w=0; w<mNw; ++w){
         p[w] = logCat(w, beta.row( c[ z[w] ]).t()) + 
@@ -758,9 +769,36 @@ class HDP_var_ss: public HDP_ss<uint32_t>
           logBeta(pi, 1.0, mAlpha) +
           logDir(beta.row( c[ z[w] ]).t(), mLambda.t());
       }
+      return p;
+    };
+
+    /* Probability distribution over the words in document d
+     *
+     * TODO: so is that here not some MAP or ML estimate?!
+     */
+    Row<double> logP_w(uint32_t d) const {
+      return logP_w(mPhi[d],mZeta[d],mGamma[d],mLambda);
+    };
+    Row<double> logP_w(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda) const
+    {
+      Row<double> p(mNw);
+      p.zeros();
+
+      Col<double> pi;
+      Col<double> sigPi;
+      Col<uint32_t> c;
+      getDocTopics(pi,sigPi,c,gamma,zeta);
+      Col<uint32_t> z(mNw);
+      getWordTopics(z, phi);
+      Mat<double> beta;
+      getCorpTopics(beta,lambda);
+
+      for (uint32_t w=0; w<mNw; ++w){
+        p[w] = logCat(w, beta.row( c[ z[w] ]).t());
+      }
 
       return p;
-    }
+    };
 
   protected:
     Mat<double> mLambda; // corpus level topics (Dirichlet)

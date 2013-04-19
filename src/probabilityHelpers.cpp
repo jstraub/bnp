@@ -14,10 +14,16 @@ double Cat(uint32_t x, Row<double> pi)
 double logCat(uint32_t x, Row<double> pi)
 {
   assert(x<pi.n_elem);
-  double p = log(pi[x]);
-  for (uint32_t i=0; i< pi.n_elem; ++i)
-    if (i!=x) p += log(1.0 - pi[i]);
-  return p;
+  if (pi[x] == 0.0) {
+    return 0.0;
+  }else{
+    double p = log(pi[x]);
+    for (uint32_t i=0; i< pi.n_elem; ++i){
+      if (i!=x) p += log(1.0 - pi[i]);
+      //cout<<"pi["<<i<<"]="<<pi[i]<<endl;
+    }
+    return p;
+  }
 };
 
 double Beta(double x, double alpha, double beta)

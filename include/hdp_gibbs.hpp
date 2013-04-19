@@ -321,7 +321,7 @@ class HDP_gibbs : public HDP<U>
       }
     };
 
-    Row<double> P_x(uint32_t d) const{
+    Row<double> logP_w(uint32_t d) const{
       uint32_t Nw = 10;
       Row<double> p(Nw);
       return p;
