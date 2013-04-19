@@ -43,8 +43,8 @@ protected:
     double mAlpha; 
     double mOmega;
     Mat<U> mX; // training data
-    Mat<U> mX_ho; //  held out data
-    //vector<Col<uint32_t> > mZ;
+    Mat<U> mX_ho; // held out data
+    Mat<U> mX_te; // test data
 
 };
 
@@ -62,239 +62,6 @@ class HDP_var_ss: public HDP_ss<uint32_t>
     ~HDP_var_ss()
     {};
 
-    double digamma(double x)
-    {
-      //http://en.wikipedia.org/wiki/Digamma_function#Computation_and_approximation
-      if(x<1e-50){
-        //cerr<<"\tdigamma param x near zero: "<<x<<" cutting of"<<endl;
-        x=1e-50;
-      }
-      //double x_sq = x*x;
-      //return log(x)-1.0/(2.0*x)-1.0/(12.0*x_sq)+1.0/(12*x_sq*x_sq)-1.0/(252.0*x_sq*x_sq*x_sq);
-      return boost::math::digamma(x);
-    }
-
-    double ElogBeta(const Mat<double>& lambda, uint32_t k, uint32_t w)
-    {
-      //if(lambda[k](w_dn)<1e-6){
-      //  cout<<"\tlambda[k]("<<w_dn<<") near zero: "<<lambda[k](w_dn)<<endl;
-      //}
-      return digamma(lambda(k,w)) - digamma(sum(lambda.row(k)));
-    }
-
-    double ElogSigma(const Mat<double>& a, uint32_t k)
-    {
-      double e=digamma(a(k,0)) - digamma(a(k,0) + a(k,1));
-      for (uint32_t l=0; l<k; ++l)
-        e+=digamma(a(k,1)) - digamma(a(k,0) + a(k,1));
-      return e; 
-    }
-
-
-    //bool normalizeLogDistribution(Row<double>& r)
-    bool normalizeLogDistribution(arma::subview_row<double> r)
-    {
-      //r.row(i)=exp(r.row(i));
-      //cout<<" r="<<r<<endl;
-      double minR = as_scalar(min(r));
-      //cout<<" minR="<<minR<<endl;
-      if(minR > -100.0) {
-        //cout<<" logDenom="<<sum(exp(r),1)<<endl;
-        double denom = as_scalar(sum(exp(r),1));
-        //cout<<" logDenom="<<denom<<endl;
-        r -= log(denom); // avoid division by 0
-        //cout<<" r - logDenom="<<r<<endl;
-        r = exp(r);
-        r /= sum(r);
-        //cout<<" exp(r - logDenom)="<<r<<endl;
-        return true;
-      }else{ // cannot compute this -> set the smallest r to 1.0 and the rest to 0
-        double maxR = as_scalar(max(r));
-        //cout<<"maxR="<<maxR<<" <-" <<arma::max(r) <<endl;
-        uint32_t kMax=as_scalar(find(r==maxR,1));
-        //cout<<"maxR="<<maxR<<" kMax="<<kMax<<" <-" <<arma::max(r) <<endl;
-        r.zeros();
-        r(kMax)=1.0;
-        //cout<<" r ="<<r<<endl;
-        return false;
-      }
-    }
-
-    //  double ElogSigma(const vector<double>& a, const vector<double>& b, uint32_t k)
-    //  {
-    //    double e=digamma(a[k]) - digamma(a[k] + b[k]);
-    //    for (uint32_t l=0; l<k; ++l)
-    //      e+=digamma(b[k]) - digamma(a[k] + b[k]);
-    //    return e; 
-    //  };
-    //
-    void initZeta(Mat<double>& zeta, const Mat<double>& lambda, const Row<uint32_t>& x_d)
-    {
-      uint32_t Nw = x_d.n_cols;
-      uint32_t T = zeta.n_rows;
-      uint32_t K = zeta.n_cols;
-      //cerr<<"\tinit zeta"<<endl;
-      for (uint32_t i=0; i<T; ++i) {
-        for (uint32_t k=0; k<K; ++k) {
-          zeta(i,k)=0.0;
-          for (uint32_t w=0; w<Nw; ++w) {
-            //if(i==0 && k==0) cout<<zeta(i,k)<<" -> ";
-            zeta(i,k) += x_d(w) * ElogBeta(lambda, k, w);
-          }
-        }
-        normalizeLogDistribution(zeta.row(i));
-        //        if(normalizeLogDistribution(zeta.row(i)))
-        //        {
-        //          cerr<<"zeta normally computed"<<endl;
-        //        }else{
-        //          cerr<<"zeta thresholded"<<endl;
-        //        }
-
-        //cout<<" normalized="<<zeta(0,0)<<endl;
-      }
-      //cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
-      //cerr<<"normalization check:"<<endl<<sum(zeta,1).t()<<endl; // sum over rows
-    };
-
-    void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& lambda, const Row<uint32_t>& x_d)
-    {
-      uint32_t Nw = x_d.n_cols;
-      uint32_t T = zeta.n_rows;
-      uint32_t K = zeta.n_cols;
-      //cout<<"\tinit phi"<<endl;
-      for (uint32_t w=0; w<Nw; ++w){
-        for (uint32_t i=0; i<T; ++i) {
-          phi(w,i)=0.0;
-          for (uint32_t k=0; k<K; ++k) {
-            phi(w,i)+=zeta(i,k)* x_d(w) * ElogBeta(lambda, k, w);
-          }
-        }
-        normalizeLogDistribution(phi.row(w));
-        //        if(normalizeLogDistribution(phi.row(n)))
-        //        {
-        //          cerr<<"phi normally computed"<<endl;
-        //        }else{
-        //          cerr<<"phi thresholded"<<endl;
-        //        }
-        //
-        //        phi.row(n)=exp(phi.row(n));
-        //        double denom = sum(phi.row(n));
-        //        if(denom > EPS)
-        //        {
-        //          phi.row(n)/=denom; // avoid division by 0
-        //        }else{
-        //          cout<<"Phi Init: denominator too small -> no division!
-        //        }
-      }
-      //cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
-    };
-
-    void updateGamma(Mat<double>& gamma, const Mat<double>& phi)
-    {
-      uint32_t N = phi.n_rows;
-      uint32_t T = phi.n_cols;
-
-      gamma.ones();
-      gamma.col(1) *= mAlpha;
-      for (uint32_t i=0; i<T; ++i) 
-      {
-        for (uint32_t n=0; n<N; ++n){
-          gamma(i,0) += phi(n,i);
-          for (uint32_t j=i+1; j<T; ++j) {
-            gamma(i,1) += phi(n,j);
-          }
-        }
-      }
-      //cout<<gamma.t()<<endl;
-    };
-
-    void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& a, const Mat<double>& lambda, const Row<uint32_t>& x_d)
-    {
-      uint32_t Nw = x_d.n_cols;
-      uint32_t T = zeta.n_rows;
-      uint32_t K = zeta.n_cols;
-
-      for (uint32_t i=0; i<T; ++i){
-        //zeta(i,k)=0.0;
-        for (uint32_t k=0; k<K; ++k) {
-          zeta(i,k) = ElogSigma(a,k);
-          //cout<<zeta(i,k)<<endl;
-          for (uint32_t w=0; w<Nw; ++w){
-            zeta(i,k) += phi(w,i)*x_d(w)*ElogBeta(lambda,k,w);
-          }
-        }
-        normalizeLogDistribution(zeta.row(i));
-        //          if(normalizeLogDistribution(zeta.row(i)))
-        //          {
-        //            cerr<<"zeta normally computed"<<endl;
-        //          }else{
-        //            cerr<<"zeta thresholded"<<endl;
-        //          }
-
-        //          zeta.row(i)=exp(zeta.row(i));
-        //          double denom = sum(zeta.row(i));
-        //          if(denom > EPS) zeta.row(i)/=denom; // avoid division by 0
-      }
-    }
-
-
-    void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Row<uint32_t>& x_d)
-    {
-      uint32_t Nw = x_d.n_cols;
-      uint32_t T = zeta.n_rows;
-      uint32_t K = zeta.n_cols;
-
-      for (uint32_t w=0; w<Nw; ++w){
-        //phi(n,i)=0.0;
-        for (uint32_t i=0; i<T; ++i) {
-          phi(w,i) = ElogSigma(gamma,i);
-          for (uint32_t k=0; k<K; ++k) {
-            phi(w,i) += zeta(i,k)*x_d(w)*ElogBeta(lambda,k,w) ;
-          }
-        }
-        normalizeLogDistribution(phi.row(w));
-        //          if(normalizeLogDistribution(phi.row(n)))
-        //          {
-        //            cerr<<"phi normally computed"<<endl;
-        //          }else{
-        //            cerr<<"phi thresholded"<<endl;
-        //          }
-        //          phi.row(n)=exp(phi.row(n));
-        //          double denom = sum(phi.row(n));
-        //          if(denom > EPS) phi.row(n)/=denom; // avoid division by 0
-      }
-    }
-
-    void computeNaturalGradients(Mat<double>& d_lambda, Mat<double>& d_a, const Mat<double>& zeta, const Mat<double>&  phi, double omega, uint32_t D, const Row<uint32_t>& x_d)
-    {
-      uint32_t Nw = x_d.n_cols;
-      uint32_t T = zeta.n_rows;
-      uint32_t K = zeta.n_cols;
-
-      d_lambda.zeros();
-      d_a.zeros();
-      for (uint32_t k=0; k<K; ++k) { // for all K corpus level topics
-        for (uint32_t i=0; i<T; ++i) {
-          Row<double> _lambda(Nw); _lambda.zeros();
-          for (uint32_t w=0; w<Nw; ++w){
-            _lambda(w) +=  x_d(w)*phi(w,i);
-          }
-          d_lambda.row(k) += zeta(i,k) * _lambda;
-          d_a(k,0) += zeta(i,k);
-          for (uint32_t l=k+1; l<K; ++l) {
-            d_a(k,1) += zeta(i,l);
-          }
-        }
-        d_lambda.row(k) = D*d_lambda.row(k);
-        //cout<<"lambda-nu="<<d_lambda[k].t()<<endl;
-        d_lambda.row(k) += ((Dir*)(&mH))->mAlphas;
-        //cout<<"lambda="<<d_lambda[k].t()<<endl;
-        d_a(k,0) = D*d_a(k,0)+1.0;
-        d_a(k,1) = D*d_a(k,1)+omega;
-      }
-      //cout<<"da="<<d_a<<endl;
-    }
-
 
     // method for "one shot" computation without storing data in this class
     //  Nw: number of different words
@@ -302,7 +69,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>
     //  uint32_t T=10; // truncation on document level
     //  uint32_t K=100; // truncation on corpus level
     // S = batch size
-    void densityEst(Mat<uint32_t>& x, Mat<uint32_t>& x_ho, double kappa, uint32_t K, uint32_t T, uint32_t S)
+    void densityEst(Mat<uint32_t>& x, Mat<uint32_t>& x_test, double kappa, uint32_t K, uint32_t T, uint32_t S)
     {
 
       // From: Online Variational Inference for the HDP
@@ -317,12 +84,37 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       // T = T-1;
 
       mX = x;
-      mX_ho = x_ho;
-
       mT = T;
       mK = K;
       mNw = x.n_cols;
       uint32_t D=x.n_rows;
+
+      // split up x_test into test and held out data points
+      mX_te.set_size(x_test.n_rows,x_test.n_cols);
+      mX_ho.set_size(x_test.n_rows,x_test.n_cols);
+      for (uint32_t d=0; d<x_test.n_rows; ++d){
+        uint32_t N=sum(x_test.row(d));
+        Row<uint32_t> x_s(N); // construct a vector with the words as given by the counts in x_test
+        uint32_t offset =0;
+        for (uint32_t w=0; w<mNw; ++w){
+          for (uint32_t i=0; i<x_test(d,w); ++i){
+            x_s[i+offset] = w;
+          }
+          offset += x_test(d,w);
+        }
+        x_s = shuffle(x_s); // shuffle and then split
+        Row<uint32_t> x_te(x_s.cols(0,N/2));
+        Row<uint32_t> x_ho(x_s.cols(N/2,N));
+        // now convert back into counts
+        for (uint32_t w=0; w<mNw; ++w){
+          mX_ho.row(d)[w] = sum(x_ho == w);
+          mX_te.row(d)[w] = sum(x_te == w);
+        }
+        cout<<"x_test=\t"<<x_test.row(d)<<endl;
+        cout<<"x_te+ho=\t"<<mX_te.row(d)+mX_ho.row(d)<<endl;
+        cout<<"x_ho=\t"<<mX_ho.row(d)<<endl;
+        cout<<"x_te=\t"<<mX_te.row(d)<<endl;
+      }
 
       Mat<double> a(K,2);
       a.ones();
@@ -417,7 +209,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>
 #pragma omp parallel for schedule(dynamic) 
             for (uint32_t i=0; i<mX_ho.n_rows; ++i)
             {
-              double perp_i =  perplexity(mX_ho.row(i),dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
+              double perp_i =  perplexity(mX_te.row(i),mX_ho.row(i),dd+bS/2+1,kappa); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
               cout<<"perp_"<<i<<"="<<perp_i<<endl;
 #pragma omp critical
               {
@@ -457,7 +249,6 @@ class HDP_var_ss: public HDP_ss<uint32_t>
         uint32_t K = mK; //mZeta[0].n_cols;
         mX.resize(d+1,mX.n_cols);
         mX.row(d) = x;
-        uint32_t N = x.n_rows;
         mZeta.push_back(Mat<double>(T,K));
         mPhi.push_back(Mat<double>(Nw,T));
         //    mZeta.set_size(T,K);
@@ -469,7 +260,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>
         {
           mPerp[d] = 0.0;
           for (uint32_t i=0; i<mX_ho.n_rows; ++i)
-            mPerp[d] += perplexity(mX_ho.row(i), mZeta[d], mPhi[d], mGamma[d], mLambda);
+            mPerp[d] += perplexity(mX_te.row(i),mX_ho.row(i), d, kappa); //mZeta[d], mPhi[d], mGamma[d], mLambda);
           mPerp[d] /= double(mX_ho.n_rows);
           cout<<"Perplexity="<<mPerp[d]<<endl;
           return true; 
@@ -481,11 +272,11 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       }
     };
 
-    // compute the perplexity of a given document x
-    double perplexity(const Row<uint32_t>& x, uint32_t d, double kappa=0.75)
+    // compute the perplexity of a given document x_ho (held out for perplexity) and x_te (used to update the model) of a document
+    double perplexity(const Row<uint32_t>& x_te, const Row<uint32_t>& x_ho, uint32_t d, double kappa)
     {
       if (mX.n_rows > 0 && mX.n_rows == mPhi.size()) { // this should indicate that there exists a estimate already
-        uint32_t Nw = x.n_cols;
+        uint32_t Nw = x_te.n_cols;
         //uint32_t Nw = mLambda.n_cols;
         uint32_t T = mT; //mZeta[0].n_rows; 
         uint32_t K = mK; //mZeta[0].n_cols;
@@ -500,30 +291,29 @@ class HDP_var_ss: public HDP_ss<uint32_t>
         double omega = mOmega;
 
         //cout<<"updating copied model with x"<<endl;
-        updateEst(x,zeta,phi,gamma,a,lambda,omega,d,kappa);
+        updateEst(x_te,zeta,phi,gamma,a,lambda,omega,d,kappa);
         //cout<<"computing perplexity under updated model"<<endl;
 
-        return perplexity(x, zeta, phi, gamma, lambda);
+        return perplexity(x_ho, zeta, phi, gamma, lambda);
       }else{
         return 1.0/0.0;
       }
     };
 
-    // compute the perplexity given a document x and the model paremeters of it (after incorporating x)
-    double perplexity(const Row<uint32_t>& x, const Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& gamma, const Mat<double>& lambda)
+    // compute the perplexity given a heldout data from document x_ho and the model paremeters of it (after incorporating x)
+    double perplexity(const Row<uint32_t>& x_ho, const Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& gamma, const Mat<double>& lambda)
     {
       Row<double> logP= logP_w(phi, zeta, gamma, lambda);
 
 //      //cout<<"Computing Perplexity"<<endl;
-      uint32_t Nw = x.n_cols;
-      uint32_t N = sum(x);
+      uint32_t Nw = x_ho.n_cols;
+      uint32_t N = sum(x_ho);
       double perp = 0.0;
-      //cout<<"x: "<<x.n_rows<<"x"<<x.n_cols<<endl;
       for (uint32_t w=0; w<Nw; ++w){
-        //cout<<"c_z_n = "<<c[z[w]]<<" z_n="<<z[w]<<" w="<<w<<" N="<<N<<" x_w="<<x[w]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols;
-        if (x[w] > 0) {
-          perp -= x[w]*logP[w];
-          cout<<"w="<<w<<"\tx_w="<<x[w]<<"\tlogP="<<logP[w]<<"\tperp+="<<-double(x[w])*logP[w]<<endl;
+        //cout<<"c_z_n = "<<c[z[w]]<<" z_n="<<z[w]<<" w="<<w<<" N="<<N<<" x_w="<<x_ho[w]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols;
+        if (x_ho[w] > 0) {
+          perp -= x_ho[w]*logP[w];
+          cout<<"w="<<w<<"\tx_ho_w="<<x_ho[w]<<"\tlogP="<<logP[w]<<"\tperp+="<<-double(x_ho[w])*logP[w]<<endl;
         }
       } cout<<endl;
       perp /= double(N);
@@ -534,7 +324,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>
     }
 
 
-    bool updateEst(const Row<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa= 0.75)
+    bool updateEst(const Row<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa)
     {
       uint32_t D = d+1; // assume that doc d is appended to the end  
       //uint32_t N = x.n_rows;
@@ -788,6 +578,192 @@ class HDP_var_ss: public HDP_ss<uint32_t>
     uint32_t mT; // Doc level truncation
     uint32_t mK; // Corp level truncation
     uint32_t mNw; // size of dictionary
+  private:
+
+
+    void initZeta(Mat<double>& zeta, const Mat<double>& lambda, const Row<uint32_t>& x_d)
+    {
+      uint32_t Nw = x_d.n_cols;
+      uint32_t T = zeta.n_rows;
+      uint32_t K = zeta.n_cols;
+      //cerr<<"\tinit zeta"<<endl;
+      for (uint32_t i=0; i<T; ++i) {
+        for (uint32_t k=0; k<K; ++k) {
+          zeta(i,k)=0.0;
+          for (uint32_t w=0; w<Nw; ++w) {
+            //if(i==0 && k==0) cout<<zeta(i,k)<<" -> ";
+            zeta(i,k) += x_d(w) * ElogBeta(lambda, k, w);
+          }
+        }
+        normalizeLogDistribution(zeta.row(i));
+      }
+      //cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
+      //cerr<<"normalization check:"<<endl<<sum(zeta,1).t()<<endl; // sum over rows
+    };
+
+    void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& lambda, const Row<uint32_t>& x_d)
+    {
+      uint32_t Nw = x_d.n_cols;
+      uint32_t T = zeta.n_rows;
+      uint32_t K = zeta.n_cols;
+      //cout<<"\tinit phi"<<endl;
+      for (uint32_t w=0; w<Nw; ++w){
+        for (uint32_t i=0; i<T; ++i) {
+          phi(w,i)=0.0;
+          for (uint32_t k=0; k<K; ++k) {
+            phi(w,i)+=zeta(i,k)* x_d(w) * ElogBeta(lambda, k, w);
+          }
+        }
+        normalizeLogDistribution(phi.row(w));
+      }
+      //cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
+    };
+
+    void updateGamma(Mat<double>& gamma, const Mat<double>& phi)
+    {
+      uint32_t N = phi.n_rows;
+      uint32_t T = phi.n_cols;
+
+      gamma.ones();
+      gamma.col(1) *= mAlpha;
+      for (uint32_t i=0; i<T; ++i) 
+      {
+        for (uint32_t n=0; n<N; ++n){
+          gamma(i,0) += phi(n,i);
+          for (uint32_t j=i+1; j<T; ++j) {
+            gamma(i,1) += phi(n,j);
+          }
+        }
+      }
+      //cout<<gamma.t()<<endl;
+    };
+
+    void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& a, const Mat<double>& lambda, const Row<uint32_t>& x_d)
+    {
+      uint32_t Nw = x_d.n_cols;
+      uint32_t T = zeta.n_rows;
+      uint32_t K = zeta.n_cols;
+
+      for (uint32_t i=0; i<T; ++i){
+        //zeta(i,k)=0.0;
+        for (uint32_t k=0; k<K; ++k) {
+          zeta(i,k) = ElogSigma(a,k);
+          //cout<<zeta(i,k)<<endl;
+          for (uint32_t w=0; w<Nw; ++w){
+            zeta(i,k) += phi(w,i)*x_d(w)*ElogBeta(lambda,k,w);
+          }
+        }
+        normalizeLogDistribution(zeta.row(i));
+      }
+    }
+
+
+    void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Row<uint32_t>& x_d)
+    {
+      uint32_t Nw = x_d.n_cols;
+      uint32_t T = zeta.n_rows;
+      uint32_t K = zeta.n_cols;
+
+      for (uint32_t w=0; w<Nw; ++w){
+        //phi(n,i)=0.0;
+        for (uint32_t i=0; i<T; ++i) {
+          phi(w,i) = ElogSigma(gamma,i);
+          for (uint32_t k=0; k<K; ++k) {
+            phi(w,i) += zeta(i,k)*x_d(w)*ElogBeta(lambda,k,w) ;
+          }
+        }
+        normalizeLogDistribution(phi.row(w));
+      }
+    }
+
+    void computeNaturalGradients(Mat<double>& d_lambda, Mat<double>& d_a, const Mat<double>& zeta, const Mat<double>&  phi, double omega, uint32_t D, const Row<uint32_t>& x_d)
+    {
+      uint32_t Nw = x_d.n_cols;
+      uint32_t T = zeta.n_rows;
+      uint32_t K = zeta.n_cols;
+
+      d_lambda.zeros();
+      d_a.zeros();
+      for (uint32_t k=0; k<K; ++k) { // for all K corpus level topics
+        for (uint32_t i=0; i<T; ++i) {
+          Row<double> _lambda(Nw); _lambda.zeros();
+          for (uint32_t w=0; w<Nw; ++w){
+            _lambda(w) +=  x_d(w)*phi(w,i);
+          }
+          d_lambda.row(k) += zeta(i,k) * _lambda;
+          d_a(k,0) += zeta(i,k);
+          for (uint32_t l=k+1; l<K; ++l) {
+            d_a(k,1) += zeta(i,l);
+          }
+        }
+        d_lambda.row(k) = D*d_lambda.row(k);
+        //cout<<"lambda-nu="<<d_lambda[k].t()<<endl;
+        d_lambda.row(k) += ((Dir*)(&mH))->mAlphas;
+        //cout<<"lambda="<<d_lambda[k].t()<<endl;
+        d_a(k,0) = D*d_a(k,0)+1.0;
+        d_a(k,1) = D*d_a(k,1)+omega;
+      }
+      //cout<<"da="<<d_a<<endl;
+    }
+
+
+    double digamma(double x)
+    {
+      //http://en.wikipedia.org/wiki/Digamma_function#Computation_and_approximation
+      if(x<1e-50){
+        //cerr<<"\tdigamma param x near zero: "<<x<<" cutting of"<<endl;
+        x=1e-50;
+      }
+      //double x_sq = x*x;
+      //return log(x)-1.0/(2.0*x)-1.0/(12.0*x_sq)+1.0/(12*x_sq*x_sq)-1.0/(252.0*x_sq*x_sq*x_sq);
+      return boost::math::digamma(x);
+    }
+
+    double ElogBeta(const Mat<double>& lambda, uint32_t k, uint32_t w)
+    {
+      //if(lambda[k](w_dn)<1e-6){
+      //  cout<<"\tlambda[k]("<<w_dn<<") near zero: "<<lambda[k](w_dn)<<endl;
+      //}
+      return digamma(lambda(k,w)) - digamma(sum(lambda.row(k)));
+    }
+
+    double ElogSigma(const Mat<double>& a, uint32_t k)
+    {
+      double e=digamma(a(k,0)) - digamma(a(k,0) + a(k,1));
+      for (uint32_t l=0; l<k; ++l)
+        e+=digamma(a(k,1)) - digamma(a(k,0) + a(k,1));
+      return e; 
+    }
+
+
+    //bool normalizeLogDistribution(Row<double>& r)
+    bool normalizeLogDistribution(arma::subview_row<double> r)
+    {
+      //r.row(i)=exp(r.row(i));
+      //cout<<" r="<<r<<endl;
+      double minR = as_scalar(min(r));
+      //cout<<" minR="<<minR<<endl;
+      if(minR > -100.0) {
+        //cout<<" logDenom="<<sum(exp(r),1)<<endl;
+        double denom = as_scalar(sum(exp(r),1));
+        //cout<<" logDenom="<<denom<<endl;
+        r -= log(denom); // avoid division by 0
+        //cout<<" r - logDenom="<<r<<endl;
+        r = exp(r);
+        r /= sum(r);
+        //cout<<" exp(r - logDenom)="<<r<<endl;
+        return true;
+      }else{ // cannot compute this -> set the smallest r to 1.0 and the rest to 0
+        double maxR = as_scalar(max(r));
+        //cout<<"maxR="<<maxR<<" <-" <<arma::max(r) <<endl;
+        uint32_t kMax=as_scalar(find(r==maxR,1));
+        //cout<<"maxR="<<maxR<<" kMax="<<kMax<<" <-" <<arma::max(r) <<endl;
+        r.zeros();
+        r(kMax)=1.0;
+        //cout<<" r ="<<r<<endl;
+        return false;
+      }
+    }
 
 };
 

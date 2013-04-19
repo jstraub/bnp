@@ -191,22 +191,28 @@ public:
     //cout<<"Creating "<<typeid(this).name()<<endl;
   };
 
-  bool densityEst(uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
+  bool densityEst(uint32_t Nw, uint32_t K0, uint32_t T0, uint32_t It)
   {
     cout<<"mX.size()="<<HDP<U>::mX.size()<<endl;
     for (uint32_t i=0; i<HDP<U>::mX.size(); ++i)
-      cout<<"  x_"<<i<<": "<<HDP<U>::mX[i].n_rows<<"x"<<HDP<U>::mX[i].n_cols<<": "<<HDP<U>::mX[i]<<endl;
+      cout<<"  x_"<<i<<": "<<HDP<U>::mX[i].n_cols<<": "<<HDP<U>::mX[i]<<endl;
 
-    return HDP_gibbs<U>::densityEst(K0, T0, It);
+    return HDP_gibbs<U>::densityEst(Nw, K0, T0, It);
   }
 
   // makes no copy of the external data x_i
   uint32_t addDoc(const numeric::array& x_i)
   {
-    Mat<U> x_i_mat=np2mat<U>(x_i); // can do this since x_i_mat gets copied inside
+    Row<U> x_i_mat=np2row<U>(x_i); // can do this since x_i_mat gets copied inside
 
-    cout<<"adding  x: "<<x_i_mat.n_rows<<"x"<<x_i_mat.n_cols<<": "<<x_i_mat<<endl;
+    cout<<"adding  x: "<<x_i_mat.n_cols<<": "<<x_i_mat<<endl;
     return HDP_gibbs<U>::addDoc(x_i_mat);
+  };
+
+  uint32_t addHeldOut(const numeric::array& x_i)
+  {
+    Row<uint32_t> x_i_mat=np2row<U>(x_i); // can do this since x_i_mat gets copied inside
+    return HDP_gibbs<U>::addHeldOut(x_i_mat);
   };
 
   // works on the data in z_i -> size has to be correct in order for this to work!
@@ -253,13 +259,13 @@ public:
   // makes no copy of the external data x_i
   uint32_t addDoc(const numeric::array& x_i)
   {
-    Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
+    Row<uint32_t> x_i_mat=np2row<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
     return HDP_var::addDoc(x_i_mat);
   };
 
   uint32_t addHeldOut(const numeric::array& x_i)
   {
-    Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
+    Row<uint32_t> x_i_mat=np2row<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
     return HDP_var::addHeldOut(x_i_mat);
   };
 
@@ -268,7 +274,7 @@ public:
   // can use this to update the estimate with information from additional x 
   bool updateEst(const numeric::array& x, double ro=0.75)
   {
-    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
+    Row<uint32_t> x_mat=np2row<uint32_t>(x); // can do this since x_mat gets copied inside    
     return HDP_var::updateEst(x_mat,ro);
   }
 
@@ -394,11 +400,11 @@ public:
     }
   };
 
-  double perplexity(numeric::array& x, uint32_t d, double kappa)
-  {
-    Mat<uint32_t> x_mat=np2col<uint32_t>(x); // can do this since x_mat gets copied inside    
-    return HDP_var::perplexity(x_mat,d,kappa);
-  };
+//  double perplexity(numeric::array& x, uint32_t d, double kappa)
+//  {
+//    Row<uint32_t> x_mat=np2col<uint32_t>(x); // can do this since x_mat gets copied inside    
+//    return HDP_var::perplexity(x_mat,d,kappa);
+//  };
 
 };
 
@@ -428,10 +434,10 @@ public:
 
   // after an initial densitiy estimate has been made using addDoc() and densityEst()
   // can use this to update the estimate with information from additional x 
-  bool updateEst(const numeric::array& x, double ro=0.75)
+  bool updateEst(const numeric::array& x, double kappa)
   {
-    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
-    return HDP_var_ss::updateEst(x_mat,ro);
+    Row<uint32_t> x_mat=np2row<uint32_t>(x); // can do this since x_mat gets copied inside    
+    return HDP_var_ss::updateEst(x_mat,kappa);
   }
 
   // works on the data in lambda -> size has to be correct in order for this to work!
@@ -539,11 +545,11 @@ public:
     }
   };
 
-  double perplexity(numeric::array& x, uint32_t d, double kappa)
-  {
-    Mat<uint32_t> x_mat=np2col<uint32_t>(x); // can do this since x_mat gets copied inside    
-    return HDP_var_ss::perplexity(x_mat,d,kappa);
-  };
+//  double perplexity(numeric::array& x, uint32_t d, double kappa)
+//  {
+//    Row<uint32_t> x_mat=np2col<uint32_t>(x); // can do this since x_mat gets copied inside    
+//    return HDP_var_ss::perplexity(x_mat,d,kappa);
+//  };
 
 };
 
@@ -577,7 +583,6 @@ BOOST_PYTHON_MODULE(libbnp)
 	class_<HDP_var_py>("HDP_var",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_var_py::densityEst)
         .def("updateEst",&HDP_var_py::updateEst)
-        .def("perplexity",&HDP_var_py::perplexity)
         .def("addDoc",&HDP_var_py::addDoc)
         .def("addHeldOut",&HDP_var_py::addHeldOut)
         .def("getPerplexity",&HDP_var_py::getPerplexity)
@@ -589,12 +594,12 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("getCorpTopicProportions",&HDP_var_py::getCorpTopicProportions)
         .def("getCorpTopic",&HDP_var_py::getCorpTopic);
    //     .def_readonly("mGamma", &HDP_var_py::mGamma);
+//        .def("perplexity",&HDP_var_py::perplexity)
 
 
 	class_<HDP_var_ss_py>("HDP_var_ss",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_var_ss_py::densityEst)
         .def("updateEst",&HDP_var_ss_py::updateEst)
-        .def("perplexity",&HDP_var_ss_py::perplexity)
         .def("getPerplexity",&HDP_var_ss_py::getPerplexity)
         .def("getA",&HDP_var_ss_py::getA)
         .def("getB",&HDP_var_ss_py::getB)
@@ -603,6 +608,7 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("getWordTopics",&HDP_var_ss_py::getWordTopics)
         .def("getCorpTopicProportions",&HDP_var_ss_py::getCorpTopicProportions)
         .def("getCorpTopic",&HDP_var_ss_py::getCorpTopic);
+//        .def("perplexity",&HDP_var_ss_py::perplexity)
 
 }
 

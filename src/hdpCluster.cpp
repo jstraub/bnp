@@ -181,7 +181,7 @@ int main(int argc, char** argv)
   double alpha =1.0, gamma=1.0;
   Dir dir(alphas);
   HDP_gibbs<uint32_t> hdp(dir, alpha, gamma);
-  vector<Col<uint32_t> > z_ji = hdp.densityEst(x_int,10,10,Niter);
+  vector<Row<uint32_t> > z_ji = hdp.densityEst(x_int,i0,10,Niter);
 #else
   mat means(J,d);
   double x_max=-999999., x_min=999999.;

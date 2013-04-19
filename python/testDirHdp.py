@@ -62,7 +62,7 @@ class HDPgibbs(bnp.HDP_Dir):
       print("adding held out")
       self.addHeldOut(np.vstack(x_ho_i))
       #self.addHeldOut(np.vstack(x_ho_i[0:N_d]))
-    return self.densityEst(Nw,kappa,K,T,S)
+    return self.densityEst(Nw,K0,T0,It)
 
 
 if __name__ == '__main__':
@@ -169,8 +169,11 @@ if __name__ == '__main__':
     raw_input()
 
   else:
+    It = 10;
+    K0 = 30;
+    T0 = 10;
     hdp = HDPgibbs(dirichlet,alpha,omega)
-    hdp.initialEstimate(x_tr,x_ho,Nw,kappa,K,T,S)
+    hdp.initialEstimate(x_tr,x_ho,Nw,K0,T0,It)
 
 #    hdp=bnp.HDP_Dir(dirichlet,alpha,omega)
 #    for x_i in x[0:D]:

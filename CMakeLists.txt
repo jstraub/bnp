@@ -71,8 +71,8 @@ set(LIBS
 add_executable(testHdp ./src/testHdp.cpp ${SRC})
 target_link_libraries(testHdp ${LIBS} stdc++)
 
-add_executable(hdpCluster ./src/hdpCluster.cpp ${SRC}) 
-target_link_libraries(hdpCluster ${LIBS} stdc++)
+#add_executable(hdpCluster ./src/hdpCluster.cpp ${SRC}) 
+#target_link_libraries(hdpCluster ${LIBS} stdc++)
 
 add_executable(testRandom ./src/testRandom.cpp)
 target_link_libraries(testRandom ${LIBS} stdc++)

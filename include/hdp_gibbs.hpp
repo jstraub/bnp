@@ -34,10 +34,10 @@ class HDP_gibbs : public HDP<U>
     ~HDP_gibbs()
     {	};
 
-    // method for "one shot" computation without storing data in this class
-    vector<Col<uint32_t> > densityEst(const vector<Mat<U> >& x, uint32_t Nw, uint32_t K0=10, uint32_t T0=10, uint32_t It=10)
-    {
 
+    // method for "one shot" computation without storing data in this class
+    vector<Row<uint32_t> > densityEst(const vector<Row<U> >& x, uint32_t Nw, uint32_t K0, uint32_t T0, uint32_t It)
+    {
       mNw = Nw;
 
       RandDisc rndDisc;
@@ -61,7 +61,7 @@ class HDP_gibbs : public HDP<U>
         k_jt[j] = rndK.draw(T[j]);
       }
 
-      vector<Col<uint32_t> > z_ji(J);
+      vector<Row<uint32_t> > z_ji(J);
       vector<uint32_t> Tprev=T;   // number of tables in each restaurant
       uint32_t Kprev=K;
       for (uint32_t tt=0; tt<It; ++tt)
@@ -84,7 +84,7 @@ class HDP_gibbs : public HDP<U>
                 l[t]=math::nan();
                 continue;
               }
-              Mat<U> x_k_ji = getXinK(x,j,i,k_jt[j](t),k_jt,t_ji);
+              Row<U> x_k_ji = getXinK(x,j,i,k_jt[j](t),k_jt,t_ji);
               //HDP hdp_x_ji = posterior(x_k_ji); // compute posterior hdp given the data 
               double f_k_jt = this->mH.predictiveProb(x[j].row(i).t(),x_k_ji);
               //logGaus(x[j].row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov()); // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
@@ -104,7 +104,7 @@ class HDP_gibbs : public HDP<U>
                 l[T[j]+k] = math::nan();
                 continue;
               }
-              Mat<U> x_k_ji = getXinK(x,j,i,k,k_jt,t_ji,tt==It-1);
+              Row<U> x_k_ji = getXinK(x,j,i,k,k_jt,t_ji,tt==It-1);
               //HDP hdp_x_ji = posterior(x_k_ji); // compute posterior hdp given the data in 
               double f_k =  this->mH.predictiveProb(x[j].row(i).t(),x_k_ji);
               //logGaus(x[j].row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());  // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
@@ -191,7 +191,7 @@ class HDP_gibbs : public HDP<U>
             for (uint32_t jj=0; jj<J; ++jj)
               m_ += T[jj];
             uvec i_jt=find(t == t_ji[j]);
-            Mat<U> x_jt = zeros<Mat<U> >(i_jt.n_elem,d);
+            Row<U> x_jt = zeros<Row<U> >(i_jt.n_elem,d);
             for (uint32_t i=0; i<i_jt.n_elem; ++i)
               x_jt.row(i) = x[j].row(i_jt(i)); //all datapoints which are sitting at table t 
             for (uint32_t k=0; k<K; ++k)
@@ -206,7 +206,7 @@ class HDP_gibbs : public HDP<U>
               double f_k=0.0;
               for (uint32_t i=0; i<x_jt.n_rows; ++i)
               { // product over independent x_ji_t
-                Mat<U> x_k_ji = getXinK(x,j,i_jt(i),k,k_jt,t_ji); // for posterior computation
+                Row<U> x_k_ji = getXinK(x,j,i_jt(i),k,k_jt,t_ji); // for posterior computation
                 //HDP hdp_x_ji = posterior(x_k_ji); // compute posterior hdp given the data in 
                 f_k += this->mH.predictiveProb(x_jt.row(i).t(),x_k_ji);
                 //logGaus(x_jt.row(i).t(), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());
@@ -279,25 +279,13 @@ class HDP_gibbs : public HDP<U>
           //cout<<"z_ji["<<j<<"]="<<z_ji[j].t()<<" |.|="<<z_ji[j].n_elem<<endl;
         }
 
-        // TODO: compute log likelyhood of data under model
-        //      for (uint32_t k=0; k<K; ++k)
-        //      {
-        //        Mat<U> x_k = zeros<Mat<U> >(d,1);
-        //        for (uint32_t j=0; j<J; ++j)
-        //        {
-        //          Col<uint32_t> id=find(z_ji[j] == k);
-        //          uint32_t offset=x_k.n_rows;
-        //          x_k.resize(x_k.n_rows+id.n_elem, x_k.n_cols);
-        //          for (uint32_t i=0; i<id.n_elem; ++i)
-        //            x_k.row(offset+i) = x[j].row(id(i));
-        //        }
-        //        x_k.shed_row(0);
-        //        mat mu=mean(x_k,0);
-        //        mat c=var(x_k,0,0);
-        //        cout<<"@"<<k<<": mu="<<mu(0,0)<<" var="<<c(0,0)<<endl;
-        //      }
       }
-      mZ = z_ji;
+      mZ_ji = z_ji;
+      mK = K;
+      mT = T;
+
+      computeTopics(); // compute the corpus level topic distributions from the labels z_ji
+
       return z_ji;
     };
     // compute density estimate based on data previously fed into the class using addDoc
@@ -305,7 +293,15 @@ class HDP_gibbs : public HDP<U>
     {
       if(HDP<U>::mX.size() > 0)
       {
-        mZ = densityEst(HDP<U>::mX,Nw,K0,T0,It);
+        if(HDP<U>::mX_te.size() > 0){
+          // put the test docs mX_te into th normal docs and record their index
+          mX_id_test.resize(HDP<U>::mX_te.size());
+          for(uint32_t i=0; i<HDP<U>::mX_te.size(); ++i){
+            mX_id_test[i]= HDP<U>::mX.size(); // helps locate the documents wich are trained in order to get a topic model
+            HDP<U>::mX.push_back(HDP<U>::mX_te[i]);
+          }
+        }
+        mZ_ji = densityEst(HDP<U>::mX,Nw,K0,T0,It);
         return true;
       }else{
         return false;
@@ -315,54 +311,79 @@ class HDP_gibbs : public HDP<U>
     // after computing the labels we can use this to get them.
     bool getClassLabels(Col<uint32_t>& z_i, uint32_t i)
     {
-      if(mZ.size() > 0 && i < mZ.size())
+      if(mZ_ji.size() > 0 && i < mZ_ji.size())
       {
-        z_i=mZ[i];
+        z_i=mZ_ji[i];
         return true;
       }else{
         return false;
       }
     };
 
-
-    //TODO: compute topics from the labeling
-    void recoverTopics() const
+    Row<double> logP_w(uint32_t d) const
     {
-      uint32_t D=mX.size(); // D=J -> number of documents in corpus; document d/j
-      for (uint32_t d=0; d<D; ++d){
-        
+      Row<double> logP(mNw);
+      logP.zeros();
+      uint32_t N = mZ_ji[d].n_elem;
+      for (uint32_t i=0; i<N; ++i){
+        logP[ HDP<U>::mX[d](i) ] += log(mBeta( mZ_ji[d](i), HDP<U>::mX[d](i)));
       }
-      for (uint32_t i=0; i<mZ[d].n_elems; ++i){
-        if (w==mX[i]) p[w] += 0.0;
-      }
+      return logP;
     };
 
 
-    Row<double> logP_w(uint32_t d) const
-    {
-      Row<double> p(mNw);
-      for (uint32_t w=0; w<mNw; ++w){
-        p[w] =0.0;
-        for (uint32_t i=0; i<mZ[d].n_elems; ++i){
-          if (w==mX[i]) p[w] += 
-        }
+    /* compute the perplexity of all test docs after gibbs sampling is done
+     */
+    Row<double> perplexity(){
+      mPerp.set_size(HDP<U>::mX_ho.n_rows);
+      for (uint32_t i=0; i<mX_id_test.size(); ++i){
+        // iterate over all held out data and compute the perplexity
+        uint32_t d=mX_id_test[i];
+        Row<double> logP = logP_w(d);
+        mPerp(i) = perplexity(HDP<U>::mX_ho.row(i),logP);
       }
-      return p;
+      return mPerp;
     };
 
   protected:
 
-    vector<Col<uint32_t> > mZ;
+    Row<uint32_t> mX_id_test; //  the id of the half of the test data in mX
+
+    vector<Row<uint32_t> > mZ_ji;
     uint32_t mNw; // number of different words 
+    uint32_t mK;
+    vector<uint32_t> mT;
+    Mat<double> mBeta; // corpus level topics
+    Row<double> mPerp; // perplexities of all test docs after sampling is finished
 
   private:
 
-    Mat<U> getXinK(const vector<Mat<U> >& x, uint32_t j_x, uint32_t i_x, uint32_t k, 
+    //TODO: compute topics from the labeling
+    void computeTopics(void)
+    {
+      mBeta.set_size(mK,mNw); // corpus level topics
+      mBeta.zeros();
+      uint32_t D=HDP<U>::mX.size(); // D=J -> number of documents in corpus; document d/j
+      for (uint32_t d=0; d<D; ++d){
+        uint32_t N = mZ_ji[d].n_elem;
+        for (uint32_t i=0; i<N; ++i){
+          assert(mZ_ji[d](i)<mK);
+          assert(HDP<U>::mX[d](i)<mNw);
+          mBeta(mZ_ji[d](i), HDP<U>::mX[d](i)) ++; // increment count for word x_di in topic z_di 
+        }
+      }
+      //normalize
+      for (uint32_t k=0; k<mK; ++k){
+        mBeta.row(k) /= sum(mBeta.row(k));
+      }
+    };
+
+    Row<U> getXinK(const vector<Row<U> >& x, uint32_t j_x, uint32_t i_x, uint32_t k, 
         const vector<Col<uint32_t> >& k_jt, const vector<Col<uint32_t> >& t_ji, bool disp=false) const
     {
       uint32_t J = k_jt.size();
       uint32_t d = x[0].n_cols;
-      Mat<U> x_k=zeros<Mat<U> >(1,d); // datapoints in cluster k
+      Row<U> x_k=zeros<Row<U> >(1,d); // datapoints in cluster k
 #ifndef NDEBUG
       if(disp) printf("----------- J=%d; d=%d; j_x=%d; i_x=%d; k=%d; ----------- \n",J,d,j_x,i_x,k);
 #endif
