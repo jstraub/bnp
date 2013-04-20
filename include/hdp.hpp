@@ -43,8 +43,8 @@ class HDP // : public DP<U>
       uint32_t N = x_i.n_cols;
       
       Mat<U> x_s = shuffle(x_i,1); // suffle the columns (words)
-      Mat<U> x_te = x_s.cols(0,N/2) ; // select first half to train on
-      Mat<U> x_ho = x_s.cols(N/2,N) ; // select second half as held out
+      Mat<U> x_te = x_s.cols(0,(N/2)-1) ; // select first half to train on
+      Mat<U> x_ho = x_s.cols(N/2,N-1) ; // select second half as held out
 
       mX_te.push_back(x_te); // on half of the data we train as usual to get a topic model for the document
       mX_ho.push_back(x_ho); // held out data to evaluate the perplexity
@@ -53,17 +53,11 @@ class HDP // : public DP<U>
 
     virtual Row<double> logP_w(uint32_t d) const=0;
 
-protected:
 
-    const BaseMeasure<U>& mH; // base measure
-    double mAlpha; 
-    double mOmega;
-    vector<Mat<U> > mX; // training data
-    vector<Mat<U> > mX_te; //  test data
-    vector<Mat<U> > mX_ho; //  held out data
-
-    double perplexity(const Row<double>& x_ho, const Row<double>& logP) const
+    double perplexity(const Mat<U>& x_ho, const Row<double>& logP) const
     {
+      assert(x_ho.n_rows==1);
+
       uint32_t N = x_ho.n_cols;
       double perp = 0.0;
       for (uint32_t i=0; i<N; ++i){
@@ -77,6 +71,16 @@ protected:
 
       return perp;
     };
+
+protected:
+
+    const BaseMeasure<U>& mH; // base measure
+    double mAlpha; 
+    double mOmega;
+    vector<Mat<U> > mX; // training data
+    vector<Mat<U> > mX_te; //  test data
+    vector<Mat<U> > mX_ho; //  held out data
+
 
 private:
 

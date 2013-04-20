@@ -58,9 +58,9 @@ public:
 
     // compute posterior under x_given
     uint32_t k=x_q(0);
-    uvec ids=x_given==k;
+    Row<uint32_t> ids=(x_given.row(0)==k);
     uint32_t C_k=sum(ids);
-    uint32_t L=x_given.n_rows;
+    uint32_t L=x_given.n_cols;
     //    cout<<"k="<<k<<" C_k="<<C_k<<" L="<<L<<" alpha0="<<mAlpha0
     //      <<" alpha_k="<<mAlphas(k)
     //      <<" log(p)="<< log((C_k + mAlphas(k))/(L + mAlpha0))<<endl;
@@ -98,8 +98,8 @@ public:
     // M0: number of data points in the cluster
     // M1: sum over all data points in the cluster
     // M2: x*x.T over all data points in the cluster
-    double M0=x_given.n_rows;
-    colvec M1=sum(x_given,0).t();
+    double M0=x_given.n_cols;
+    colvec M1=sum(x_given,1);
     mat M2=x_given.t()*x_given;
     double kappa = mKappa+M0;
     double nu = mNu+M0;

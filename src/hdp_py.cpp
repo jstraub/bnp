@@ -124,6 +124,7 @@ Mat<U> np2mat(const numeric::array& np)
   PyArrayObject* a = (PyArrayObject*)PyArray_FROM_O(np.ptr());
   if(!checkPyArr(a,2,NpTyp<U>::Num)) exit(0);
   // do not copy the data!
+  //cout<<a->nd<<": "<<a->dimensions[0]<<"x"<<a->dimensions[1]<<endl;
   return arma::Mat<U>((U*)a->data,a->dimensions[0],a->dimensions[1],false,true);
 }
 
@@ -205,7 +206,7 @@ public:
   {
     Mat<U> x_i_mat=np2mat<U>(x_i); // can do this since x_i_mat gets copied inside
 
-    cout<<"adding  x: "<<x_i_mat.n_cols<<": "<<x_i_mat<<endl;
+    //cout<<"adding  x: "<<x_i_mat.n_cols<<": "<<x_i_mat<<endl;
     return HDP_gibbs<U>::addDoc(x_i_mat);
   };
 
@@ -214,6 +215,14 @@ public:
     Mat<uint32_t> x_i_mat=np2mat<U>(x_i); // can do this since x_i_mat gets copied inside
     return HDP_gibbs<U>::addHeldOut(x_i_mat);
   };
+
+
+  void getPerplexity(numeric::array& perp)
+  {
+    Row<double> perp_wrap=np2row<double>(perp); 
+    perp_wrap = HDP_gibbs<U>::perplexity();
+  };
+
 
   // works on the data in z_i -> size has to be correct in order for this to work!
   // makes a copy of the internal labels vector
@@ -259,13 +268,13 @@ public:
   // makes no copy of the external data x_i
   uint32_t addDoc(const numeric::array& x_i)
   {
-    Row<uint32_t> x_i_mat=np2row<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
+    Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
     return HDP_var::addDoc(x_i_mat);
   };
 
   uint32_t addHeldOut(const numeric::array& x_i)
   {
-    Row<uint32_t> x_i_mat=np2row<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
+    Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
     return HDP_var::addHeldOut(x_i_mat);
   };
 
@@ -274,7 +283,7 @@ public:
   // can use this to update the estimate with information from additional x 
   bool updateEst(const numeric::array& x, double ro=0.75)
   {
-    Row<uint32_t> x_mat=np2row<uint32_t>(x); // can do this since x_mat gets copied inside    
+    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
     return HDP_var::updateEst(x_mat,ro);
   }
 
@@ -571,7 +580,9 @@ BOOST_PYTHON_MODULE(libbnp)
 	class_<HDP_Dir>("HDP_Dir",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_Dir::densityEst)
         .def("getClassLabels",&HDP_Dir::getClassLabels)
-        .def("addDoc",&HDP_Dir::addDoc);
+        .def("addDoc",&HDP_Dir::addDoc)
+        .def("addHeldOut",&HDP_Dir::addHeldOut)
+        .def("getPerplexity",&HDP_Dir::getPerplexity);
   //      .def_readonly("mGamma", &HDP_Dir::mGamma);
 
 	class_<HDP_INW>("HDP_INW",init<InvNormWishart_py&,double,double>())

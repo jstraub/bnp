@@ -85,7 +85,10 @@ class HDP_gibbs : public HDP<U>
               }
               Mat<U> x_k_ji = getXinK(x,j,i,k_jt[j](t),k_jt,t_ji);
               //HDP hdp_x_ji = posterior(x_k_ji); // compute posterior hdp given the data 
+              //cout<<"x_j="<<x[j].col(i)<<endl;
+              //cout<<"x_k_ji="<<x_k_ji<<endl;
               double f_k_jt = this->mH.predictiveProb(x[j].col(i),x_k_ji);
+              //cout<<"f_k_jt="<<f_k_jt<<endl;
               //logGaus(x[j].col(i), hdp_x_ji.mVtheta, hdp_x_ji.mmCov()); // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
               f(t) = f_k_jt;
               l(t) = log(n_jt/(n_j + this->mAlpha)) + f_k_jt;
@@ -190,7 +193,7 @@ class HDP_gibbs : public HDP<U>
             for (uint32_t jj=0; jj<J; ++jj)
               m_ += T[jj];
             uvec i_jt=find(t == t_ji[j]);
-            Mat<U> x_jt = zeros<Mat<U> >(i_jt.n_elem);
+            Mat<U> x_jt = zeros<Mat<U> >(x[j].n_rows,i_jt.n_elem);
             for (uint32_t i=0; i<i_jt.n_elem; ++i)
               x_jt.col(i) = x[j].col(i_jt(i)); //all datapoints which are sitting at table t 
             for (uint32_t k=0; k<K; ++k)
@@ -339,7 +342,7 @@ class HDP_gibbs : public HDP<U>
         // iterate over all held out data and compute the perplexity
         uint32_t d=mX_id_test[i];
         Row<double> logP = logP_w(d);
-        mPerp(i) = perplexity(HDP<U>::mX_ho[i],logP);
+        mPerp(i) = HDP<U>::perplexity(HDP<U>::mX_ho[i],logP);
       }
       return mPerp;
     };

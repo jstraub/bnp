@@ -42,11 +42,11 @@ class HDPvar(bnp.HDP_var):
   def initialEstimate(self,x,x_ho,Nw,kappa,K,T,S):
     D = len(x)
     for x_i in x:
-      self.addDoc(np.vstack(x_i))
+      self.addDoc(x_i.reshape((1,x_i.shape[0])))
       #self.addDoc(np.vstack(x_i[0:N_d]))
     for x_ho_i in x_ho:
       print("adding held out")
-      self.addHeldOut(np.vstack(x_ho_i))
+      self.addHeldOut(x_i.reshape((1,x_i.shape[0])))
       #self.addHeldOut(np.vstack(x_ho_i[0:N_d]))
     return self.densityEst(Nw,kappa,K,T,S)
 
@@ -56,11 +56,12 @@ class HDPgibbs(bnp.HDP_Dir):
   def initialEstimate(self,x,x_ho,Nw,K0,T0,It):
     D = len(x)
     for x_i in x:
-      self.addDoc(np.vstack(x_i))
+      xx=np.hstack(x_i)
+      #print("adding {}; {}".format(xx.shape,xx))
+      self.addDoc(x_i.reshape((1,x_i.shape[0])))
       #self.addDoc(np.vstack(x_i[0:N_d]))
     for x_ho_i in x_ho:
-      print("adding held out")
-      self.addHeldOut(np.vstack(x_ho_i))
+      self.addHeldOut(x_i.reshape((1,x_i.shape[0])))
       #self.addHeldOut(np.vstack(x_ho_i[0:N_d]))
     return self.densityEst(Nw,K0,T0,It)
 
@@ -83,7 +84,6 @@ if __name__ == '__main__':
   args = parser.parse_args()
   print('args: {0}'.format(args))
 
-  variational = ~args.gibbs
 
   D = args.D #number of documents to process
   D_ho = args.Ho # (ho= held out) number of docs used for testing (perplexity)
@@ -110,7 +110,25 @@ if __name__ == '__main__':
   dirichlet=bnp.Dir(dirAlphas)
   print("Dir created")
 
-  if variational:
+  if args.gibbs:
+    print('Gibbs');
+    It = 100;
+    K0 = 30;
+    T0 = 10;
+    hdp = HDPgibbs(dirichlet,alpha,omega)
+    hdp.initialEstimate(x_tr,x_ho,Nw,K0,T0,It)
+
+    perp = np.zeros(D_ho)
+    hdp.getPerplexity(perp)
+    print('Perplexity of test docs: {}'.format(perp))
+
+#    hdp=bnp.HDP_Dir(dirichlet,alpha,omega)
+#    for x_i in x[0:D]:
+#      hdp.addDoc(np.vstack(x_i[0:N_d]))
+#    result=hdp.densityEst(10,10,10)
+
+  else:
+    print('Variational');
     hdp = HDPvar(dirichlet,alpha,omega)
     hdp.initialEstimate(x_tr,x_ho,Nw,kappa,K,T,S)
 
@@ -167,18 +185,5 @@ if __name__ == '__main__':
     plt.imshow(hdp_var.docTopicsImg(),interpolation='nearest', cmap = cm.hot)
     fig2.show()
     raw_input()
-
-  else:
-    It = 10;
-    K0 = 30;
-    T0 = 10;
-    hdp = HDPgibbs(dirichlet,alpha,omega)
-    hdp.initialEstimate(x_tr,x_ho,Nw,K0,T0,It)
-
-#    hdp=bnp.HDP_Dir(dirichlet,alpha,omega)
-#    for x_i in x[0:D]:
-#      hdp.addDoc(np.vstack(x_i[0:N_d]))
-#    result=hdp.densityEst(10,10,10)
-
 
 
