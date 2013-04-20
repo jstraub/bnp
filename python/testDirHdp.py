@@ -112,7 +112,7 @@ if __name__ == '__main__':
 
   if args.gibbs:
     print('Gibbs');
-    It = 100;
+    It = 500;
     K0 = 30;
     T0 = 10;
     hdp = HDPgibbs(dirichlet,alpha,omega)
