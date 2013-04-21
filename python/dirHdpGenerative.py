@@ -94,6 +94,9 @@ class HDP_sample:
   x_ho = []
   # results
   perp = np.zeros(1)
+
+  toSave = dict()
+  loaded = dict()
   
   def __init__(self, K=None,T=None,Nw=None,omega=None,alpha=None,Lambda=None, pathToModel=None):
     if pathToModel is None:
@@ -105,19 +108,42 @@ class HDP_sample:
       self.Lambda = Lambda
     else:
       self.load(pathToModel)
-  
+ 
+  def collectToSave(s):
+    s.toSave['K']=s.K
+    s.toSave['T']=s.T
+    s.toSave['Nw']=s.Nw
+    s.toSave['omega']=s.omega
+    s.toSave['alpha']=s.alpha
+    s.toSave['Lambda']=s.Lambda
+    s.toSave['c']=s.c
+    s.toSave['z']=s.z
+    s.toSave['beta']=s.beta
+    s.toSave['v']=s.v
+    s.toSave['sigV']=s.sigV
+    s.toSave['pi']=s.pi
+    s.toSave['sigPi']=s.sigPi
+    s.toSave['x_tr']=s.x_tr
+    s.toSave['x_ho']=s.x_ho
+    s.toSave['perp']=s.perp
+    #{'K':s.K,'T':s.T,'Nw':s.Nw,'omega':s.omega,'alpha':s.alpha,'Lambda':s.Lambda,'c':s.c,'z':s.z,'beta':s.beta,'v':s.v,'sigV':s.sigV,'pi':s.pi,'sigPi':s.sigPi,'x_tr':s.x_tr,'x_ho':s.x_ho,'perp':s.perp}
 
   def save(s,path):
     print('len(x_tr)={0}'.format(len(s.x_tr)))
-    sio.savemat(path,{'K':s.K,'T':s.T,'Nw':s.Nw,'omega':s.omega,'alpha':s.alpha,'Lambda':s.Lambda,'c':s.c,'z':s.z,'beta':s.beta,'v':s.v,'sigV':s.sigV,'pi':s.pi,'sigPi':s.sigPi,'x_tr':s.x_tr,'x_ho':s.x_ho,'perp':s.perp})
+    HDP_sample.collectToSave(s)
+    sio.savemat(path,s.toSave)
 
   def load(s,path):
     try:
-      mat=sio.loadmat(path)
+      s.loaded=sio.loadmat(path)
       print('Found model under {0}'.format(path))
     except Exception, err:
       print('Did not find model under {0}'.format(path))
       return False
+    HDP_sample.parseLoad(s,s.loaded)
+    return True
+
+  def parseLoad(s,mat):
     s.K=mat['K'][0][0]
     print('loaded K\t {0}'.format(s.K))
     s.T=mat['T'][0][0]
@@ -137,13 +163,16 @@ class HDP_sample:
     s.v=mat['v']
     print('loaded v\t {0}'.format(s.v.shape))
     s.perp = mat['perp']
-    s.x_tr=[]; s.x_ho=[]; s.z=[]; s.c=[]; s.pi=[]; s.sigPi=[]
-    for d in range(0,mat['x_ho'].shape[0]):
-      s.x_ho.append(mat['x_ho'][d][0])
+
+    s.x_tr = mat['x_tr']
+    print('loaded x_tr\t {}'.format(s.x_tr.shape))
+    s.x_ho = mat['x_ho']
+
+    s.z=[]; s.c=[]; s.pi=[]; s.sigPi=[]
+    #for d in range(0,mat['x_ho'].shape[0]):
+    #  s.x_ho.append(mat['x_ho'][d][0])
 
     for d in range(0,mat['x_tr'].shape[0]):
-      s.x_tr.append(mat['x_tr'][d][0])
-      #print('loaded x[{}]\t {}'.format(d,s.x[d].shape))
       s.z.append(mat['z'][d][0])
       #print('loaded z[{}]\t {}'.format(d,s.z[d].shape))
       s.c.append(mat['c'][d,:])
@@ -152,13 +181,12 @@ class HDP_sample:
       #print('loaded pi[{}]\t {}'.format(d,s.pi[d].shape))
       s.sigPi.append(mat['sigPi'][d,:])
       #print('loaded sigPi[{}]\t {}'.format(d,s.sigPi[d].shape))
-    return True
 
 
   def loadHDPSample(self, x_tr, x_ho, hdp):
     self.x_tr = x_tr
     self.x_ho = x_ho
-    if isinstance(hdp,bnp.HDP_var):
+    if isinstance(hdp,bnp.HDP_var) or isinstance(hdp,bnp.HDP_var_ss):
       D=len(self.x_tr)
       D_ho=len(self.x_ho)
       print("---------------------- Loading from hdp -------------------------");

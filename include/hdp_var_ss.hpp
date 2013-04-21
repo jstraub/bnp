@@ -102,9 +102,19 @@ class HDP_var_ss: public HDP_ss<uint32_t>
           }
           offset += x_test(d,w);
         }
-        x_s = shuffle(x_s); // shuffle and then split
-        Row<uint32_t> x_te(x_s.cols(0,N/2));
-        Row<uint32_t> x_ho(x_s.cols(N/2,N));
+        vector<uint32_t> rndInds(N);
+        for (uint32_t i=0; i<N; ++i)
+          rndInds[i]=i;
+        std::random_shuffle(rndInds.begin(),rndInds.end());
+
+        Row<uint32_t> x_te(N/2);
+        Row<uint32_t> x_ho(N/2+N%2);
+        for (uint32_t i=0; i<N/2; ++i)
+          x_te[i] = x_s[rndInds[i]];
+        for (uint32_t i=N/2; i<N; ++i)
+          x_ho[i-(N/2)] = x_s[rndInds[i]];
+
+        cout<<"x_te.n_elem="<<x_te.n_elem<<" x_ho.n_elem="<<x_ho.n_elem<<" N="<<N<<endl;
         // now convert back into counts
         for (uint32_t w=0; w<mNw; ++w){
           mX_ho.row(d)[w] = sum(x_ho == w);
