@@ -158,7 +158,7 @@ class HDP_sample:
   def loadHDPSample(self, x_tr, x_ho, hdp):
     self.x_tr = x_tr
     self.x_ho = x_ho
-    if isinstance(hdp,bnp.HDP_var):
+    if isinstance(hdp,bnp.HDP_var) or isinstance(hdp,bnp.HDP_var_ss):
       D=len(self.x_tr)
       D_ho=len(self.x_ho)
       print("---------------------- Loading from hdp -------------------------");
