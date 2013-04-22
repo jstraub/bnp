@@ -109,10 +109,22 @@ uint32_t multinomialMode(const Row<double>& p )
 
 void dirMode(Row<double>& mode, const Row<double>& alpha)
 {
-  mode = (alpha-1.0)/sum(alpha-1.0);
+  // see derivation in my notes
+  Row<double> alpha_mod(alpha);
+  double alpha_0 = sum(alpha);
+  double K = alpha.n_elem;
+  if (alpha_0 < K) {
+    for (uint32_t i=0; i<K; ++i)
+      if (alpha_mod[i] > 1.0) {alpha_mod[i] = 1.0;}
+  }else if(alpha_0 > K) {
+    for (uint32_t i=0; i<K; ++i)
+      if (alpha_mod[i] < 1.0) {alpha_mod[i] = 1.0;}
+  }
+  mode = (alpha_mod-1.0)/sum(alpha_mod-1.0);
 };
 
 void dirMode(Col<double>& mode, const Col<double>& alpha)
 {
+
   mode = (alpha-1.0)/sum(alpha-1.0);
 };
