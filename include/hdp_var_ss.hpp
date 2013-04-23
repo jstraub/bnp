@@ -505,7 +505,10 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       topics.set_size(K,Nw);
       for (uint32_t k=0; k<K; k++){
         // mode of dirichlet (MAP estimate)
-        topics.row(k) = (lambda.row(k)-1.0)/sum(lambda.row(k)-1.0);
+        Row<double> lamb = lambda.row(k);
+        Row<double> beta(Nw);
+        dirMode(beta, lamb);
+        topics.row(k) = beta;
 //        cout<<"lambda_"<<k<<"="<<lambda.row(k)<<endl;
 //        cout<<"topic_"<<k<<"="<<topics.row(k)<<endl;
 //        cout<<"sum over topic_"<<k<<"="<<sum(topics.row(k))<<endl<<endl;

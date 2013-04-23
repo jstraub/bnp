@@ -112,11 +112,14 @@ if __name__ == '__main__':
 
   if args.gibbs:
     print('Gibbs');
-    It = 500;
+    It = 100;
     K0 = 30;
     T0 = 10;
     hdp = HDPgibbs(dirichlet,alpha,omega)
+
+    start = time.clock()
     hdp.initialEstimate(x_tr,x_ho,Nw,K0,T0,It)
+    print('--- time taken: {}'.format(time.clock() - start))
 
     perp = np.zeros(D_ho)
     hdp.getPerplexity(perp)
@@ -130,7 +133,10 @@ if __name__ == '__main__':
   else:
     print('Variational');
     hdp = HDPvar(dirichlet,alpha,omega)
+
+    start = time.clock()
     hdp.initialEstimate(x_tr,x_ho,Nw,kappa,K,T,S)
+    print('--- time taken: {}'.format(time.clock() - start))
 
 #    hdp=bnp.HDP_onl(dirichlet,alpha,omega)
 #    for x_i in x[0:D]:
