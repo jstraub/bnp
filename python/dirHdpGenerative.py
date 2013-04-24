@@ -276,15 +276,28 @@ class HDP_sample:
     D = len(self.x_tr)
     ks=np.zeros(D)
     for d in range(0,D):
-      t_max=np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))[0][0]
-      print('d={}; D={}'.format(d,D))
-      print('t_max={};'.format(np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))))
-      print('sigPi={}; sum={}'.format(self.sigPi[d],np.sum(self.sigPi[d])))
-      print('c[{}]={};'.format(d,self.c[d]))
-      if t_max < self.c[d].size:
-        k_max = self.c[d][t_max]
-      else:
-        k_max = np.nan # this means that we arre not selecting one of the estimated models!! (the last element in sigPi is 1-sum(sigPi(0:end-1)) and represents the "other" models
+
+      # necessaary since topics may be selected several times!
+      c_u=np.unique(self.c[d])
+      sigPi_u = np.zeros(c_u.size)
+      for i in range(0,c_u.size):
+        #print('{}'.format(c_u[i] == self.c[d]))
+        #print('{}'.format(self.sigPi[d]))
+        sigPi_u[i] = np.sum(self.sigPi[d][c_u[i] == self.c[d]])
+      k_max = c_u[sigPi_u == np.max(sigPi_u)]
+#      print('c={};'.format(self.c[d]))
+#      print('sigPi={};'.format(self.sigPi[d]))
+#      print('sigPi_u = {};\tc_u={};\tk_max={}'.format(sigPi_u,c_u,k_max))
+
+#      t_max=np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))[0][0]
+#      print('d={}; D={}'.format(d,D))
+#      print('t_max={};'.format(np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))))
+#      print('sigPi={}; sum={}'.format(self.sigPi[d],np.sum(self.sigPi[d])))
+#      print('c[{}]={};'.format(d,self.c[d]))
+#      if t_max < self.c[d].size:
+#        k_max = self.c[d][t_max]
+#      else:
+#        k_max = np.nan # this means that we arre not selecting one of the estimated models!! (the last element in sigPi is 1-sum(sigPi(0:end-1)) and represents the "other" models
       ks[d]=k_max
     ks_unique=np.unique(ks)
     ks_unique=ks_unique[~np.isnan(ks_unique)]
@@ -309,6 +322,7 @@ class HDP_sample:
       plt.subplot(Ncol,Nrow,i+1)
       x = np.linspace(0,self.beta[int(ks_unique[i])].size-1,self.beta[int(ks_unique[i])].size)
       plt.stem(x,self.beta[int(ks_unique[i])])
+      plt.ylim([0.0,1.0])
       plt.xlabel('topic '+str(ks_unique[i]))
     return fig
 
