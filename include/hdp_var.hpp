@@ -274,7 +274,6 @@ class HDP_var: public HDP<uint32_t>
         cout<<"ind_x: "<<ind_x.cols(0,10)<<endl;
         cout<<"ind  : "<<ind.cols(0,10)<<endl;
 
-
       zeta.resize(ind.n_elem,Mat<double>(T,K));
       phi.resize(ind.n_elem,Mat<double>(N,T));
       gamma.resize(ind.n_elem,Mat<double>(T,2));
