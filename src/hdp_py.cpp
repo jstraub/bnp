@@ -154,12 +154,12 @@ public:
   Dir_py(const numeric::array& alphas) :
 	  Dir(np2row<double>(alphas))
   {
-	  cout<<"alphas: "<<mAlphas<<endl;
+	  //cout<<"alphas: "<<mAlphas<<endl;
   };
   Dir_py(const Dir_py& dir) :
 	  Dir(dir)
   {
-	  cout<<"alphas: "<<mAlphas<<endl;
+	  //cout<<"alphas: "<<mAlphas<<endl;
   };
 };
 

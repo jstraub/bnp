@@ -75,7 +75,7 @@ def logDir(x, alpha):
   return logP
 
 
-class HDP_sample:
+class HDP_base:
 
   K=0; T=0; Nw=0
   # hyper parameters
@@ -108,7 +108,7 @@ class HDP_sample:
       self.Lambda = Lambda
     else:
       self.load(pathToModel)
- 
+
   def collectToSave(s):
     s.toSave['K']=s.K
     s.toSave['T']=s.T
@@ -326,6 +326,37 @@ class HDP_sample:
       plt.xlabel('topic '+str(ks_unique[i]))
     return fig
 
+  def logP_fullJoint(self):
+    logP = 0.0
+    D = len(self.x_tr)
+    for d in range(0,D):
+      N = self.x_tr[d].size
+      for n in range(0,N):
+        logP_w = self.logP_wordJoint(d,n)
+#        print('logP({},{})={}'.format(d,n,logP_w))
+        logP += logP_w
+    return logP
+
+  def logP_wordJoint(self, d, n):
+    #print('d={}, n={}'.format(d,n))
+    #print('x={}; x.len={}; x[d].size={}; c.len={}; z.len={}; v.size={}; sigV.size={}; pi.len={}; sigPi.len={}'.format(self.x[d][n],len(self.x),self.x[d].size,len(self.c),len(self.z),self.v.size,self.sigV.size,len(self.pi),len(self.sigPi)))
+    #print('z={}; c={}; beta.size {}\n'.format(self.z[d][n], self.c[d][ self.z[d][n]],self.beta.shape))
+
+#    print('\tx|beta =    {}'.format(logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]])))
+#    print('\tc|sigV =    {}'.format(logCat(self.c[d][ self.z[d][n]], self.sigV)))
+#    print('\tv|omega =   {}'.format(logBeta(self.v, 1.0, self.omega)))
+#    print('\tz|sigPi =   {}'.format(logCat(self.z[d][n], self.sigPi[d])))
+#    print('\tpi|alpha =  {}'.format(logBeta(self.pi[d], 1.0, self.alpha)))
+#    print('\tbeta|lambda={}'.format(logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)))
+    return logCat(self.x_tr[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
+    + logCat(self.c[d][ self.z[d][n]], self.sigV) \
+    + logBeta(self.v, 1.0, self.omega) \
+    + logCat(self.z[d][n], self.sigPi[d]) \
+    + logBeta(self.pi[d], 1.0, self.alpha) \
+    + logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)
+
+class HDP_sample(HDP_base):
+
   def generateDirHDPSample(self,D,N):
     # doc level
     self.x_tr=[]
@@ -366,31 +397,3 @@ class HDP_sample:
     return self.x_tr, self.sigV, self.beta, self.pi, self.c
 
   
-  def logP_fullJoint(self):
-    logP = 0.0
-    D = len(self.x_tr)
-    for d in range(0,D):
-      N = self.x_tr[d].size
-      for n in range(0,N):
-        logP_w = self.logP_wordJoint(d,n)
-#        print('logP({},{})={}'.format(d,n,logP_w))
-        logP += logP_w
-    return logP
-
-  def logP_wordJoint(self, d, n):
-    #print('d={}, n={}'.format(d,n))
-    #print('x={}; x.len={}; x[d].size={}; c.len={}; z.len={}; v.size={}; sigV.size={}; pi.len={}; sigPi.len={}'.format(self.x[d][n],len(self.x),self.x[d].size,len(self.c),len(self.z),self.v.size,self.sigV.size,len(self.pi),len(self.sigPi)))
-    #print('z={}; c={}; beta.size {}\n'.format(self.z[d][n], self.c[d][ self.z[d][n]],self.beta.shape))
-
-#    print('\tx|beta =    {}'.format(logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]])))
-#    print('\tc|sigV =    {}'.format(logCat(self.c[d][ self.z[d][n]], self.sigV)))
-#    print('\tv|omega =   {}'.format(logBeta(self.v, 1.0, self.omega)))
-#    print('\tz|sigPi =   {}'.format(logCat(self.z[d][n], self.sigPi[d])))
-#    print('\tpi|alpha =  {}'.format(logBeta(self.pi[d], 1.0, self.alpha)))
-#    print('\tbeta|lambda={}'.format(logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)))
-    return logCat(self.x_tr[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
-    + logCat(self.c[d][ self.z[d][n]], self.sigV) \
-    + logBeta(self.v, 1.0, self.omega) \
-    + logCat(self.z[d][n], self.sigPi[d]) \
-    + logBeta(self.pi[d], 1.0, self.alpha) \
-    + logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)
