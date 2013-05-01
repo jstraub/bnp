@@ -21,20 +21,20 @@ class HDP // : public DP<U>
   public:
     HDP(const BaseMeasure<U>& base, double alpha, double omega)
       : mH(base), mAlpha(alpha), mOmega(omega)
-    {
-      //    cout<<"Creating "<<typeid(this).name()<<endl;
-    };
+    { };
 
     ~HDP()
     {	};
 
-    // interface mainly for python
+    /* 
+     * interface mainly for python
+     * @return the index of the added x_i in the set of all documents
+     */
     uint32_t addDoc(const Mat<U>& x_i)
     {
       mX.push_back(x_i);
-      return mX.size();
+      return mX.size()-1; 
     };
-
 
     // interface mainly for python
     uint32_t addHeldOut(const Mat<U>& x_i)
@@ -87,7 +87,6 @@ protected:
     vector<Mat<U> > mX; // training data
     vector<Mat<U> > mX_te; //  test data
     vector<Mat<U> > mX_ho; //  held out data
-
 
 private:
 

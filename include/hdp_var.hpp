@@ -35,141 +35,65 @@ class HDP_var: public HDP<uint32_t>
     ~HDP_var()
     {};
 
-    // method for "one shot" computation without storing data in this class
-    //  Nw: number of different words
-    //  kappa=0.9: forgetting rate
-    //  uint32_t T=10; // truncation on document level
-    //  uint32_t K=100; // truncation on corpus level
-    // S = batch size
+    // interface mainly for python
+    uint32_t addDoc(const Mat<uint32_t>& x_i)
+    {
+      uint32_t x_ind = HDP<uint32_t>::addDoc(x_i);
+      // TODO: potentially slow
+      // add the index of the added x_i
+      mInd2Proc.resize(mInd2Proc.n_elem+1);
+      mInd2Proc[mInd2Proc.n_elem-1] = x_ind;
+      return x_ind;
+    };
+
+
+    /* 
+     * Initializes the corpus level parameters mA and mLambda according to Blei's Stochastic Variational paper
+     * @param D is the assumed number of documents for init
+     */
+    void initCorpusParams(uint32_t Nw, uint32_t K, uint32_t T, uint32_t D)
+    {
+      mA.ones(K,2);
+      mA.col(1) *= mOmega; 
+
+      // initialize lambda
+      mLambda.zeros(K,Nw);
+      GammaRnd gammaRnd(1.0, 1.0);
+      for (uint32_t k=0; k<K; ++k){
+        for (uint32_t w=0; w<Nw; ++w) mLambda(k,w) = gammaRnd.draw();
+        mLambda.row(k) *= double(D)*100.0/double(K*Nw);
+        mLambda.row(k) += ((Dir*)(&mH))->mAlphas;
+      }
+    };
+
+    /* From: Online Variational Inference for the HDP
+     * method for "one shot" computation without storing data in this class
+     *  Nw: number of different words
+     *  kappa=0.9: forgetting rate
+     *  uint32_t T=10; // truncation on document level
+     *  uint32_t K=100; // truncation on corpus level
+     *  S = batch size
+     */
     void densityEst(const vector<Mat<uint32_t> >& x, uint32_t Nw, 
         double kappa, uint32_t K, uint32_t T, uint32_t S)
     {
-
-      // From: Online Variational Inference for the HDP
-      // TODO: think whether it makes sense to use columns and Mat here
-      //double mAlpha = 1;
-      //double mGamma = 1;
-      //double nu = ((Dir*)(&mH))->mAlpha0; // get nu from vbase measure (Dir)
-      //double kappa = 0.75;
-
-      // T-1 gamma draws determine a T dim multinomial
-      // T = T-1;
-
       cout<<"densityEstimate with: K="<<K<<"; T="<<T<<"; kappa="<<kappa<<"; Nw="<<Nw<<"; S="<<S<<endl;
+
+      mX = x;
+      uint32_t D=mX.size();
+      mInd2Proc = linspace<Row<uint32_t> >(0,D-1,D);
 
       mT = T;
       mK = K;
       mNw = Nw;
 
-      Mat<double> a(K,2);
-      a.ones();
-      a.col(1) *= mOmega; 
-      uint32_t D=x.size();
+      initCorpusParams(mNw,mK,mT,D);
+      Row<uint32_t> ind = updateEst_batch(mInd2Proc,mZeta,mPhi,mGamma,mA,mLambda,mPerp,mOmega,kappa,S);
 
-      // initialize lambda
-      GammaRnd gammaRnd(1.0,1.0);
-      Mat<double> lambda(K,Nw);
-      for (uint32_t k=0; k<K; ++k){
-        for (uint32_t w=0; w<Nw; ++w) lambda(k,w) = gammaRnd.draw();
-        lambda.row(k) *= double(D)*100.0/double(K*Nw);
-        lambda.row(k) += ((Dir*)(&mH))->mAlphas;
-      }
+      mInd2Proc.set_size(0); // all processed
+      
 
-      mZeta.resize(D,Mat<double>());
-      mPhi.resize(D,Mat<double>());
-      mGamma.resize(D,Mat<double>());
-      mPerp.zeros(D);
 
-      Col<uint32_t> ind = shuffle(linspace<Col<uint32_t> >(0,D-1,D),0);
-//#pragma omp parallel private(dd,db)
-//#pragma omp parallel private(d,dd,N,zeta,phi,converged,gamma,gamma_prev,o,d_lambda,d_a,ro,i,perp_i)
-      //shared(x,mZeta,mPhi,mGamma,mOmega,D,T,K,Nw,mA,mLambda,mPerp,mX_ho)
-      {
-//#pragma omp for schedule(dynamic)
-//#pragma omp for schedule(dynamic) ordered
-        for (uint32_t dd=0; dd<D; dd += S)
-        {
-          Mat<double> db_lambda(K,Nw); // batch updates
-          Mat<double> db_a(K,2); 
-          db_lambda.zeros();
-          db_a.zeros();
-#pragma omp parallel for schedule(dynamic) 
-          for (uint32_t db=dd; db<min(dd+S,D); db++)
-          {
-            uint32_t d=ind[db];  
-            uint32_t N=x[d].n_cols;
-            //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
-
-            cout<<"-- db="<<db<<" d="<<d<<" N="<<N<<endl;
-            Mat<double> zeta(T,K);
-            Mat<double> phi(N,T);
-            initZeta(zeta,lambda,x[d]);
-            initPhi(phi,zeta,lambda,x[d]);
-
-            //cout<<" ------------------------ doc level updates --------------------"<<endl;
-            Mat<double> gamma(T,2);
-            Mat<double> gamma_prev(T,2);
-            gamma_prev.ones();
-            gamma_prev.col(1) += mAlpha;
-            bool converged = false;
-            uint32_t o=0;
-            while(!converged){
-              //           cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
-              updateGamma(gamma,phi);
-              updateZeta(zeta,phi,a,lambda,x[d]);
-              updatePhi(phi,zeta,gamma,lambda,x[d]);
-
-              converged = (accu(gamma_prev != gamma))==0 || o>60 ;
-              gamma_prev = gamma;
-              ++o;
-            }
-
-            mZeta[d] = Mat<double>(zeta);
-            mPhi[d] = Mat<double>(phi);
-            mGamma[d] = Mat<double>(gamma);
-            Mat<double> d_lambda(K,Nw);
-            Mat<double> d_a(K,2); 
-            //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
-            computeNaturalGradients(d_lambda, d_a, zeta, phi, mOmega, D, x[d]);
- #pragma omp critical
-            {
-              db_lambda += d_lambda;
-              db_a += d_a;
-            }
-          }
-          //for (uint32_t k=0; k<K; ++k)
-          //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
-          // ----------------------- update global params -----------------------
-          uint32_t bS = min(S,D-dd); // necessary for the last batch, which migth not form a complete batch
-          double ro = exp(-kappa*log(1+double(dd)+double(bS)/2.0)); // as "time" use the middle of the batch 
-          cout<<" -- global parameter updates dd="<<dd<<" bS="<<bS<<" ro="<<ro<<endl;
-          //cout<<"d_a="<<d_a<<endl;
-          //cout<<"a="<<a<<endl;
-          lambda = (1.0-ro)*lambda + (ro/S)*db_lambda;
-          a = (1.0-ro)*a + (ro/S)*db_a;
-          mA=a;
-          mLambda = lambda;
-
-          mPerp[dd+bS/2] = 0.0;
-          if (mX_te.size() > 0) {
-            cout<<"computing "<<mX_te.size()<<" perplexities"<<endl;
-#pragma omp parallel for schedule(dynamic) 
-            for (uint32_t i=0; i<mX_te.size(); ++i)
-            {
-              cout<<"mX_te: "<< mX_te[i].n_rows << "x"<< mX_te[i].n_cols<<endl;
-              cout<<"mX_ho: "<< mX_ho[i].n_rows << "x"<< mX_ho[i].n_cols<<endl;
-              double perp_i =  perplexity(mX_te[i],mX_ho[i],dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
-              cout<<"perp_"<<i<<"="<<perp_i<<endl;
-#pragma omp critical
-              {
-                mPerp[dd+bS/2] += perp_i;
-              }
-            }
-            mPerp[dd+bS/2] /= double(mX_te.size());
-            //cout<<"Perplexity="<<mPerp[d]<<endl;
-          }
-        }
-      }
     };
 
     // compute density estimate based on data previously fed into the class using addDoc
@@ -185,8 +109,42 @@ class HDP_var: public HDP<uint32_t>
       }
     };
 
-    // after an initial densitiy estimate has been made using densityEst()
-    // can use this to update the estimate with information from additional x 
+
+    /* 
+     * updated the estimate using newly added docs in mX
+     * "newly added": the ones that are indicated in mInd2Proc
+     */
+    void updatedEst_batch(double kappa, uint32_t S)
+    {
+      uint32_t Db=mInd2Proc.n_elem;
+      if (Db >0){  
+        cout<<"updatedEstimate with: K="<<mK<<"; T="<<mT<<"; kappa="<<kappa<<"; Nw="<<mNw<<"; S="<<S<<endl;
+        vector<Mat<double> > zeta; // will get resized accordingly inside updateEst_batch
+        vector<Mat<double> > phi;
+        vector<Mat<double> > gamma;
+        Col<double> perp;
+
+        Row<uint32_t> ind = updateEst_batch(mInd2Proc,zeta,phi,gamma,mA,mLambda,perp,mOmega,kappa,S);
+
+        mZeta.resize(mZeta.size()+Db);
+        mPhi.resize(mPhi.size()+Db);
+        mGamma.resize(mGamma.size()+Db);
+        mPerp.resize(mPerp.n_elem+Db);
+        for (uint32_t i=0; i<ind.n_elem; ++i){
+          mZeta[ind[i]] = zeta[i];
+          mPhi[ind[i]] = phi[i];
+          mGamma[ind[i]] = gamma[i];
+          mPerp[ind[i]] = perp[i];
+        }
+      }else{
+        cout<<"add more documents before starting to process"<<endl;
+      }
+    };
+
+    /*
+     * after an initial densitiy estimate has been made using densityEst()
+     * can use this to update the estimate with information from additional x 
+     */
     bool  updateEst(const Mat<uint32_t>& x, double kappa)
     {
       if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists an estimate already
@@ -266,23 +224,24 @@ class HDP_var: public HDP<uint32_t>
      * @param ind_x indices of docs to process within docs mX. !these are assumed to be in order!
      * @return the randomly shuffled indices to show how the data was processed -> this allows association of zetas, phis and gammas with docs in mX
      */
-    Row<uint32_t> updateEst_batch(const Row<uint32_t>& ind_x, vector<Mat<double> >& zeta, vector<Mat<double> >& phi, vector<Mat<double> >& gamma, Mat<double>& a, Mat<double>& lambda, Row<double>& perp, double omega, double kappa)
+    Row<uint32_t> updateEst_batch(const Row<uint32_t>& ind_x, vector<Mat<double> >& zeta, vector<Mat<double> >& phi, vector<Mat<double> >& gamma, Mat<double>& a, Mat<double>& lambda, Col<double>& perp, double omega, double kappa, uint32_t S)
     {
       uint32_t d_0 = min(ind_x); // thats the doc number that we start with -> needed for ro computation; assumes that all indices in mX prior to d_0 have already been processed.
+      uint32_t D= max(ind_x)+1; // D is the maximal index of docs that we are processing +1
 
       Row<uint32_t> ind = shuffle(ind_x,1);
         cout<<"ind_x: "<<ind_x.cols(0,10)<<endl;
         cout<<"ind  : "<<ind.cols(0,10)<<endl;
 
-      zeta.resize(ind.n_elem,Mat<double>(T,K));
-      phi.resize(ind.n_elem,Mat<double>(N,T));
-      gamma.resize(ind.n_elem,Mat<double>(T,2));
+      zeta.resize(ind.n_elem,Mat<double>(mT,mK));
+      phi.resize(ind.n_elem);
+      gamma.resize(ind.n_elem,Mat<double>(mT,2));
       perp.zeros(ind.n_elem);
 
         for (uint32_t dd=0; dd<ind.n_elem; dd += S)
         {
-          Mat<double> db_lambda(K,Nw); // batch updates
-          Mat<double> db_a(K,2); 
+          Mat<double> db_lambda(mK,mNw); // batch updates
+          Mat<double> db_a(mK,2); 
           db_lambda.zeros();
           db_a.zeros();
 #pragma omp parallel for schedule(dynamic) 
@@ -294,13 +253,13 @@ class HDP_var: public HDP<uint32_t>
 
             cout<<"-- db="<<db<<" d="<<d<<" N="<<N<<endl;
             //Mat<double> zeta(T,K);
-            //Mat<double> phi(N,T);
+            phi[db].resize(N,mT);
             initZeta(zeta[db],lambda,mX[d]);
             initPhi(phi[db],zeta[db],lambda,mX[d]);
 
             //cout<<" ------------------------ doc level updates --------------------"<<endl;
             //Mat<double> gamma(T,2);
-            Mat<double> gamma_prev(T,2);
+            Mat<double> gamma_prev(mT,2);
             gamma_prev.ones();
             gamma_prev.col(1) += mAlpha;
             bool converged = false;
@@ -316,8 +275,8 @@ class HDP_var: public HDP<uint32_t>
               ++o;
             }
 
-            Mat<double> d_lambda(K,Nw);
-            Mat<double> d_a(K,2); 
+            Mat<double> d_lambda(mK,mNw);
+            Mat<double> d_a(mK,2); 
             //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
             computeNaturalGradients(d_lambda, d_a, zeta[db], phi[db], mOmega, D, mX[d]);
  #pragma omp critical
@@ -403,8 +362,8 @@ class HDP_var: public HDP<uint32_t>
       // find most likely z_dn
       Col<uint32_t> z;
       getWordTopics(z, phi);
-      cout <<" |z_n|="<<z[n].n_elem <<" |phi|="<< phi.n_rows<< "x"<<phi.n_cols <<endl;
-      cout<<"z_n="<<z[n]<<endl;
+      cout <<" |z|="<<z.n_elem <<" |phi|="<< phi.n_rows<< "x"<<phi.n_cols <<endl;
+      cout<<"z="<<z<<endl;
 
 
       // find most likely topics 
@@ -569,6 +528,8 @@ class HDP_var: public HDP<uint32_t>
     uint32_t mT; // Doc level truncation
     uint32_t mK; // Corp level truncation
     uint32_t mNw; // size of dictionary
+
+    Row<uint32_t> mInd2Proc; // indices of docs that have not been processed
 
 private:
 
