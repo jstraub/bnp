@@ -233,10 +233,10 @@ class HDP_var: public HDP<uint32_t>
         Mat<double> lambda(mLambda);
         double omega = mOmega;
 
-        //cout<<"updating copied model with x"<<endl;
+        cout<<"updating copied model with x"<<endl;
         updateEst(x_te,zeta,phi,gamma,a,lambda,omega,d,kappa);
-      //cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
-        //cout<<"computing perplexity under updated model"<<endl;
+        cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
+        cout<<"computing perplexity under updated model"<<endl;
         //TODO: compute probabilities then use that to compute perplexity
 
         return perplexity(x_ho, zeta, phi, gamma, lambda);
@@ -263,12 +263,12 @@ class HDP_var: public HDP<uint32_t>
       //cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
       //cout<<" lambda="<<lambda[0]<<" "<<lambda[1]<<endl;
       getCorpTopic(topics, lambda);
-      //cout<<" topics="<<topics[0]<<" "<<topics[1]<<endl;
+      cout<<" topics="<<topics[0]<<" "<<topics[1]<<endl;
 
       double perp = 0.0;
-      //cout<<"x: "<<x_ho.n_rows<<"x"<<x_ho.n_cols<<endl;
+      cout<<"x: "<<x_ho.n_rows<<"x"<<x_ho.n_cols<<endl;
       for (uint32_t n=0; n<x_ho.n_cols; ++n){
-        //cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x_ho.n_cols<<" x_n="<<x_ho[n]<<" topics.shape="<<topics.n_rows<<"x"<<topics.n_cols<<endl;
+        cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x_ho.n_cols<<" x_n="<<x_ho[n]<<" topics.shape="<<topics.n_rows<<"x"<<topics.n_cols<<endl;
         perp -= logCat(x_ho[n],topics.row(c[z[n]]));
         cout<<perp<<" ";
       } cout<<endl;
