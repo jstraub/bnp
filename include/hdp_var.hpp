@@ -91,6 +91,8 @@ class HDP_var: public HDP<uint32_t>
         {
           Mat<double> db_lambda(K,Nw); // batch updates
           Mat<double> db_a(K,2); 
+          db_lambda.zeros();
+          db_a.zeros();
 #pragma omp parallel for schedule(dynamic) 
           for (uint32_t db=dd; db<min(dd+S,D); db++)
           {
@@ -138,7 +140,7 @@ class HDP_var: public HDP<uint32_t>
           //for (uint32_t k=0; k<K; ++k)
           //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
           // ----------------------- update global params -----------------------
-          double bS = min(S,D-dd); // necessary for the last batch, which migth not form a complete batch
+          uint32_t bS = min(S,D-dd); // necessary for the last batch, which migth not form a complete batch
           double ro = exp(-kappa*log(1+double(dd)+double(bS)/2.0)); // as "time" use the middle of the batch 
           cout<<" -- global parameter updates dd="<<dd<<" bS="<<bS<<" ro="<<ro<<endl;
           //cout<<"d_a="<<d_a<<endl;
@@ -160,10 +162,10 @@ class HDP_var: public HDP<uint32_t>
               //cout<<"perp_"<<i<<"="<<perp_i<<endl;
 #pragma omp critical
               {
-                mPerp[dd] += perp_i;
+                mPerp[dd+bS/2] += perp_i;
               }
             }
-            mPerp[dd] /= double(mX_te.size());
+            mPerp[dd+bS/2] /= double(mX_te.size());
             //cout<<"Perplexity="<<mPerp[d]<<endl;
           }
         }
@@ -259,6 +261,108 @@ class HDP_var: public HDP<uint32_t>
     };
 
 
+    /*
+     * Updates the estimate using mini batches
+     * @param ind_x indices of docs to process within docs mX. !these are assumed to be in order!
+     * @return the randomly shuffled indices to show how the data was processed -> this allows association of zetas, phis and gammas with docs in mX
+     */
+    Row<uint32_t> updateEst_batch(const Row<uint32_t>& ind_x, vector<Mat<double> >& zeta, vector<Mat<double> >& phi, vector<Mat<double> >& gamma, Mat<double>& a, Mat<double>& lambda, Row<double>& perp, double omega, double kappa)
+    {
+      uint32_t d_0 = min(ind_x); // thats the doc number that we start with -> needed for ro computation; assumes that all indices in mX prior to d_0 have already been processed.
+
+      Row<uint32_t> ind = shuffle(ind_x,1);
+        cout<<"ind_x: "<<ind_x.cols(0,10)<<endl;
+        cout<<"ind  : "<<ind.cols(0,10)<<endl;
+
+
+      zeta.resize(ind.n_elem,Mat<double>(T,K));
+      phi.resize(ind.n_elem,Mat<double>(N,T));
+      gamma.resize(ind.n_elem,Mat<double>(T,2));
+      perp.zeros(ind.n_elem);
+
+        for (uint32_t dd=0; dd<ind.n_elem; dd += S)
+        {
+          Mat<double> db_lambda(K,Nw); // batch updates
+          Mat<double> db_a(K,2); 
+          db_lambda.zeros();
+          db_a.zeros();
+#pragma omp parallel for schedule(dynamic) 
+          for (uint32_t db=dd; db<min(dd+S,ind.n_elem); db++)
+          {
+            uint32_t d=ind[db];  
+            uint32_t N=mX[d].n_cols;
+            //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
+
+            cout<<"-- db="<<db<<" d="<<d<<" N="<<N<<endl;
+            //Mat<double> zeta(T,K);
+            //Mat<double> phi(N,T);
+            initZeta(zeta[db],lambda,mX[d]);
+            initPhi(phi[db],zeta[db],lambda,mX[d]);
+
+            //cout<<" ------------------------ doc level updates --------------------"<<endl;
+            //Mat<double> gamma(T,2);
+            Mat<double> gamma_prev(T,2);
+            gamma_prev.ones();
+            gamma_prev.col(1) += mAlpha;
+            bool converged = false;
+            uint32_t o=0;
+            while(!converged){
+              //           cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
+              updateGamma(gamma[db],phi[db]);
+              updateZeta(zeta[db],phi[db],a,lambda,mX[d]);
+              updatePhi(phi[db],zeta[db],gamma[db],lambda,mX[d]);
+
+              converged = (accu(gamma_prev != gamma[db]))==0 || o>60 ;
+              gamma_prev = gamma[db];
+              ++o;
+            }
+
+            Mat<double> d_lambda(K,Nw);
+            Mat<double> d_a(K,2); 
+            //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
+            computeNaturalGradients(d_lambda, d_a, zeta[db], phi[db], mOmega, D, mX[d]);
+ #pragma omp critical
+            {
+              db_lambda += d_lambda;
+              db_a += d_a;
+            }
+          }
+          //for (uint32_t k=0; k<K; ++k)
+          //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
+          // ----------------------- update global params -----------------------
+          uint32_t t=dd+d_0; // d_0 is the timestep of the the first index to process; dd is the index in the current batch
+          uint32_t bS = min(S,ind.n_elem-dd); // necessary for the last batch, which migth not form a complete batch
+          //TODO: what is the time dd? d_0 needed?
+          double ro = exp(-kappa*log(1+double(t)+double(bS)/2.0)); // as "time" use the middle of the batch 
+          cout<<" -- global parameter updates t="<<t<<" bS="<<bS<<" ro="<<ro<<endl;
+          //cout<<"d_a="<<d_a<<endl;
+          //cout<<"a="<<a<<endl;
+          lambda = (1.0-ro)*lambda + (ro/S)*db_lambda;
+          a = (1.0-ro)*a + (ro/S)*db_a;
+
+          perp[dd+bS/2] = 0.0;
+          if (mX_te.size() > 0) {
+            cout<<"computing "<<mX_te.size()<<" perplexities"<<endl;
+#pragma omp parallel for schedule(dynamic) 
+            for (uint32_t i=0; i<mX_te.size(); ++i)
+            {
+              //cout<<"mX_te: "<< mX_te[i].n_rows << "x"<< mX_te[i].n_cols<<endl;
+              //cout<<"mX_ho: "<< mX_ho[i].n_rows << "x"<< mX_ho[i].n_cols<<endl;
+              double perp_i =  perplexity(mX_te[i],mX_ho[i],dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
+              //cout<<"perp_"<<i<<"="<<perp_i<<endl;
+#pragma omp critical
+              {
+                perp[dd+bS/2] += perp_i;
+              }
+            }
+            perp[dd+bS/2] /= double(mX_te.size());
+            //cout<<"Perplexity="<<mPerp[d]<<endl;
+          }
+        }
+      return ind;
+    };
+
+
     // compute the perplexity of a given document split into x_test (to find a topic model for the doc) and x_ho (to evaluate the perplexity)
     double perplexity(const Mat<uint32_t>& x_te, const Mat<uint32_t>& x_ho, uint32_t d, double kappa=0.75)
     {
@@ -300,6 +404,10 @@ class HDP_var: public HDP<uint32_t>
       // find most likely z_dn
       Col<uint32_t> z;
       getWordTopics(z, phi);
+      cout <<" |z_n|="<<z[n].n_elem <<" |phi|="<< phi.n_rows<< "x"<<phi.n_cols <<endl;
+      cout<<"z_n="<<z[n]<<endl;
+
+
       // find most likely topics 
       Mat<double> topics;
 
