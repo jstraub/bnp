@@ -24,7 +24,7 @@ class BaseMeasure
 public:
   BaseMeasure()
   {
-    cout<<"Creating "<<typeid(this).name()<<endl;
+    //cout<<"Creating "<<typeid(this).name()<<endl;
   };
   virtual ~BaseMeasure()
   {};

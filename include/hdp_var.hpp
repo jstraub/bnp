@@ -187,7 +187,7 @@ class HDP_var: public HDP<uint32_t>
     // can use this to update the estimate with information from additional x 
     bool  updateEst(const Mat<uint32_t>& x, double kappa)
     {
-      if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
+      if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists an estimate already
         uint32_t N = x.n_cols;
         uint32_t T = mT; 
         uint32_t K = mK;
@@ -215,6 +215,49 @@ class HDP_var: public HDP<uint32_t>
         return false;
       }
     };
+
+    bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa)
+    {
+      uint32_t D = d+1; // assume that doc d is appended to the end  
+      uint32_t Nw = lambda.n_cols;
+      uint32_t T = zeta.n_rows;
+      uint32_t K = zeta.n_cols;
+
+      //    cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
+      initZeta(zeta,lambda,x);
+      initPhi(phi,zeta,lambda,x);
+
+      // ------------------------ doc level updates --------------------
+      bool converged = false;
+      Mat<double> gamma_prev(T,2);
+      gamma_prev.ones();
+
+      uint32_t o=0;
+      while(!converged){
+        //      cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
+        updateGamma(gamma,phi);
+        updateZeta(zeta,phi,a,lambda,x);
+        updatePhi(phi,zeta,gamma,lambda,x);
+
+        converged = (accu(gamma_prev != gamma))==0 || o>60 ;
+        gamma_prev = gamma;
+        ++o;
+      }
+
+      //    cout<<" --------------------- natural gradients --------------------------- "<<endl;
+      //    cout<<"\tD="<<D<<" omega="<<omega<<endl;
+      Mat<double> d_lambda(K,Nw);
+      Mat<double> d_a(K,2); 
+      computeNaturalGradients(d_lambda, d_a, zeta, phi, omega, D, x);
+
+      //    cout<<" ------------------- global parameter updates: ---------------"<<endl;
+      double ro = exp(-kappa*log(1+double(d+1)));
+      //    cout<<"\tro="<<ro<<endl;
+      lambda = (1.0-ro)*lambda + ro*d_lambda;
+      a = (1.0-ro)*a+ ro*d_a;
+      return true;
+    };
+
 
     // compute the perplexity of a given document split into x_test (to find a topic model for the doc) and x_ho (to evaluate the perplexity)
     double perplexity(const Mat<uint32_t>& x_te, const Mat<uint32_t>& x_ho, uint32_t d, double kappa=0.75)
@@ -280,63 +323,6 @@ class HDP_var: public HDP<uint32_t>
     }
 
 
-    bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa= 0.75)
-    {
-      uint32_t D = d+1; // assume that doc d is appended to the end  
-      uint32_t Nw = lambda.n_cols;
-      uint32_t T = zeta.n_rows;
-      uint32_t K = zeta.n_cols;
-
-      //    cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
-      //    cout<<"a=\t"<<a.t();
-      //    for (uint32_t k=0; k<K; ++k)
-      //    {
-      //      cout<<"@"<<k<<" lambda=\t"<<lambda.row(k);
-      //    }
-
-      initZeta(zeta,lambda,x);
-      initPhi(phi,zeta,lambda,x);
-
-      // ------------------------ doc level updates --------------------
-      bool converged = false;
-      Mat<double> gamma_prev(T,2);
-      gamma_prev.ones();
-
-      uint32_t o=0;
-      while(!converged){
-        //      cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
-        updateGamma(gamma,phi);
-        updateZeta(zeta,phi,a,lambda,x);
-        updatePhi(phi,zeta,gamma,lambda,x);
-
-        converged = (accu(gamma_prev != gamma))==0 || o>60 ;
-
-        gamma_prev = gamma;
-        //cout<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
-        //cout<<"phi>"<<endl<<phi<<"<phi"<<endl;
-        ++o;
-      }
-
-      //    cout<<" --------------------- natural gradients --------------------------- "<<endl;
-      //    cout<<"\tD="<<D<<" omega="<<omega<<endl;
-
-      Mat<double> d_lambda(K,Nw);
-      Mat<double> d_a(K,2); 
-      computeNaturalGradients(d_lambda, d_a, zeta, phi, omega, D, x);
-
-      //    cout<<" ------------------- global parameter updates: ---------------"<<endl;
-      //cout<<"delta a= "<<d_a.t()<<endl;
-      //for (uint32_t k=0; k<K; ++k)
-      //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
-
-      // ----------------------- update global params -----------------------
-      double ro = exp(-kappa*log(1+double(d+1)));
-      //    cout<<"\tro="<<ro<<endl;
-      lambda = (1.0-ro)*lambda + ro*d_lambda;
-      a = (1.0-ro)*a+ ro*d_a;
-
-      return true;
-    };
 
     void getA(Col<double>& a)
     {
