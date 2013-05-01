@@ -42,10 +42,17 @@ class HDP // : public DP<U>
       //cout<<"added heldout doc with "<<x_i.size()<<" words"<<endl;
       uint32_t N = x_i.n_cols;
       
+      //DONE: this shuffle might not be working
+      cout<<"x_i: "<<x_i.cols(0,10)<<endl;
       Mat<U> x_s = shuffle(x_i,1); // suffle the columns (words)
+      cout<<"x_s: "<<x_s.cols(0,10)<<endl;
       Mat<U> x_te = x_s.cols(0,(N/2)-1) ; // select first half to train on
       Mat<U> x_ho = x_s.cols(N/2,N-1) ; // select second half as held out
 
+      cout<<"x_te: "<<x_te.n_rows<<"x"<<x_te.n_cols<<endl;
+      cout<<"x_ho: "<<x_ho.n_rows<<"x"<<x_ho.n_cols<<endl;
+      
+  
       mX_te.push_back(x_te); // on half of the data we train as usual to get a topic model for the document
       mX_ho.push_back(x_ho); // held out data to evaluate the perplexity
       return mX_ho.size();

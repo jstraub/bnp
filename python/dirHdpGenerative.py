@@ -106,6 +106,7 @@ class HDP_base:
       self.omega = omega
       self.alpha = alpha
       self.Lambda = Lambda
+      print('in HDP_base setting K={}; T={}; Nw={}; omega={}; alpha={};'.format(self.K,self.T,self.Nw,self.omega,self.alpha))
     else:
       self.load(pathToModel)
 

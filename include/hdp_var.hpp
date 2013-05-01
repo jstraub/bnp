@@ -55,6 +55,8 @@ class HDP_var: public HDP<uint32_t>
       // T-1 gamma draws determine a T dim multinomial
       // T = T-1;
 
+      cout<<"densityEstimate with: K="<<K<<"; T="<<T<<"; kappa="<<kappa<<"; Nw="<<Nw<<"; S="<<S<<endl;
+
       mT = T;
       mK = K;
       mNw = Nw;
@@ -152,8 +154,10 @@ class HDP_var: public HDP<uint32_t>
 #pragma omp parallel for schedule(dynamic) 
             for (uint32_t i=0; i<mX_te.size(); ++i)
             {
+              //cout<<"mX_te: "<< mX_te[i].n_rows << "x"<< mX_te[i].n_cols<<endl;
+              //cout<<"mX_ho: "<< mX_ho[i].n_rows << "x"<< mX_ho[i].n_cols<<endl;
               double perp_i =  perplexity(mX_te[i],mX_ho[i],dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
-              cout<<"perp_"<<i<<"="<<perp_i<<endl;
+              //cout<<"perp_"<<i<<"="<<perp_i<<endl;
 #pragma omp critical
               {
                 mPerp[dd] += perp_i;
@@ -231,6 +235,7 @@ class HDP_var: public HDP<uint32_t>
 
         //cout<<"updating copied model with x"<<endl;
         updateEst(x_te,zeta,phi,gamma,a,lambda,omega,d,kappa);
+      //cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
         //cout<<"computing perplexity under updated model"<<endl;
         //TODO: compute probabilities then use that to compute perplexity
 
@@ -256,14 +261,16 @@ class HDP_var: public HDP<uint32_t>
       Mat<double> topics;
 
       //cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
+      //cout<<" lambda="<<lambda[0]<<" "<<lambda[1]<<endl;
       getCorpTopic(topics, lambda);
+      //cout<<" topics="<<topics[0]<<" "<<topics[1]<<endl;
 
       double perp = 0.0;
-      //cout<<"x: "<<x.n_rows<<"x"<<x.n_cols<<endl;
+      //cout<<"x: "<<x_ho.n_rows<<"x"<<x_ho.n_cols<<endl;
       for (uint32_t n=0; n<x_ho.n_cols; ++n){
-        //cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x.n_rows<<" x_n="<<x[n]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols<<endl;
+        //cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x_ho.n_cols<<" x_n="<<x_ho[n]<<" topics.shape="<<topics.n_rows<<"x"<<topics.n_cols<<endl;
         perp -= logCat(x_ho[n],topics.row(c[z[n]]));
-        //cout<<perp<<" ";
+        cout<<perp<<" ";
       } cout<<endl;
       perp /= double(x_ho.n_cols);
       perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
