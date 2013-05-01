@@ -154,10 +154,10 @@ class HDP_var: public HDP<uint32_t>
 #pragma omp parallel for schedule(dynamic) 
             for (uint32_t i=0; i<mX_te.size(); ++i)
             {
-              //cout<<"mX_te: "<< mX_te[i].n_rows << "x"<< mX_te[i].n_cols<<endl;
-              //cout<<"mX_ho: "<< mX_ho[i].n_rows << "x"<< mX_ho[i].n_cols<<endl;
+              cout<<"mX_te: "<< mX_te[i].n_rows << "x"<< mX_te[i].n_cols<<endl;
+              cout<<"mX_ho: "<< mX_ho[i].n_rows << "x"<< mX_ho[i].n_cols<<endl;
               double perp_i =  perplexity(mX_te[i],mX_ho[i],dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
-              //cout<<"perp_"<<i<<"="<<perp_i<<endl;
+              cout<<"perp_"<<i<<"="<<perp_i<<endl;
 #pragma omp critical
               {
                 mPerp[dd] += perp_i;
