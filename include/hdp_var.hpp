@@ -81,6 +81,9 @@ class HDP_var: public HDP<uint32_t>
 
       mX = x;
       uint32_t D=mX.size();
+      cout<<"D="<<D<<endl;
+      cout<<"mX[0].shape= "<<mX[0].n_rows<<"x"<<mX[0].n_cols<<endl;
+
       mInd2Proc = linspace<Row<uint32_t> >(0,D-1,D);
 
       mT = T;
@@ -88,6 +91,7 @@ class HDP_var: public HDP<uint32_t>
       mNw = Nw;
 
       initCorpusParams(mNw,mK,mT,D);
+      cout<<"Init of corpus params done"<<endl;
       Row<uint32_t> ind = updateEst_batch(mInd2Proc,mZeta,mPhi,mGamma,mA,mLambda,mPerp,mOmega,kappa,S);
 
       mInd2Proc.set_size(0); // all processed
@@ -232,8 +236,8 @@ class HDP_var: public HDP<uint32_t>
       uint32_t D= max(ind_x)+1; // D is the maximal index of docs that we are processing +1
 
       Row<uint32_t> ind = shuffle(ind_x,1);
-        cout<<"ind_x: "<<ind_x.cols(0,10)<<endl;
-        cout<<"ind  : "<<ind.cols(0,10)<<endl;
+        cout<<"ind_x: "<<ind_x.cols(0,S)<<endl;
+        cout<<"ind  : "<<ind.cols(0,S)<<endl;
 
       zeta.resize(ind.n_elem,Mat<double>(mT,mK));
       phi.resize(ind.n_elem);

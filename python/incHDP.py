@@ -52,13 +52,14 @@ if __name__ == '__main__':
   omega = args.omega # concentration on G_0
   dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
 
-  print("---------------- Starting! use " + str(D) +" docs and " + str(D_ho) + " held out --------------")
+  print("---------------- Starting! --------------")
 
   hdp = HDP_var_inc(K,T,Nw,omega,alpha,dirAlphas)
 
   x=[]
   for line in fileinput.input():
     x.append(np.fromstring(line, dtype='uint32', sep=" "))
+    print('{}'.format(x[-1]))
     if len(x) >= S:
-      hdp.updateEst(x_tr=x,kappa=kappa,S=S)
-    
+      print('----------')
+      hdp.updateEst(x,kappa,S)
