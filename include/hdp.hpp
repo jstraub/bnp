@@ -121,13 +121,17 @@ class HDP_var_base
       Col<double> sigPi;
       Col<uint32_t> c;
       getDocTopics(pi,sigPi,c,gamma,zeta);
+      cout<<"getDocTopics done"<<endl;
       Col<uint32_t> z(mNw);
       getWordTopics(z, phi);
+      cout<<"getWordTopics done"<<endl;
       Mat<double> beta;
       getCorpTopic(beta,lambda);
+      cout<<"getCorpTopics done"<<endl;
 
       for (uint32_t w=0; w<mNw; ++w){
         p[w] = logCat(w, beta.row( c[ z[w] ]));
+        cout<<"p_"<<w<<"="<<p[w]<<endl;
       }
       cout<<"p="<<p<<endl;
       return p;
