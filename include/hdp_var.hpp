@@ -95,12 +95,12 @@ class HDP_var: public HDP<uint32_t>
       Row<uint32_t> ind = updateEst_batch(mInd2Proc,mZeta,mPhi,mGamma,mA,mLambda,mPerp,mOmega,kappa,S);
 
       mInd2Proc.set_size(0); // all processed
-      
-
 
     };
 
-    // compute density estimate based on data previously fed into the class using addDoc
+    /*
+     * compute density estimate based on data previously fed into the class using addDoc
+     */
     bool densityEst(uint32_t Nw, double kappa, uint32_t K, uint32_t T, uint32_t S)
     {
       if(mX.size() > 0)
