@@ -70,6 +70,7 @@ class HDP // : public DP<U>
       double perp = 0.0;
       for (uint32_t i=0; i<N; ++i){
         //cout<<"c_z_n = "<<c[z[w]]<<" z_n="<<z[w]<<" w="<<w<<" N="<<N<<" x_w="<<x_ho[w]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols;
+        cout<<"x_ho_i="<<x_ho(i)<<"; logP_x_ho_i="<<logP(x_ho(i))<<endl;
           perp -= logP(x_ho(i));
         //cout<<"w="<<w<<"\tx_ho_w="<<x_ho[w]<<"\tlogP="<<logP[w]<<"\tperp+="<<-double(x_ho[w])*logP[w]<<endl;
       } cout<<endl;
@@ -126,8 +127,9 @@ class HDP_var_base
       getCorpTopic(beta,lambda);
 
       for (uint32_t w=0; w<mNw; ++w){
-        p[w] = logCat(w, beta.row( c[ z[w] ]).t());
+        p[w] = logCat(w, beta.row( c[ z[w] ]));
       }
+      cout<<"p="<<p<<endl;
       return p;
     };
 
