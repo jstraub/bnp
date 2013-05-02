@@ -63,3 +63,6 @@ if __name__ == '__main__':
     if len(x) >= S:
       print('----------')
       hdp.updateEst(x,kappa,S)
+      x=[]
+
+
