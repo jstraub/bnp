@@ -114,7 +114,7 @@ class HDP_var: public HDP<uint32_t>
      * updated the estimate using newly added docs in mX
      * "newly added": the ones that are indicated in mInd2Proc
      */
-    void updatedEst_batch(double kappa, uint32_t S)
+    bool updateEst_batch(double kappa, uint32_t S)
     {
       uint32_t Db=mInd2Proc.n_elem;
       if (Db >0){  
@@ -136,9 +136,11 @@ class HDP_var: public HDP<uint32_t>
           mGamma[ind[i]] = gamma[i];
           mPerp[ind[i]] = perp[i];
         }
+        return true;
       }else{
         cout<<"add more documents before starting to process"<<endl;
       }
+      return false;
     };
 
     /*

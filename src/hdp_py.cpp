@@ -287,6 +287,10 @@ public:
     return HDP_var::updateEst(x_mat,ro);
   }
 
+  bool updateEst_batch(double kappa, uint32_t S){
+    return HDP_var::updateEst_batch(kappa,S);
+  }
+
 
 //  // works on the data in z_i -> size has to be correct in order for this to work!
 //  // makes a copy of the internal labels vector
@@ -594,6 +598,7 @@ BOOST_PYTHON_MODULE(libbnp)
 	class_<HDP_var_py>("HDP_var",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_var_py::densityEst)
         .def("updateEst",&HDP_var_py::updateEst)
+        .def("updateEst_batch",&HDP_var_py::updateEst_batch)
         .def("addDoc",&HDP_var_py::addDoc)
         .def("addHeldOut",&HDP_var_py::addHeldOut)
         .def("getPerplexity",&HDP_var_py::getPerplexity)

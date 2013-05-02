@@ -131,7 +131,7 @@ class HDP_base:
 
   def save(s,path):
     print('len(x_tr)={0}'.format(len(s.x_tr)))
-    HDP_sample.collectToSave(s)
+    HDP_base.collectToSave(s)
     sio.savemat(path,s.toSave)
 
   def load(s,path):
@@ -141,7 +141,7 @@ class HDP_base:
     except Exception, err:
       print('Did not find model under {0}'.format(path))
       return False
-    HDP_sample.parseLoad(s,s.loaded)
+    HDP_base.parseLoad(s,s.loaded)
     return True
 
   def parseLoad(s,mat):
@@ -398,3 +398,10 @@ class HDP_sample(HDP_base):
     return self.x_tr, self.sigV, self.beta, self.pi, self.c
 
   
+    
+    
+    
+
+
+
+
