@@ -1,3 +1,6 @@
+
+#pragma once
+
 #include <boost/math/special_functions/gamma.hpp>
 #include <boost/math/special_functions/digamma.hpp>
 #include <boost/math/special_functions/beta.hpp>
@@ -25,3 +28,30 @@ void stickBreaking(Col<double>& prop, const Col<double>& v);
 uint32_t multinomialMode(const Row<double>& p);
 void dirMode(Row<double>& mode, const Row<double>& alpha);
 void dirMode(Col<double>& mode, const Col<double>& alpha);
+
+template <class U>
+Row<uint32_t> size(Mat<U> A)
+{
+  Row<uint32_t> s(2);
+  s(0) = A.n_rows;
+  s(1) = A.n_cols;
+  return s;
+};
+
+template <class U>
+Row<uint32_t> size(Col<U> A)
+{
+  Row<uint32_t> s(2);
+  s(0) = A.n_rows;
+  s(1) = 1;
+  return s;
+};
+
+template <class U>
+Row<uint32_t> size(Row<U> A)
+{
+  Row<uint32_t> s(2);
+  s(0) = 1;
+  s(1) = A.n_cols;
+  return s;
+};

@@ -171,7 +171,7 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
           mPerp[d] = 0.0;
           for (uint32_t i=0; i<mX_ho.size(); ++i)
           {    
-            Row<double> logP=HDP_var_base<uint32_t>::logP_w(mPhi[d], mZeta[d], mGamma[d], mLambda);
+            Row<double> logP=HDP_var_base<uint32_t>::logP_w(mX[d],mPhi[d], mZeta[d], mGamma[d], mLambda);
             mPerp[d] += HDP<uint32_t>::perplexity(mX_ho[i], logP);
             //mPerp[d] += perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], mLambda);
           }
@@ -354,7 +354,8 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
         cout<<"computing perplexity under updated model"<<endl;
         //TODO: compute probabilities then use that to compute perplexity
 
-        Row<double> logP=HDP_var_base<uint32_t>::logP_w(phi, zeta, gamma, lambda);
+        cout<<"x_te: "<<size(x_te);
+        Row<double> logP=HDP_var_base<uint32_t>::logP_w(x_te,phi, zeta, gamma, lambda);
         return HDP<uint32_t>::perplexity(x_ho, logP);
         //return perplexity(x_ho, zeta, phi, gamma, lambda);
       }else{

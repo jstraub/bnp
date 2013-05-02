@@ -723,7 +723,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>, public HDP_var_base<uint32_t>
         for (uint32_t i=0; i<T; ++i) {
           Row<double> _lambda(Nw); _lambda.zeros();
           for (uint32_t w=0; w<Nw; ++w){
-            _lambda(w) +=  x_d(w)*phi(w,i);
+            _lambda(w) += phi(w,i); // i think if I multiply by x_d(w) again here I am doing it twice (see updatePhi)  x_d(w)*phi(w,i);
           }
           d_lambda.row(k) += zeta(i,k) * _lambda;
           d_a(k,0) += zeta(i,k);
