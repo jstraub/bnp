@@ -24,12 +24,12 @@ using namespace std;
 using namespace arma;
 
 // this one assumes that the number of words per document is smaller than the dictionary size
-class HDP_var: public HDP<uint32_t>
+class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
 {
   public:
 
     HDP_var(const BaseMeasure<uint32_t>& base, double alpha, double omega)
-      : HDP<uint32_t>(base, alpha, omega), mT(0), mK(0), mNw(0)
+      : HDP<uint32_t>(base, alpha, omega), HDP_var_base<uint32_t>(0,0,0)
     {};
 
     ~HDP_var()
@@ -170,7 +170,11 @@ class HDP_var: public HDP<uint32_t>
         {
           mPerp[d] = 0.0;
           for (uint32_t i=0; i<mX_ho.size(); ++i)
-            mPerp[d] += perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], mLambda);
+          {    
+            Row<double> logP=HDP_var_base<uint32_t>::logP_w(mPhi[d], mZeta[d], mGamma[d], mLambda);
+            mPerp[d] += HDP<uint32_t>::perplexity(mX_ho[i], logP);
+            //mPerp[d] += perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], mLambda);
+          }
           mPerp[d] /= double(mX_ho.size());
           cout<<"Perplexity="<<mPerp[d]<<endl;
           return true; 
@@ -350,209 +354,64 @@ class HDP_var: public HDP<uint32_t>
         cout<<"computing perplexity under updated model"<<endl;
         //TODO: compute probabilities then use that to compute perplexity
 
-        return perplexity(x_ho, zeta, phi, gamma, lambda);
+        Row<double> logP=HDP_var_base<uint32_t>::logP_w(phi, zeta, gamma, lambda);
+        return HDP<uint32_t>::perplexity(x_ho, logP);
+        //return perplexity(x_ho, zeta, phi, gamma, lambda);
       }else{
         return 1.0/0.0;
       }
     };
 
     // compute the perplexity given a the held out data of a document x_ho and the model paremeters of it (after incorporating x)
-    double perplexity(const Mat<uint32_t>& x_ho, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& lambda)
-    {
-      uint32_t T = mT; 
-      // find most likely pi_di and c_di
-      Col<double> pi;
-      Col<double> sigPi; 
-      Col<uint32_t> c(T);
-      getDocTopics(pi, sigPi, c, gamma, zeta);
-      // find most likely z_dn
-      Col<uint32_t> z;
-      getWordTopics(z, phi);
-      cout <<" |z|="<<z.n_elem <<" |phi|="<< phi.n_rows<< "x"<<phi.n_cols <<endl;
-      cout<<"z="<<z<<endl;
+//    double perplexity(const Mat<uint32_t>& x_ho, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& lambda)
+//    {
+//      uint32_t T = mT; 
+//      // find most likely pi_di and c_di
+//      Col<double> pi;
+//      Col<double> sigPi; 
+//      Col<uint32_t> c(T);
+//      getDocTopics(pi, sigPi, c, gamma, zeta);
+//      // find most likely z_dn
+//      Col<uint32_t> z;
+//      getWordTopics(z, phi);
+//      cout <<" |z|="<<z.n_elem <<" |phi|="<< phi.n_rows<< "x"<<phi.n_cols <<endl;
+//      cout<<"z="<<z<<endl;
+//
+//
+//      // find most likely topics 
+//      Mat<double> topics;
+//
+//      //cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
+//      //cout<<" lambda="<<lambda[0]<<" "<<lambda[1]<<endl;
+//      HDP_var_base<uint32_t>::getCorpTopic(topics, lambda);
+//      cout<<" topics="<<topics[0]<<" "<<topics[1]<<endl;
+//
+//      double perp = 0.0;
+//      cout<<"x: "<<x_ho.n_rows<<"x"<<x_ho.n_cols<<endl;
+//      for (uint32_t n=0; n<x_ho.n_cols; ++n){
+//        cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x_ho.n_cols<<" x_n="<<x_ho[n]<<" topics.shape="<<topics.n_rows<<"x"<<topics.n_cols<<endl;
+//        perp -= logCat(x_ho[n],topics.row(c[z[n]]));
+//        cout<<perp<<" ";
+//      } cout<<endl;
+//      perp /= double(x_ho.n_cols);
+//      perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
+//      perp = pow(2.0,perp);
+//
+//      return perp;
+//    }
 
-
-      // find most likely topics 
-      Mat<double> topics;
-
-      //cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
-      //cout<<" lambda="<<lambda[0]<<" "<<lambda[1]<<endl;
-      getCorpTopic(topics, lambda);
-      cout<<" topics="<<topics[0]<<" "<<topics[1]<<endl;
-
-      double perp = 0.0;
-      cout<<"x: "<<x_ho.n_rows<<"x"<<x_ho.n_cols<<endl;
-      for (uint32_t n=0; n<x_ho.n_cols; ++n){
-        cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x_ho.n_cols<<" x_n="<<x_ho[n]<<" topics.shape="<<topics.n_rows<<"x"<<topics.n_cols<<endl;
-        perp -= logCat(x_ho[n],topics.row(c[z[n]]));
-        cout<<perp<<" ";
-      } cout<<endl;
-      perp /= double(x_ho.n_cols);
-      perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
-      perp = pow(2.0,perp);
-
-      return perp;
-    }
-
-
-
-    void getA(Col<double>& a)
-    {
-      a=mA.col(0);
-    };
-
-    void getB(Col<double>& b)
-    {
-      b=mA.col(1);
-    };
-
-    bool getLambda(Col<double>& lambda, uint32_t k)
-    {
-      if(mLambda.n_rows > 0 && k < mLambda.n_rows)
-      {
-        lambda=mLambda.row(k).t();
-        return true;
-      }else{
-        return false;
-      }
-    };
-
-    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d)
-    {
-      if (d < mGamma.size())
-        return getDocTopics(pi,sigPi,c,mGamma[d],mZeta[d]);
-      else{
-        cout<<"asking for out of range doc "<<d<<" have only "<<mGamma.size()<<endl;
-        return false;
-      }
-    };
-
-    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, const Mat<double>& gamma, const Mat<double>& zeta)
-    {
-      uint32_t T = gamma.n_rows; // doc level topics
-
-      sigPi.set_size(T+1);
-      pi.set_size(T);
-      c.set_size(T);
-
-      //cout<<"K="<<K<<" T="<<T<<endl;
-      betaMode(pi,gamma.col(0),gamma.col(1));
-      stickBreaking(sigPi,pi);
-      //cout<<"pi="<<pi<<endl;
-      //cout<<"sigPi="<<sigPi<<endl;
-      //cout<<"mGamma="<<mGamma[d]<<endl;
-      for (uint32_t i=0; i<T; ++i){
-        c[i] = multinomialMode(zeta.row(i));
-      }
-      return true;
-    };
-
-
-    bool getWordTopics(Col<uint32_t>& z, uint32_t d){
-      return getWordTopics(z,mPhi[d]);
-    };
-
-    bool getWordTopics(Col<uint32_t>& z, const Mat<double>& phi){
-      z.set_size(phi.n_rows);
-      for (uint32_t i=0; i<z.n_elem; ++i){
-        z[i] = multinomialMode(phi.row(i));
-      }
-      return true;
-    };
-
-    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV)
-    {
-      return getCorpTopicProportions(v,sigV,mA);
-    };
-
-    // a are the parameters of the beta distribution from which v is drawn
-    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV, const Mat<double>& a)
-    {
-      uint32_t K = a.n_rows; // corp level topics
-
-      sigV.set_size(K+1);
-      v.set_size(K);
-
-      betaMode(v, a.col(0), a.col(1));
-      stickBreaking(sigV,v);
-      return true;
-    };
-
-
-    bool getCorpTopic(Col<double>& topic, uint32_t k)
-    {
-      if(mLambda.n_rows > 0 && k < mLambda.n_rows)
-      {
-        return getCorpTopic(topic,mLambda.row(k));
-      }else{
-        return false;
-      }
-    };
-
-    bool getCorpTopic(Col<double>& topic, const Row<double>& lambda)
-    {
-      // mode of dirichlet (MAP estimate)
-      dirMode(topic, lambda.t());
-      return true;
-    };
-
-    bool getCorpTopic(Mat<double>& topics, const Mat<double>& lambda)
-    {
-      uint32_t K = lambda.n_rows;
-      uint32_t Nw = lambda.n_cols;
-      topics.set_size(K,Nw);
-      for (uint32_t k=0; k<K; k++){
-        // mode of dirichlet (MAP estimate)
-        topics.row(k) = (lambda.row(k)-1.0)/sum(lambda.row(k)-1.0);
-        //dirMode(topics.row(k), lambda.row(k));
-      }
-      return true;
-    };
-
-
-
-    /* Probability distribution over the words in document d
-     *
-     * TODO: so is that here not some MAP or ML estimate?!
-     */
-    Row<double> logP_w(uint32_t d) const {
-      return logP_w(mPhi[d],mZeta[d],mGamma[d],mLambda);
-    };
-
-    Row<double> logP_w(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda) const
-    {
-      Row<double> p(mNw);
-      p.zeros();
-
-      Col<double> pi;
-      Col<double> sigPi;
-      Col<uint32_t> c;
-      getDocTopics(pi,sigPi,c,gamma,zeta);
-      Col<uint32_t> z(mNw);
-      getWordTopics(z, phi);
-      Mat<double> beta;
-      getCorpTopics(beta,lambda);
-
-      for (uint32_t w=0; w<mNw; ++w){
-        p[w] = logCat(w, beta.row( c[ z[w] ]).t());
-      }
-
-      return p;
-    };
-
-
-  protected:
-    Mat<double> mLambda; // corpus level topics (Dirichlet)
-    Mat<double> mA; // corpus level Beta process alpha parameter for stickbreaking
-    vector<Mat<double> > mZeta; // document level topic indices/pointers to corpus level topics (Multinomial) 
-    vector<Mat<double> > mPhi; // document level word to doc level topic assignment (Multinomial)
-    vector<Mat<double> > mGamma; // document level Beta distribution alpha parameter for stickbreaking
-
-    Col<double> mPerp; // perplexity for each document
-
-    uint32_t mT; // Doc level truncation
-    uint32_t mK; // Corp level truncation
-    uint32_t mNw; // size of dictionary
+//  protected:
+//    Mat<double> mLambda; // corpus level topics (Dirichlet)
+//    Mat<double> mA; // corpus level Beta process alpha parameter for stickbreaking
+//    vector<Mat<double> > mZeta; // document level topic indices/pointers to corpus level topics (Multinomial) 
+//    vector<Mat<double> > mPhi; // document level word to doc level topic assignment (Multinomial)
+//    vector<Mat<double> > mGamma; // document level Beta distribution alpha parameter for stickbreaking
+//
+//    Col<double> mPerp; // perplexity for each document
+//
+//    uint32_t mT; // Doc level truncation
+//    uint32_t mK; // Corp level truncation
+//    uint32_t mNw; // size of dictionary
 
     Row<uint32_t> mInd2Proc; // indices of docs that have not been processed
 

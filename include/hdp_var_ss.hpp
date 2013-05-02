@@ -35,7 +35,28 @@ class HDP_ss // : public DP<U>
     ~HDP_ss()
     { };
 
-    virtual Row<double> logP_w(uint32_t d) const=0;
+    //virtual Row<double> logP_w(uint32_t d) const=0;
+
+    // compute the perplexity given a heldout data from document x_ho and the model paremeters of it (after incorporating x)
+    double perplexity(const Row<U>& x_ho, const Row<double>& logP)
+    {
+//      //cout<<"Computing Perplexity"<<endl;
+      uint32_t Nw = x_ho.n_cols;
+      uint32_t N = sum(x_ho);
+      double perp = 0.0;
+      for (uint32_t w=0; w<Nw; ++w){
+        //cout<<"c_z_n = "<<c[z[w]]<<" z_n="<<z[w]<<" w="<<w<<" N="<<N<<" x_w="<<x_ho[w]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols;
+        if (x_ho[w] > 0) {
+          perp -= x_ho[w]*logP[w];
+          cout<<"w="<<w<<"\tx_ho_w="<<x_ho[w]<<"\tlogP="<<logP[w]<<"\tperp+="<<-double(x_ho[w])*logP[w]<<endl;
+        }
+      } cout<<endl;
+      perp /= double(N);
+      perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
+      perp = pow(2.0,perp);
+
+      return perp;
+    }
 
 protected:
 
@@ -51,12 +72,12 @@ protected:
 
 // this one assumes that the number of words per document are bigger than the number of individual words
 // and is optimized for that case
-class HDP_var_ss: public HDP_ss<uint32_t>
+class HDP_var_ss: public HDP_ss<uint32_t>, public HDP_var_base<uint32_t>
 {
   public:
 
     HDP_var_ss(const BaseMeasure<uint32_t>& base, double alpha, double omega)
-      : HDP_ss<uint32_t>(base, alpha, omega), mT(0), mK(0), mNw(0)
+      : HDP_ss<uint32_t>(base, alpha, omega), HDP_var_base<uint32_t>(0,0,0)
     {};
 
     ~HDP_var_ss()
@@ -303,8 +324,9 @@ class HDP_var_ss: public HDP_ss<uint32_t>
         //cout<<"updating copied model with x"<<endl;
         updateEst(x_te,zeta,phi,gamma,a,lambda,omega,d,kappa);
         //cout<<"computing perplexity under updated model"<<endl;
-
-        return perplexity(x_ho, zeta, phi, gamma, lambda);
+        Row<double> logP=HDP_var_base<uint32_t>::logP_w(phi, zeta, gamma, lambda);
+        return HDP_ss<uint32_t>::perplexity(x_ho, logP);
+        //return perplexity(x_ho, zeta, phi, gamma, lambda);
       }else{
         return 1.0/0.0;
       }
@@ -313,7 +335,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>
     // compute the perplexity given a heldout data from document x_ho and the model paremeters of it (after incorporating x)
     double perplexity(const Row<uint32_t>& x_ho, const Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& gamma, const Mat<double>& lambda)
     {
-      Row<double> logP= logP_w(phi, zeta, gamma, lambda);
+      Row<double> logP=logP_w(phi, zeta, gamma, lambda);
 
 //      //cout<<"Computing Perplexity"<<endl;
       uint32_t Nw = x_ho.n_cols;
@@ -393,129 +415,129 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       return true;
     };
 
-    void getA(Col<double>& a)
-    {
-      a=mA.col(0);
-    };
-
-    void getB(Col<double>& b)
-    {
-      b=mA.col(1);
-    };
-
-    bool getLambda(Col<double>& lambda, uint32_t k)
-    {
-      if(mLambda.n_rows > 0 && k < mLambda.n_rows)
-      {
-        lambda=mLambda.row(k).t();
-        return true;
-      }else{
-        return false;
-      }
-    };
-
-    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d) const
-    {
-      if (d < mGamma.size())
-        return getDocTopics(pi,sigPi,c,mGamma[d],mZeta[d]);
-      else{
-        cout<<"asking for out of range doc "<<d<<" have only "<<mGamma.size()<<endl;
-        return false;
-      }
-    };
-
-    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, const Mat<double>& gamma, const Mat<double>& zeta) const
-    {
-      uint32_t T = gamma.n_rows; // doc level topics
-
-      sigPi.set_size(T+1);
-      pi.set_size(T);
-      c.set_size(T);
-
-      //cout<<"K="<<K<<" T="<<T<<endl;
-      betaMode(pi,gamma.col(0),gamma.col(1));
-      stickBreaking(sigPi,pi);
-      //cout<<"pi="<<pi<<endl;
-      //cout<<"sigPi="<<sigPi<<endl;
-      //cout<<"mGamma="<<mGamma[d]<<endl;
-      for (uint32_t i=0; i<T; ++i){
-        c[i] = multinomialMode(zeta.row(i));
-      }
-      return true;
-    };
-
-
-    bool getWordTopics(Col<uint32_t>& z, uint32_t d) const {
-      return getWordTopics(z,mPhi[d]);
-    };
-
-    bool getWordTopics(Col<uint32_t>& z, const Mat<double>& phi) const {
-      z.set_size(phi.n_rows);
-      for (uint32_t i=0; i<z.n_elem; ++i){
-        z[i] = multinomialMode(phi.row(i));
-      }
-      return true;
-    };
-
-    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV) const
-    {
-      return getCorpTopicProportions(v,sigV,mA);
-    };
-
-    /* a are the parameters of the beta distribution from which v is drawn
-     *
-     */
-    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV, const Mat<double>& a) const
-    {
-      uint32_t K = a.n_rows; // corp level topics
-
-      sigV.set_size(K+1);
-      v.set_size(K);
-
-      betaMode(v, a.col(0), a.col(1));
-      stickBreaking(sigV,v);
-      return true;
-    };
-
-    /* The mode of the estimate dirichlet distribution parameterized by lambda is used
-     * as an estimate for the Multinomial distribution of the respective topics
-     *
-     */
-    bool getCorpTopic(Col<double>& topic, uint32_t k) const
-    {
-      if(mLambda.n_rows > 0 && k < mLambda.n_rows)
-      {
-        return getCorpTopic(topic,mLambda.row(k));
-      }else{
-        return false;
-      }
-    };
-
-    bool getCorpTopic(Col<double>& topic, const Row<double>& lambda) const
-    {
-      // mode of dirichlet (MAP estimate)
-      dirMode(topic, lambda.t());
-      return true;
-    };
-
-    bool getCorpTopics(Mat<double>& topics, const Mat<double>& lambda) const
-    {
-      uint32_t K = lambda.n_rows;
-      uint32_t Nw = lambda.n_cols;
-      topics.set_size(K,Nw);
-      for (uint32_t k=0; k<K; k++){
-        // mode of dirichlet (MAP estimate)
-        Row<double> lamb = lambda.row(k);
-        Row<double> beta(Nw);
-        dirMode(beta, lamb);
-        topics.row(k) = beta;
-//        cout<<"lambda_"<<k<<"="<<lambda.row(k)<<endl;
-//        cout<<"topic_"<<k<<"="<<topics.row(k)<<endl;
-//        cout<<"sum over topic_"<<k<<"="<<sum(topics.row(k))<<endl<<endl;
-        //dirMode(topics.row(k), lambda.row(k));
-      }
-      return true;
-    };
+//    void getA(Col<double>& a)
+//    {
+//      a=mA.col(0);
+//    };
+//
+//    void getB(Col<double>& b)
+//    {
+//      b=mA.col(1);
+//    };
+//
+//    bool getLambda(Col<double>& lambda, uint32_t k)
+//    {
+//      if(mLambda.n_rows > 0 && k < mLambda.n_rows)
+//      {
+//        lambda=mLambda.row(k).t();
+//        return true;
+//      }else{
+//        return false;
+//      }
+//    };
+//
+//    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d) const
+//    {
+//      if (d < mGamma.size())
+//        return getDocTopics(pi,sigPi,c,mGamma[d],mZeta[d]);
+//      else{
+//        cout<<"asking for out of range doc "<<d<<" have only "<<mGamma.size()<<endl;
+//        return false;
+//      }
+//    };
+//
+//    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, const Mat<double>& gamma, const Mat<double>& zeta) const
+//    {
+//      uint32_t T = gamma.n_rows; // doc level topics
+//
+//      sigPi.set_size(T+1);
+//      pi.set_size(T);
+//      c.set_size(T);
+//
+//      //cout<<"K="<<K<<" T="<<T<<endl;
+//      betaMode(pi,gamma.col(0),gamma.col(1));
+//      stickBreaking(sigPi,pi);
+//      //cout<<"pi="<<pi<<endl;
+//      //cout<<"sigPi="<<sigPi<<endl;
+//      //cout<<"mGamma="<<mGamma[d]<<endl;
+//      for (uint32_t i=0; i<T; ++i){
+//        c[i] = multinomialMode(zeta.row(i));
+//      }
+//      return true;
+//    };
+//
+//
+//    bool getWordTopics(Col<uint32_t>& z, uint32_t d) const {
+//      return getWordTopics(z,mPhi[d]);
+//    };
+//
+//    bool getWordTopics(Col<uint32_t>& z, const Mat<double>& phi) const {
+//      z.set_size(phi.n_rows);
+//      for (uint32_t i=0; i<z.n_elem; ++i){
+//        z[i] = multinomialMode(phi.row(i));
+//      }
+//      return true;
+//    };
+//
+//    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV) const
+//    {
+//      return getCorpTopicProportions(v,sigV,mA);
+//    };
+//
+//    /* a are the parameters of the beta distribution from which v is drawn
+//     *
+//     */
+//    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV, const Mat<double>& a) const
+//    {
+//      uint32_t K = a.n_rows; // corp level topics
+//
+//      sigV.set_size(K+1);
+//      v.set_size(K);
+//
+//      betaMode(v, a.col(0), a.col(1));
+//      stickBreaking(sigV,v);
+//      return true;
+//    };
+//
+//    /* The mode of the estimate dirichlet distribution parameterized by lambda is used
+//     * as an estimate for the Multinomial distribution of the respective topics
+//     *
+//     */
+//    bool getCorpTopic(Col<double>& topic, uint32_t k) const
+//    {
+//      if(mLambda.n_rows > 0 && k < mLambda.n_rows)
+//      {
+//        return getCorpTopic(topic,mLambda.row(k));
+//      }else{
+//        return false;
+//      }
+//    };
+//
+//    bool getCorpTopic(Col<double>& topic, const Row<double>& lambda) const
+//    {
+//      // mode of dirichlet (MAP estimate)
+//      dirMode(topic, lambda.t());
+//      return true;
+//    };
+//
+//    bool getCorpTopics(Mat<double>& topics, const Mat<double>& lambda) const
+//    {
+//      uint32_t K = lambda.n_rows;
+//      uint32_t Nw = lambda.n_cols;
+//      topics.set_size(K,Nw);
+//      for (uint32_t k=0; k<K; k++){
+//        // mode of dirichlet (MAP estimate)
+//        Row<double> lamb = lambda.row(k);
+//        Row<double> beta(Nw);
+//        dirMode(beta, lamb);
+//        topics.row(k) = beta;
+////        cout<<"lambda_"<<k<<"="<<lambda.row(k)<<endl;
+////        cout<<"topic_"<<k<<"="<<topics.row(k)<<endl;
+////        cout<<"sum over topic_"<<k<<"="<<sum(topics.row(k))<<endl<<endl;
+//        //dirMode(topics.row(k), lambda.row(k));
+//      }
+//      return true;
+//    };
 
     /* TODO: its not realy the joint... or is it?!
      * joint probability distribution
@@ -538,7 +560,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       Col<uint32_t> z(mNw);
       getWordTopics(z, phi);
       Mat<double> beta;
-      getCorpTopics(beta,lambda);
+      getCorpTopic(beta,lambda);
 
       for (uint32_t w=0; w<mNw; ++w){
         p[w] = logCat(w, beta.row( c[ z[w] ]).t()) + 
@@ -551,46 +573,46 @@ class HDP_var_ss: public HDP_ss<uint32_t>
       return p;
     };
 
-    /* Probability distribution over the words in document d
-     *
-     * TODO: so is that here not some MAP or ML estimate?!
-     */
-    Row<double> logP_w(uint32_t d) const {
-      return logP_w(mPhi[d],mZeta[d],mGamma[d],mLambda);
-    };
-    Row<double> logP_w(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda) const
-    {
-      Row<double> p(mNw);
-      p.zeros();
+//    /* Probability distribution over the words in document d
+//     *
+//     * TODO: so is that here not some MAP or ML estimate?!
+//     */
+//    Row<double> logP_w(uint32_t d) const {
+//      return logP_w(mPhi[d],mZeta[d],mGamma[d],mLambda);
+//    };
+//    Row<double> logP_w(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda) const
+//    {
+//      Row<double> p(mNw);
+//      p.zeros();
+//
+//      Col<double> pi;
+//      Col<double> sigPi;
+//      Col<uint32_t> c;
+//      getDocTopics(pi,sigPi,c,gamma,zeta);
+//      Col<uint32_t> z(mNw);
+//      getWordTopics(z, phi);
+//      Mat<double> beta;
+//      getCorpTopics(beta,lambda);
+//
+//      for (uint32_t w=0; w<mNw; ++w){
+//        p[w] = logCat(w, beta.row( c[ z[w] ]).t());
+//      }
+//
+//      return p;
+//    };
 
-      Col<double> pi;
-      Col<double> sigPi;
-      Col<uint32_t> c;
-      getDocTopics(pi,sigPi,c,gamma,zeta);
-      Col<uint32_t> z(mNw);
-      getWordTopics(z, phi);
-      Mat<double> beta;
-      getCorpTopics(beta,lambda);
-
-      for (uint32_t w=0; w<mNw; ++w){
-        p[w] = logCat(w, beta.row( c[ z[w] ]).t());
-      }
-
-      return p;
-    };
-
-  protected:
-    Mat<double> mLambda; // corpus level topics (Dirichlet)
-    Mat<double> mA; // corpus level Beta process alpha parameter for stickbreaking
-    vector<Mat<double> > mZeta; // document level topic indices/pointers to corpus level topics (Multinomial) 
-    vector<Mat<double> > mPhi; // document level word to doc level topic assignment (Multinomial)
-    vector<Mat<double> > mGamma; // document level Beta distribution alpha parameter for stickbreaking
-
-    Col<double> mPerp; // perplexity for each document
-
-    uint32_t mT; // Doc level truncation
-    uint32_t mK; // Corp level truncation
-    uint32_t mNw; // size of dictionary
+//  protected:
+//    Mat<double> mLambda; // corpus level topics (Dirichlet)
+//    Mat<double> mA; // corpus level Beta process alpha parameter for stickbreaking
+//    vector<Mat<double> > mZeta; // document level topic indices/pointers to corpus level topics (Multinomial) 
+//    vector<Mat<double> > mPhi; // document level word to doc level topic assignment (Multinomial)
+//    vector<Mat<double> > mGamma; // document level Beta distribution alpha parameter for stickbreaking
+//
+//    Col<double> mPerp; // perplexity for each document
+//
+//    uint32_t mT; // Doc level truncation
+//    uint32_t mK; // Corp level truncation
+//    uint32_t mNw; // size of dictionary
   private:
 
 
