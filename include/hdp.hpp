@@ -58,7 +58,7 @@ class HDP // : public DP<U>
       return mX_ho.size();
     };
 
-    virtual Row<double> logP_w(uint32_t d) const=0;
+    //virtual Row<double> logP_w(uint32_t d) const=0;
 
 
     double perplexity(const Mat<U>& x_ho, const Row<double>& logP) const
@@ -91,4 +91,13 @@ protected:
 private:
 
 };
+
+template <class U>
+class HDP_var_base : public HDP<U>
+{
+
+
+
+}
+
 

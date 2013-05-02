@@ -509,18 +509,37 @@ class HDP_var: public HDP<uint32_t>
       return true;
     };
 
-    Row<double> logP_w(uint32_t d) const{
+
+
+    /* Probability distribution over the words in document d
+     *
+     * TODO: so is that here not some MAP or ML estimate?!
+     */
+    Row<double> logP_w(uint32_t d) const {
+      return logP_w(mPhi[d],mZeta[d],mGamma[d],mLambda);
+    };
+
+    Row<double> logP_w(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda) const
+    {
       Row<double> p(mNw);
       p.zeros();
 
-      //Col<double> beta = dirMode(topic, lambda.t());
+      Col<double> pi;
+      Col<double> sigPi;
+      Col<uint32_t> c;
+      getDocTopics(pi,sigPi,c,gamma,zeta);
+      Col<uint32_t> z(mNw);
+      getWordTopics(z, phi);
+      Mat<double> beta;
+      getCorpTopics(beta,lambda);
 
-//      for (uint32_t w=0; w<mNw; ++w){
-//        p[w] = logCat(w, beta[]
-//      }
-//
+      for (uint32_t w=0; w<mNw; ++w){
+        p[w] = logCat(w, beta.row( c[ z[w] ]).t());
+      }
+
       return p;
-    }
+    };
+
 
   protected:
     Mat<double> mLambda; // corpus level topics (Dirichlet)
