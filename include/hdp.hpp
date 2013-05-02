@@ -128,7 +128,6 @@ class HDP_var_base
       for (uint32_t w=0; w<mNw; ++w){
         p[w] = logCat(w, beta.row( c[ z[w] ]).t());
       }
-
       return p;
     };
 

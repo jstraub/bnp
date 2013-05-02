@@ -60,9 +60,9 @@ if __name__ == '__main__':
   for line in fileinput.input():
     x.append(np.fromstring(line, dtype='uint32', sep=" "))
     print('{}'.format(x[-1]))
-    if len(x) >= S:
+    if len(x) >= S+2:
       print('----------')
-      hdp.updateEst(x,kappa,S)
+      hdp.updateEst(x[0:-3],kappa,S,x_te=x[-2:-1])
       x=[]
 
 

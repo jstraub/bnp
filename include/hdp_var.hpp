@@ -240,8 +240,8 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
       uint32_t D= max(ind_x)+1; // D is the maximal index of docs that we are processing +1
 
       Row<uint32_t> ind = shuffle(ind_x,1);
-        cout<<"ind_x: "<<ind_x.cols(0,S)<<endl;
-        cout<<"ind  : "<<ind.cols(0,S)<<endl;
+//        cout<<"ind_x: "<<ind_x.cols(0,S)<<endl;
+//        cout<<"ind  : "<<ind.cols(0,S)<<endl;
 
       zeta.resize(ind.n_elem,Mat<double>(mT,mK));
       phi.resize(ind.n_elem);
