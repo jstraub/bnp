@@ -95,6 +95,8 @@ class HDP_base:
   loaded = dict()
   
   def __init__(self, K=None,T=None,Nw=None,omega=None,alpha=None,Lambda=None, pathToModel=None):
+    s.states=['K','T','Nw','omega','alpha','Lambda','c','z','beta','v','sigV','pi','sigPi','x_tr','x_ho','perp','logP_w']
+    s.state=dict()
     if pathToModel is None:
       self.K = K
       self.T = T
@@ -183,47 +185,47 @@ class HDP_base:
       #print('loaded sigPi[{}]\t {}'.format(d,s.sigPi[d].shape))
 
 
-  def loadHDPSample(self, x_tr, x_ho, hdp):
-    self.x_tr = x_tr
-    self.x_ho = x_ho
+  def loadHDPSample(s, x_tr, x_ho, hdp):
+    s.x_tr = x_tr
+    s.x_ho = x_ho
     if isinstance(hdp,bnp.HDP_var) or isinstance(hdp,bnp.HDP_var_ss):
-      D=len(self.x_tr)
-      D_ho=len(self.x_ho)
-      print("---------------------- Loading from hdp -------------------------");
-      self.sigV = np.zeros(self.K+1,dtype=np.double)
-      self.v = np.zeros(self.K,dtype=np.double)
-      hdp.getCorpTopicProportions(self.v,self.sigV)
-      self.logP_w =np.zeros((D+D_ho,self.Nw),dtype=np.double)
-      hdp.getWordDistr(self.logP_w)
+      D=len(s.x_tr)
+      D_ho=len(s.x_ho)
+      print("---------------------- obtaining results -------------------------");
+      s.sigV = np.zeros(s.K+1,dtype=np.double)
+      s.v = np.zeros(s.K,dtype=np.double)
+      hdp.getCorpTopicProportions(s.v,s.sigV)
+      s.logP_w =np.zeros((D+D_ho,s.Nw),dtype=np.double)
+      hdp.getWordDistr(s.logP_w)
 
-      #print('topic proportions: \t{}\t{}'.format(self.sigV,np.sum(self.sigV)))
+      #print('topic proportions: \t{}\t{}'.format(s.sigV,np.sum(s.sigV)))
       #print('GT topic proportions: \t{}\t{}'.format(gtCorpProp,np.sum(gtCorpProp)))
       #print("---------------------- Corpus Topics -------------------------");
-      self.beta=[]
-      for k in range(0,self.K):
-        self.beta.append(np.zeros(self.Nw,dtype=np.double))
-        hdp.getCorpTopic(self.beta[k],k)
-        #print('self.beta_{}=\t{}'.format(k,topic[k]))
+      s.beta=[]
+      for k in range(0,s.K):
+        s.beta.append(np.zeros(s.Nw,dtype=np.double))
+        hdp.getCorpTopic(s.beta[k],k)
+        #print('s.beta_{}=\t{}'.format(k,topic[k]))
         #print('gtTopic_{}=\t{}'.format(k,gtTopic[k,:]))
-      self.sigPi=[]
-      self.pi=[]
-      self.c=[]
-      self.z=[] # word indices to doc topics
+      s.sigPi=[]
+      s.pi=[]
+      s.c=[]
+      s.z=[] # word indices to doc topics
       for d in range(0,D):
-        self.sigPi.append(np.zeros(self.T+1,dtype=np.double))
-        self.pi.append(np.zeros(self.T,dtype=np.double))
-        self.c.append(np.zeros(self.T,dtype=np.uint32))
+        s.sigPi.append(np.zeros(s.T+1,dtype=np.double))
+        s.pi.append(np.zeros(s.T,dtype=np.double))
+        s.c.append(np.zeros(s.T,dtype=np.uint32))
         print('getting {}'.format(d))
-        hdp.getDocTopics(self.pi[d],self.sigPi[d],self.c[d],d)
-        print('pi({0}): {1}'.format(d,self.pi[d]))
-        print('sigPi({0}): {1}'.format(d,self.sigPi[d]))
-        #print('c({0}): {1}'.format(d,self.c[d]))
-        self.z.append(np.zeros(self.x_tr[d].size,dtype=np.uint32))
-        hdp.getWordTopics(self.z[d],d)
-        print('word topics ({}) size: {}'.format(d,self.z[d].shape))
-      self.perp = np.zeros(D)
-      hdp.getPerplexity(self.perp)
-      print('Perplexity of iterations: {}'.format(self.perp))
+        hdp.getDocTopics(s.pi[d],s.sigPi[d],s.c[d],d)
+        print('pi({0}): {1}'.format(d,s.pi[d]))
+        print('sigPi({0}): {1}'.format(d,s.sigPi[d]))
+        #print('c({0}): {1}'.format(d,s.c[d]))
+        s.z.append(np.zeros(s.x_tr[d].size,dtype=np.uint32))
+        hdp.getWordTopics(s.z[d],d)
+        print('word topics ({}) size: {}'.format(d,s.z[d].shape))
+      s.perp = np.zeros(D)
+      hdp.getPerplexity(s.perp)
+      print('Perplexity of iterations: {}'.format(s.perp))
     else:
       print('Error loading hdp of type {}'.format(type(hdp)))
 
