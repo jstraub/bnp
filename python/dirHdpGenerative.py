@@ -191,6 +191,9 @@ class HDP_base:
       self.sigV = np.zeros(self.K+1,dtype=np.double)
       self.v = np.zeros(self.K,dtype=np.double)
       hdp.getCorpTopicProportions(self.v,self.sigV)
+      self.logP_w =np.zeros((D+D_ho,self.Nw),dtype=np.double)
+      hdp.getWordDistr(self.logP_w)
+
       #print('topic proportions: \t{}\t{}'.format(self.sigV,np.sum(self.sigV)))
       #print('GT topic proportions: \t{}\t{}'.format(gtCorpProp,np.sum(gtCorpProp)))
       #print("---------------------- Corpus Topics -------------------------");

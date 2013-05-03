@@ -92,7 +92,7 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
 
       initCorpusParams(mNw,mK,mT,D);
       cout<<"Init of corpus params done"<<endl;
-      Row<uint32_t> ind = updateEst_batch(mInd2Proc,mZeta,mPhi,mGamma,mA,mLambda,mPerp,mOmega,kappa,S);
+      Row<uint32_t> ind = updateEst_batch(mInd2Proc,mZeta,mPhi,mGamma,mA,mLambda,mPerp,mOmega,kappa,S,true);
 
       mInd2Proc.set_size(0); // all processed
 
@@ -140,6 +140,9 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
           mGamma[ind[i]] = gamma[i];
           mPerp[ind[i]] = perp[i];
         }
+
+        mInd2Proc.set_size(0); // all processed
+
         return true;
       }else{
         cout<<"add more documents before starting to process"<<endl;
@@ -186,6 +189,9 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
       }
     };
 
+    /*
+     *
+     */
     bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa)
     {
       uint32_t D = d+1; // assume that doc d is appended to the end  
@@ -232,9 +238,10 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
     /*
      * Updates the estimate using mini batches
      * @param ind_x indices of docs to process within docs mX. !these are assumed to be in order!
+     * @param sameIndAsX == true -> zeta,phi,gamma have same indices as x (ind_x). This typically happens for the initial batch update. Setting this to true eliminates the need of reordering the results afterwords to match the indices of the docs x.
      * @return the randomly shuffled indices to show how the data was processed -> this allows association of zetas, phis and gammas with docs in mX
      */
-    Row<uint32_t> updateEst_batch(const Row<uint32_t>& ind_x, vector<Mat<double> >& zeta, vector<Mat<double> >& phi, vector<Mat<double> >& gamma, Mat<double>& a, Mat<double>& lambda, Col<double>& perp, double omega, double kappa, uint32_t S)
+    Row<uint32_t> updateEst_batch(const Row<uint32_t>& ind_x, vector<Mat<double> >& zeta, vector<Mat<double> >& phi, vector<Mat<double> >& gamma, Mat<double>& a, Mat<double>& lambda, Col<double>& perp, double omega, double kappa, uint32_t S, bool sameIndAsX=false)
     {
       uint32_t d_0 = min(ind_x); // thats the doc number that we start with -> needed for ro computation; assumes that all indices in mX prior to d_0 have already been processed.
       uint32_t D= max(ind_x)+1; // D is the maximal index of docs that we are processing +1
@@ -258,14 +265,15 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
           for (uint32_t db=dd; db<min(dd+S,ind.n_elem); db++)
           {
             uint32_t d=ind[db];  
+            uint32_t dout=sameIndAsX?d:db;
             uint32_t N=mX[d].n_cols;
             //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
 
             cout<<"-- db="<<db<<" d="<<d<<" N="<<N<<endl;
             //Mat<double> zeta(T,K);
-            phi[db].resize(N,mT);
-            initZeta(zeta[db],lambda,mX[d]);
-            initPhi(phi[db],zeta[db],lambda,mX[d]);
+            phi[dout].resize(N,mT);
+            initZeta(zeta[dout],lambda,mX[d]);
+            initPhi(phi[dout],zeta[dout],lambda,mX[d]);
 
             //cout<<" ------------------------ doc level updates --------------------"<<endl;
             //Mat<double> gamma(T,2);
@@ -276,19 +284,19 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
             uint32_t o=0;
             while(!converged){
               //           cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
-              updateGamma(gamma[db],phi[db]);
-              updateZeta(zeta[db],phi[db],a,lambda,mX[d]);
-              updatePhi(phi[db],zeta[db],gamma[db],lambda,mX[d]);
+              updateGamma(gamma[dout],phi[dout]);
+              updateZeta(zeta[dout],phi[dout],a,lambda,mX[d]);
+              updatePhi(phi[dout],zeta[dout],gamma[dout],lambda,mX[d]);
 
-              converged = (accu(gamma_prev != gamma[db]))==0 || o>60 ;
-              gamma_prev = gamma[db];
+              converged = (accu(gamma_prev != gamma[dout]))==0 || o>60 ;
+              gamma_prev = gamma[dout];
               ++o;
             }
 
             Mat<double> d_lambda(mK,mNw);
             Mat<double> d_a(mK,2); 
             //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
-            computeNaturalGradients(d_lambda, d_a, zeta[db], phi[db], mOmega, D, mX[d]);
+            computeNaturalGradients(d_lambda, d_a, zeta[dout], phi[dout], mOmega, D, mX[d]);
  #pragma omp critical
             {
               db_lambda += d_lambda;
@@ -368,6 +376,7 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
      * TODO: so is that here not some MAP or ML estimate?!
      */
     Row<double> logP_w(uint32_t d) const {
+      cout<<"mX.size="<<mX.size()<<endl;
       return logP_w(mX[d],mPhi[d],mZeta[d],mGamma[d],mLambda);
     };
 
@@ -379,30 +388,31 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
       Row<double> p(mNw);
       p.zeros();
 
-//      cout<<"phi:\t"<<size(phi);
-//      cout<<"zeta:\t"<<size(zeta);
-//      cout<<"gamma:\t"<<size(gamma);
-//      cout<<"lambda:\t"<<size(lambda);
+      cout<<"x:\t"<<size(x);
+      cout<<"phi:\t"<<size(phi);
+      cout<<"zeta:\t"<<size(zeta);
+      cout<<"gamma:\t"<<size(gamma);
+      cout<<"lambda:\t"<<size(lambda);
 
       Col<double> pi;
       Col<double> sigPi;
       Col<uint32_t> c;
       getDocTopics(pi,sigPi,c,gamma,zeta);
-//      cout<<"getDocTopics done"<<endl;
-//      cout<<"c="<<c<<endl;
+      cout<<"getDocTopics done"<<endl;
+      cout<<"c="<<c.t()<<size(c);
       Col<uint32_t> z(mNw);
       getWordTopics(z, phi);
-//      cout<<"getWordTopics done"<<endl;
-//      cout<<"z="<<z<<endl;
+      cout<<"getWordTopics done"<<endl;
+      cout<<"z="<<z.t()<<size(z);
       Mat<double> beta;
       getCorpTopic(beta,lambda);
-//      cout<<"getCorpTopics done"<<endl;
-//      cout<<"beta:\t"<<size(beta);
+      cout<<"getCorpTopics done"<<endl;
+      cout<<"beta:\t"<<size(beta);
 
       for (uint32_t i=0; i<x.n_cols; ++i){
-//        cout<<"z_i="<<z[i]<<endl;
+        cout<<"z_"<<i<<"="<<z[i]<<endl;
         p[x[i]] += logCat(x[i], beta.row( c[ z[i] ]));
-//        cout<<"p_"<<x[i]<<"="<<p[x[i]]<<endl;
+        cout<<"p_"<<x[i]<<"="<<p[x[i]]<<endl;
       }
       for (uint32_t w=0; w<mNw; ++w)
         p[w] = p[w]==0.0?-1e20:p[w];

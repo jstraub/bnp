@@ -234,6 +234,7 @@ class HDP_var_base
       uint32_t D=mZeta.size();
       assert(p.n_rows == D);
       assert(p.n_cols == mNw);
+      cout<<"D="<<D<<endl;
       for (uint32_t d=0; d<D; ++d){
         p.row(d) = logP_w(d);
       }

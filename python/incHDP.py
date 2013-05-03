@@ -57,12 +57,18 @@ if __name__ == '__main__':
   hdp = HDP_var_inc(K,T,Nw,omega,alpha,dirAlphas)
 
   x=[]
+  x_tr=[]
+  x_te=[]
   for line in fileinput.input():
     x.append(np.fromstring(line, dtype='uint32', sep=" "))
     print('{}'.format(x[-1]))
     if len(x) >= S+2:
       print('----------')
       hdp.updateEst(x[0:-3],kappa,S,x_te=x[-2:-1])
+      x_tr.extend(x[0:-3])
+      x_te.extend(x[-2:-1])
       x=[]
 
+  hdp.loadHDPSample(x_tr,x_te, hdp.hdp_var)
+  print('{}'.format(hdp.logP_w))
 
