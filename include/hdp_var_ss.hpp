@@ -415,6 +415,54 @@ class HDP_var_ss: public HDP_ss<uint32_t>, public HDP_var_base<uint32_t>
       return true;
     };
 
+    /* Probability distribution over the words in document d
+     *
+     * TODO: so is that here not some MAP or ML estimate?!
+     */
+    Row<double> logP_w(uint32_t d) const {
+      return logP_w(mPhi[d],mZeta[d],mGamma[d],mLambda);
+    };
+
+    /* 
+     * probability of assuming the use of suffient statistics
+     */
+    // TODO: this was the old version - presumably working for sufficient statistics
+    Row<double> logP_w(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda) const
+    {
+      Row<double> p(mNw);
+      p.zeros();
+
+      cout<<"phi:\t"<<size(phi);
+      cout<<"zeta:\t"<<size(zeta);
+      cout<<"gamma:\t"<<size(gamma);
+      cout<<"lambda:\t"<<size(lambda);
+
+      Col<double> pi;
+      Col<double> sigPi;
+      Col<uint32_t> c;
+      getDocTopics(pi,sigPi,c,gamma,zeta);
+      cout<<"getDocTopics done"<<endl;
+      cout<<"c="<<c<<endl;
+      Col<uint32_t> z(mNw);
+      getWordTopics(z, phi);
+      cout<<"getWordTopics done"<<endl;
+      cout<<"z="<<z<<endl;
+      Mat<double> beta;
+      getCorpTopic(beta,lambda);
+      cout<<"getCorpTopics done"<<endl;
+      cout<<"beta:\t"<<size(beta);
+
+
+      for (uint32_t w=0; w<mNw; ++w){
+        cout<<"w="<<w<<"; Nw="<<mNw<<endl;
+        cout<<"z_w="<<z[w]<<endl;
+        p[w] = logCat(w, beta.row( c[ z[w] ]));                                   
+        cout<<"p_"<<w<<"="<<p[w]<<endl;
+      }      
+      cout<<"p="<<p<<endl;
+      return p;
+    };
+
 //    void getA(Col<double>& a)
 //    {
 //      a=mA.col(0);

@@ -363,6 +363,54 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
       }
     };
 
+    /* Probability distribution over the words in document d
+     *
+     * TODO: so is that here not some MAP or ML estimate?!
+     */
+    Row<double> logP_w(uint32_t d) const {
+      return logP_w(mX[d],mPhi[d],mZeta[d],mGamma[d],mLambda);
+    };
+
+    /* 
+     * log probability using the samples x (not using sufficient statistics -> x is just a list of words)
+     */
+    Row<double> logP_w(const Mat<uint32_t>& x, const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda) const
+    {
+      Row<double> p(mNw);
+      p.zeros();
+
+//      cout<<"phi:\t"<<size(phi);
+//      cout<<"zeta:\t"<<size(zeta);
+//      cout<<"gamma:\t"<<size(gamma);
+//      cout<<"lambda:\t"<<size(lambda);
+
+      Col<double> pi;
+      Col<double> sigPi;
+      Col<uint32_t> c;
+      getDocTopics(pi,sigPi,c,gamma,zeta);
+//      cout<<"getDocTopics done"<<endl;
+//      cout<<"c="<<c<<endl;
+      Col<uint32_t> z(mNw);
+      getWordTopics(z, phi);
+//      cout<<"getWordTopics done"<<endl;
+//      cout<<"z="<<z<<endl;
+      Mat<double> beta;
+      getCorpTopic(beta,lambda);
+//      cout<<"getCorpTopics done"<<endl;
+//      cout<<"beta:\t"<<size(beta);
+
+      for (uint32_t i=0; i<x.n_cols; ++i){
+//        cout<<"z_i="<<z[i]<<endl;
+        p[x[i]] += logCat(x[i], beta.row( c[ z[i] ]));
+//        cout<<"p_"<<x[i]<<"="<<p[x[i]]<<endl;
+      }
+      for (uint32_t w=0; w<mNw; ++w)
+        p[w] = p[w]==0.0?-1e20:p[w];
+
+      cout<<"p="<<p<<endl;
+      return p;
+    };
+
     // compute the perplexity given a the held out data of a document x_ho and the model paremeters of it (after incorporating x)
 //    double perplexity(const Mat<uint32_t>& x_ho, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& lambda)
 //    {

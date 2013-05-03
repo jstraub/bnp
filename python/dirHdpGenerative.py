@@ -77,10 +77,6 @@ def logDir(x, alpha):
 
 class HDP_base:
 
-  K=0; T=0; Nw=0
-  # hyper parameters
-  omega = 0; alpha = 0 
-  Lambda = np.zeros(1)
   # parameters
   c = []
   z = []
@@ -103,6 +99,7 @@ class HDP_base:
       self.K = K
       self.T = T
       self.Nw = Nw
+      # hyper parameters
       self.omega = omega
       self.alpha = alpha
       self.Lambda = Lambda

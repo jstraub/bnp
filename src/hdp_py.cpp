@@ -291,6 +291,11 @@ public:
     return HDP_var::updateEst_batch(kappa,S);
   }
 
+  bool getWordDistr(const numeric::array& p)
+  {
+    Mat<double> p_mat=np2mat<double>(p); // can do this since x_mat gets copied inside    
+    return HDP_var::getWordDistr(p_mat);
+  }
 
 //  // works on the data in z_i -> size has to be correct in order for this to work!
 //  // makes a copy of the internal labels vector
@@ -445,16 +450,26 @@ public:
     return true;
   }
 
-  // after an initial densitiy estimate has been made using addDoc() and densityEst()
-  // can use this to update the estimate with information from additional x 
+  /* 
+   * after an initial densitiy estimate has been made using addDoc() and densityEst()
+   * can use this to update the estimate with information from additional x 
+   */
   bool updateEst(const numeric::array& x, double kappa)
   {
     Row<uint32_t> x_mat=np2row<uint32_t>(x); // can do this since x_mat gets copied inside    
     return HDP_var_ss::updateEst(x_mat,kappa);
   }
 
-  // works on the data in lambda -> size has to be correct in order for this to work!
-  // makes a copy of the internal labels vector
+  bool getWordDistr(const numeric::array& p)
+  {
+    Mat<double> p_mat=np2mat<double>(p); // can do this since x_mat gets copied inside    
+    return HDP_var_ss::getWordDistr(p_mat);
+  }
+
+  /* 
+   * works on the data in lambda -> size has to be correct in order for this to work!
+   * makes a copy of the internal labels vector
+   */
   bool getLambda(numeric::array& lambda, uint32_t k)
   {
     Col<double> lambda_col;
@@ -608,7 +623,8 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("getDocTopics",&HDP_var_py::getDocTopics)
         .def("getWordTopics",&HDP_var_py::getWordTopics)
         .def("getCorpTopicProportions",&HDP_var_py::getCorpTopicProportions)
-        .def("getCorpTopic",&HDP_var_py::getCorpTopic);
+        .def("getCorpTopic",&HDP_var_py::getCorpTopic)
+        .def("getWordDistr",&HDP_var_py::getWordDistr);
    //     .def_readonly("mGamma", &HDP_var_py::mGamma);
 //        .def("perplexity",&HDP_var_py::perplexity)
 
@@ -623,7 +639,8 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("getDocTopics",&HDP_var_ss_py::getDocTopics)
         .def("getWordTopics",&HDP_var_ss_py::getWordTopics)
         .def("getCorpTopicProportions",&HDP_var_ss_py::getCorpTopicProportions)
-        .def("getCorpTopic",&HDP_var_ss_py::getCorpTopic);
+        .def("getCorpTopic",&HDP_var_ss_py::getCorpTopic)
+        .def("getWordDistr",&HDP_var_ss_py::getWordDistr);
 //        .def("perplexity",&HDP_var_ss_py::perplexity)
 
 }
