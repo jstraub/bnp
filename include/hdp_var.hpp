@@ -411,60 +411,11 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
       return p;
     };
 
-    // compute the perplexity given a the held out data of a document x_ho and the model paremeters of it (after incorporating x)
-//    double perplexity(const Mat<uint32_t>& x_ho, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& lambda)
-//    {
-//      uint32_t T = mT; 
-//      // find most likely pi_di and c_di
-//      Col<double> pi;
-//      Col<double> sigPi; 
-//      Col<uint32_t> c(T);
-//      getDocTopics(pi, sigPi, c, gamma, zeta);
-//      // find most likely z_dn
-//      Col<uint32_t> z;
-//      getWordTopics(z, phi);
-//      cout <<" |z|="<<z.n_elem <<" |phi|="<< phi.n_rows<< "x"<<phi.n_cols <<endl;
-//      cout<<"z="<<z<<endl;
-//
-//
-//      // find most likely topics 
-//      Mat<double> topics;
-//
-//      //cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
-//      //cout<<" lambda="<<lambda[0]<<" "<<lambda[1]<<endl;
-//      HDP_var_base<uint32_t>::getCorpTopic(topics, lambda);
-//      cout<<" topics="<<topics[0]<<" "<<topics[1]<<endl;
-//
-//      double perp = 0.0;
-//      cout<<"x: "<<x_ho.n_rows<<"x"<<x_ho.n_cols<<endl;
-//      for (uint32_t n=0; n<x_ho.n_cols; ++n){
-//        cout<<"c_z_n = "<<c[z[n]]<<" z_n="<<z[n]<<" n="<<n<<" N="<<x_ho.n_cols<<" x_n="<<x_ho[n]<<" topics.shape="<<topics.n_rows<<"x"<<topics.n_cols<<endl;
-//        perp -= logCat(x_ho[n],topics.row(c[z[n]]));
-//        cout<<perp<<" ";
-//      } cout<<endl;
-//      perp /= double(x_ho.n_cols);
-//      perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
-//      perp = pow(2.0,perp);
-//
-//      return perp;
-//    }
-
-//  protected:
-//    Mat<double> mLambda; // corpus level topics (Dirichlet)
-//    Mat<double> mA; // corpus level Beta process alpha parameter for stickbreaking
-//    vector<Mat<double> > mZeta; // document level topic indices/pointers to corpus level topics (Multinomial) 
-//    vector<Mat<double> > mPhi; // document level word to doc level topic assignment (Multinomial)
-//    vector<Mat<double> > mGamma; // document level Beta distribution alpha parameter for stickbreaking
-//
-//    Col<double> mPerp; // perplexity for each document
-//
-//    uint32_t mT; // Doc level truncation
-//    uint32_t mK; // Corp level truncation
-//    uint32_t mNw; // size of dictionary
+  protected:
 
     Row<uint32_t> mInd2Proc; // indices of docs that have not been processed
 
-private:
+  private:
 
     void initZeta(Mat<double>& zeta, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
     {
@@ -481,13 +432,6 @@ private:
           }
         }
         normalizeLogDistribution(zeta.row(i));
-        //        if(normalizeLogDistribution(zeta.row(i)))
-        //        {
-        //          cerr<<"zeta normally computed"<<endl;
-        //        }else{
-        //          cerr<<"zeta thresholded"<<endl;
-        //        }
-
         //cout<<" normalized="<<zeta(0,0)<<endl;
       }
       //cerr<<"zeta>"<<endl<<zeta<<"<zeta"<<endl;
@@ -508,21 +452,6 @@ private:
           }
         }
         normalizeLogDistribution(phi.row(n));
-        //        if(normalizeLogDistribution(phi.row(n)))
-        //        {
-        //          cerr<<"phi normally computed"<<endl;
-        //        }else{
-        //          cerr<<"phi thresholded"<<endl;
-        //        }
-        //
-        //        phi.row(n)=exp(phi.row(n));
-        //        double denom = sum(phi.row(n));
-        //        if(denom > EPS)
-        //        {
-        //          phi.row(n)/=denom; // avoid division by 0
-        //        }else{
-        //          cout<<"Phi Init: denominator too small -> no division!
-        //        }
       }
       //cerr<<"phi>"<<endl<<phi<<"<phi"<<endl;
     };
@@ -565,16 +494,6 @@ private:
           }
         }
         normalizeLogDistribution(zeta.row(i));
-        //          if(normalizeLogDistribution(zeta.row(i)))
-        //          {
-        //            cerr<<"zeta normally computed"<<endl;
-        //          }else{
-        //            cerr<<"zeta thresholded"<<endl;
-        //          }
-
-        //          zeta.row(i)=exp(zeta.row(i));
-        //          double denom = sum(zeta.row(i));
-        //          if(denom > EPS) zeta.row(i)/=denom; // avoid division by 0
       }
     }
 
@@ -597,15 +516,6 @@ private:
           }
         }
         normalizeLogDistribution(phi.row(n));
-        //          if(normalizeLogDistribution(phi.row(n)))
-        //          {
-        //            cerr<<"phi normally computed"<<endl;
-        //          }else{
-        //            cerr<<"phi thresholded"<<endl;
-        //          }
-        //          phi.row(n)=exp(phi.row(n));
-        //          double denom = sum(phi.row(n));
-        //          if(denom > EPS) phi.row(n)/=denom; // avoid division by 0
       }
     }
 

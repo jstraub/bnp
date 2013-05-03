@@ -104,121 +104,6 @@ class HDP_var_base
       : mK(K), mT(T), mNw(Nw)
     {};
 
-//    void getA(Col<double>& a)
-//    {
-//      a=mA.col(0);
-//    };
-//
-//    void getB(Col<double>& b)
-//    {
-//      b=mA.col(1);
-//    };
-//
-//    bool getLambda(Col<double>& lambda, uint32_t k)
-//    {
-//      if(mLambda.n_rows > 0 && k < mLambda.n_rows)
-//      {
-//        lambda=mLambda.row(k).t();
-//        return true;
-//      }else{
-//        return false;
-//      }
-//    };
-//
-//    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d)
-//    {
-//      if (d < mGamma.size())
-//        return getDocTopics(pi,sigPi,c,mGamma[d],mZeta[d]);
-//      else{
-//        cout<<"asking for out of range doc "<<d<<" have only "<<mGamma.size()<<endl;
-//        return false;
-//      }
-//    };
-//
-//    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, const Mat<double>& gamma, const Mat<double>& zeta)
-//    {
-//      uint32_t T = gamma.n_rows; // doc level topics
-//
-//      sigPi.set_size(T+1);
-//      pi.set_size(T);
-//      c.set_size(T);
-//
-//      //cout<<"K="<<K<<" T="<<T<<endl;
-//      betaMode(pi,gamma.col(0),gamma.col(1));
-//      stickBreaking(sigPi,pi);
-//      //cout<<"pi="<<pi<<endl;
-//      //cout<<"sigPi="<<sigPi<<endl;
-//      //cout<<"mGamma="<<mGamma[d]<<endl;
-//      for (uint32_t i=0; i<T; ++i){
-//        c[i] = multinomialMode(zeta.row(i));
-//      }
-//      return true;
-//    };
-//
-//
-//    bool getWordTopics(Col<uint32_t>& z, uint32_t d){
-//      return getWordTopics(z,mPhi[d]);
-//    };
-//
-//    bool getWordTopics(Col<uint32_t>& z, const Mat<double>& phi){
-//      z.set_size(phi.n_rows);
-//      for (uint32_t i=0; i<z.n_elem; ++i){
-//        z[i] = multinomialMode(phi.row(i));
-//      }
-//      return true;
-//    };
-//
-//    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV)
-//    {
-//      return getCorpTopicProportions(v,sigV,mA);
-//    };
-//
-//    // a are the parameters of the beta distribution from which v is drawn
-//    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV, const Mat<double>& a)
-//    {
-//      uint32_t K = a.n_rows; // corp level topics
-//
-//      sigV.set_size(K+1);
-//      v.set_size(K);
-//
-//      betaMode(v, a.col(0), a.col(1));
-//      stickBreaking(sigV,v);
-//      return true;
-//    };
-//
-//
-//    bool getCorpTopic(Col<double>& topic, uint32_t k)
-//    {
-//      if(mLambda.n_rows > 0 && k < mLambda.n_rows)
-//      {
-//        return getCorpTopic(topic,mLambda.row(k));
-//      }else{
-//        return false;
-//      }
-//    };
-//
-//    bool getCorpTopic(Col<double>& topic, const Row<double>& lambda)
-//    {
-//      // mode of dirichlet (MAP estimate)
-//      dirMode(topic, lambda.t());
-//      return true;
-//    };
-//
-//    bool getCorpTopic(Mat<double>& topics, const Mat<double>& lambda)
-//    {
-//      uint32_t K = lambda.n_rows;
-//      uint32_t Nw = lambda.n_cols;
-//      topics.set_size(K,Nw);
-//      for (uint32_t k=0; k<K; k++){
-//        // mode of dirichlet (MAP estimate)
-//        topics.row(k) = (lambda.row(k)-1.0)/sum(lambda.row(k)-1.0);
-//        //dirMode(topics.row(k), lambda.row(k));
-//      }
-//      return true;
-//    };
-//
-
-
     void getA(Col<double>& a)
     {
       a=mA.col(0);
@@ -343,6 +228,16 @@ class HDP_var_base
       return true;
     };
 
+    virtual Row<double> logP_w(uint32_t d) const = 0;
+
+    void getWordDistr(Mat<double>& p){
+      uint32_t D=mZeta.size();
+      assert(p.n_rows == D);
+      assert(p.n_cols == mNw);
+      for (uint32_t d=0; d<D; ++d){
+        p.row(d) = logP_w(d);
+      }
+    };
 
 
   protected:
