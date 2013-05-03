@@ -22,10 +22,10 @@ class HDP_var_inc(HDP_base):
         s.hdp_var.addHeldOut(np.resize(x_i,(1,x_i.size)))
     
     if s.firstEst:
-      print('initial estimate: D={}; K={}; T={}; kappa={}; Nw={}; S={};'.format(len(x_tr),s.K,s.T,kappa,s.Nw,S))
-      s.hdp_var.densityEst(s.Nw,kappa,s.K,s.T,S)
+      print('initial estimate: D={}; K={}; T={}; kappa={}; Nw={}; S={};'.format(len(x_tr),s.state['K'],s.state['T'],kappa,s.state['Nw'],S))
+      s.hdp_var.densityEst(s.state['Nw'],kappa,s.state['K'],s.state['T'],S)
     else:
-      print('updated estimate: D={}; K={}; T={}; kappa={}; Nw={}; S={};'.format(len(x_tr),s.K,s.T,kappa,s.Nw,S))
+      print('updated estimate: D={}; K={}; T={}; kappa={}; Nw={}; S={};'.format(len(x_tr),s.state['K'],s.state['T'],kappa,s.state['Nw'],S))
       s.hdp_var.updateEst(kappa,S)
 
 

@@ -24,12 +24,12 @@ using namespace std;
 using namespace arma;
 
 // this one assumes that the number of words per document is smaller than the dictionary size
-class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
+class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 {
   public:
 
     HDP_var(const BaseMeasure<uint32_t>& base, double alpha, double omega)
-      : HDP<uint32_t>(base, alpha, omega), HDP_var_base<uint32_t>(0,0,0)
+      : HDP_var_base(0,0,0), HDP<uint32_t>(base, alpha, omega)
     {};
 
     ~HDP_var()
@@ -93,6 +93,9 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
       initCorpusParams(mNw,mK,mT,D);
       cout<<"Init of corpus params done"<<endl;
       Row<uint32_t> ind = updateEst_batch(mInd2Proc,mZeta,mPhi,mGamma,mA,mLambda,mPerp,mOmega,kappa,S,true);
+      cout<<"mPhi -> D="<<mPhi.size()<<endl;
+      cout<<"mPhi -> D="<<HDP_var_base::mPhi.size()<<endl;
+      cout<<"mPerp="<<mPerp.t()<<endl;
 
       mInd2Proc.set_size(0); // all processed
 
@@ -106,6 +109,8 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
       if(mX.size() > 0)
       {
         densityEst(mX,Nw,kappa,K,T,S);
+        cout<<"mPerp="<<mPerp.t()<<endl;
+        cout<<"mPhi -> D="<<mPhi.size()<<endl;
         //TODO: return p_d(x)
         return true;
       }else{
@@ -134,11 +139,11 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
         mPhi.resize(mPhi.size()+Db);
         mGamma.resize(mGamma.size()+Db);
         mPerp.resize(mPerp.n_elem+Db);
+        mPerp.rows(mPerp.n_elem-Db,mPerp.n_elem) = perp;
         for (uint32_t i=0; i<ind.n_elem; ++i){
           mZeta[ind[i]] = zeta[i];
           mPhi[ind[i]] = phi[i];
           mGamma[ind[i]] = gamma[i];
-          mPerp[ind[i]] = perp[i];
         }
 
         mInd2Proc.set_size(0); // all processed
@@ -255,86 +260,87 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
       gamma.resize(ind.n_elem,Mat<double>(mT,2));
       perp.zeros(ind.n_elem);
 
-        for (uint32_t dd=0; dd<ind.n_elem; dd += S)
+      for (uint32_t dd=0; dd<ind.n_elem; dd += S)
+      {
+        Mat<double> db_lambda(mK,mNw); // batch updates
+        Mat<double> db_a(mK,2); 
+        db_lambda.zeros();
+        db_a.zeros();
+#pragma omp parallel for schedule(dynamic) 
+        for (uint32_t db=dd; db<min(dd+S,ind.n_elem); db++)
         {
-          Mat<double> db_lambda(mK,mNw); // batch updates
-          Mat<double> db_a(mK,2); 
-          db_lambda.zeros();
-          db_a.zeros();
-#pragma omp parallel for schedule(dynamic) 
-          for (uint32_t db=dd; db<min(dd+S,ind.n_elem); db++)
-          {
-            uint32_t d=ind[db];  
-            uint32_t dout=sameIndAsX?d:db;
-            uint32_t N=mX[d].n_cols;
-            //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
+          uint32_t d=ind[db];  
+          uint32_t dout=sameIndAsX?d:db;
+          uint32_t N=mX[d].n_cols;
+          //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
 
-            cout<<"-- db="<<db<<" d="<<d<<" N="<<N<<endl;
-            //Mat<double> zeta(T,K);
-            phi[dout].resize(N,mT);
-            initZeta(zeta[dout],lambda,mX[d]);
-            initPhi(phi[dout],zeta[dout],lambda,mX[d]);
+          cout<<"-- db="<<db<<" d="<<d<<" N="<<N<<endl;
+          //Mat<double> zeta(T,K);
+          phi[dout].resize(N,mT);
+          initZeta(zeta[dout],lambda,mX[d]);
+          initPhi(phi[dout],zeta[dout],lambda,mX[d]);
 
-            //cout<<" ------------------------ doc level updates --------------------"<<endl;
-            //Mat<double> gamma(T,2);
-            Mat<double> gamma_prev(mT,2);
-            gamma_prev.ones();
-            gamma_prev.col(1) += mAlpha;
-            bool converged = false;
-            uint32_t o=0;
-            while(!converged){
-              //           cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
-              updateGamma(gamma[dout],phi[dout]);
-              updateZeta(zeta[dout],phi[dout],a,lambda,mX[d]);
-              updatePhi(phi[dout],zeta[dout],gamma[dout],lambda,mX[d]);
+          //cout<<" ------------------------ doc level updates --------------------"<<endl;
+          //Mat<double> gamma(T,2);
+          Mat<double> gamma_prev(mT,2);
+          gamma_prev.ones();
+          gamma_prev.col(1) += mAlpha;
+          bool converged = false;
+          uint32_t o=0;
+          while(!converged){
+            //           cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
+            updateGamma(gamma[dout],phi[dout]);
+            updateZeta(zeta[dout],phi[dout],a,lambda,mX[d]);
+            updatePhi(phi[dout],zeta[dout],gamma[dout],lambda,mX[d]);
 
-              converged = (accu(gamma_prev != gamma[dout]))==0 || o>60 ;
-              gamma_prev = gamma[dout];
-              ++o;
-            }
-
-            Mat<double> d_lambda(mK,mNw);
-            Mat<double> d_a(mK,2); 
-            //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
-            computeNaturalGradients(d_lambda, d_a, zeta[dout], phi[dout], mOmega, D, mX[d]);
- #pragma omp critical
-            {
-              db_lambda += d_lambda;
-              db_a += d_a;
-            }
+            converged = (accu(gamma_prev != gamma[dout]))==0 || o>60 ;
+            gamma_prev = gamma[dout];
+            ++o;
           }
-          //for (uint32_t k=0; k<K; ++k)
-          //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
-          // ----------------------- update global params -----------------------
-          uint32_t t=dd+d_0; // d_0 is the timestep of the the first index to process; dd is the index in the current batch
-          uint32_t bS = min(S,ind.n_elem-dd); // necessary for the last batch, which migth not form a complete batch
-          //TODO: what is the time dd? d_0 needed?
-          double ro = exp(-kappa*log(1+double(t)+double(bS)/2.0)); // as "time" use the middle of the batch 
-          cout<<" -- global parameter updates t="<<t<<" bS="<<bS<<" ro="<<ro<<endl;
-          //cout<<"d_a="<<d_a<<endl;
-          //cout<<"a="<<a<<endl;
-          lambda = (1.0-ro)*lambda + (ro/S)*db_lambda;
-          a = (1.0-ro)*a + (ro/S)*db_a;
 
-          perp[dd+bS/2] = 0.0;
-          if (mX_te.size() > 0) {
-            cout<<"computing "<<mX_te.size()<<" perplexities"<<endl;
-#pragma omp parallel for schedule(dynamic) 
-            for (uint32_t i=0; i<mX_te.size(); ++i)
-            {
-              //cout<<"mX_te: "<< mX_te[i].n_rows << "x"<< mX_te[i].n_cols<<endl;
-              //cout<<"mX_ho: "<< mX_ho[i].n_rows << "x"<< mX_ho[i].n_cols<<endl;
-              double perp_i =  perplexity(mX_te[i],mX_ho[i],dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
-              //cout<<"perp_"<<i<<"="<<perp_i<<endl;
+          Mat<double> d_lambda(mK,mNw);
+          Mat<double> d_a(mK,2); 
+          //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
+          computeNaturalGradients(d_lambda, d_a, zeta[dout], phi[dout], mOmega, D, mX[d]);
 #pragma omp critical
-              {
-                perp[dd+bS/2] += perp_i;
-              }
-            }
-            perp[dd+bS/2] /= double(mX_te.size());
-            //cout<<"Perplexity="<<mPerp[d]<<endl;
+          {
+            db_lambda += d_lambda;
+            db_a += d_a;
           }
         }
+        //for (uint32_t k=0; k<K; ++k)
+        //  cout<<"delta lambda_"<<k<<" min="<<min(d_lambda.row(k))<<" max="<< max(d_lambda.row(k))<<" #greater 0.1="<<sum(d_lambda.row(k)>0.1)<<endl;
+        // ----------------------- update global params -----------------------
+        uint32_t t=dd+d_0; // d_0 is the timestep of the the first index to process; dd is the index in the current batch
+        uint32_t bS = min(S,ind.n_elem-dd); // necessary for the last batch, which migth not form a complete batch
+        //TODO: what is the time dd? d_0 needed?
+        double ro = exp(-kappa*log(1+double(t)+double(bS)/2.0)); // as "time" use the middle of the batch 
+        cout<<" -- global parameter updates t="<<t<<" bS="<<bS<<" ro="<<ro<<endl;
+        //cout<<"d_a="<<d_a<<endl;
+        //cout<<"a="<<a<<endl;
+        lambda = (1.0-ro)*lambda + (ro/S)*db_lambda;
+        a = (1.0-ro)*a + (ro/S)*db_a;
+
+        perp[dd+bS/2] = 0.0;
+        if (mX_te.size() > 0) {
+          cout<<"computing "<<mX_te.size()<<" perplexities"<<endl;
+#pragma omp parallel for schedule(dynamic) 
+          for (uint32_t i=0; i<mX_te.size(); ++i)
+          {
+            //cout<<"mX_te: "<< mX_te[i].n_rows << "x"<< mX_te[i].n_cols<<endl;
+            //cout<<"mX_ho: "<< mX_ho[i].n_rows << "x"<< mX_ho[i].n_cols<<endl;
+            double perp_i =  perplexity(mX_te[i],mX_ho[i],dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
+            //cout<<"perp_"<<i<<"="<<perp_i<<endl;
+#pragma omp critical
+            {
+              perp[dd+bS/2] += perp_i;
+            }
+          }
+          perp[dd+bS/2] /= double(mX_te.size());
+          //cout<<"Perplexity="<<mPerp[d]<<endl;
+        }
+      }
+      cout<<"perp="<<perp.t()<<endl;
       return ind;
     };
 
@@ -405,7 +411,7 @@ class HDP_var: public HDP<uint32_t>, public HDP_var_base<uint32_t>
       cout<<"getWordTopics done"<<endl;
       cout<<"z="<<z.t()<<size(z);
       Mat<double> beta;
-      getCorpTopic(beta,lambda);
+      getCorpTopics(beta,lambda);
       cout<<"getCorpTopics done"<<endl;
       cout<<"beta:\t"<<size(beta);
 

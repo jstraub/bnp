@@ -95,23 +95,22 @@ private:
 
 };
 
-template <class U>
 class HDP_var_base 
 {
   public:
-
-    HDP_var_base(uint32_t K, uint32_t T, uint32_t Nw)
+    
+    HDP_var_base(uint32_t K=0, uint32_t T=0, uint32_t Nw=0)
       : mK(K), mT(T), mNw(Nw)
     {};
 
-    void getA(Col<double>& a)
+    void getA(Mat<double>& a)
     {
-      a=mA.col(0);
+      a=mA;
     };
 
-    void getB(Col<double>& b)
+    void getPerplexity(Mat<double>& perp)
     {
-      b=mA.col(1);
+      perp=mPerp;
     };
 
     bool getLambda(Col<double>& lambda, uint32_t k)
@@ -125,47 +124,47 @@ class HDP_var_base
       }
     };
 
-    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d) const
+//    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d) const
+//    {
+//      if (d < mGamma.size())
+//        return getDocTopics(pi,sigPi,c,mGamma[d],mZeta[d]);
+//      else{
+//        cout<<"asking for out of range doc "<<d<<" have only "<<mGamma.size()<<endl;
+//        return false;
+//      }
+//    };
+
+    bool getDocTopics(Mat<double>& pi, Mat<double>& sigPi, Mat<uint32_t>& c) const
     {
-      if (d < mGamma.size())
-        return getDocTopics(pi,sigPi,c,mGamma[d],mZeta[d]);
-      else{
-        cout<<"asking for out of range doc "<<d<<" have only "<<mGamma.size()<<endl;
-        return false;
+      uint32_t D=mZeta.size();
+      for (uint32_t d=0; d<D; ++d){
+        Col<double> cpi;
+        Col<double> csigPi;
+        Col<uint32_t> cc;
+        getDocTopics(cpi,csigPi,cc,mGamma[d],mZeta[d]);
+        pi.row(d) = cpi.t();
+        sigPi.row(d) = csigPi.t();
+        c.row(d) = cc.t();
       }
+        return true;
     };
 
-    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, const Mat<double>& gamma, const Mat<double>& zeta) const
-    {
-      uint32_t T = gamma.n_rows; // doc level topics
-
-      sigPi.set_size(T+1);
-      pi.set_size(T);
-      c.set_size(T);
-
-      //cout<<"K="<<K<<" T="<<T<<endl;
-      betaMode(pi,gamma.col(0),gamma.col(1));
-      stickBreaking(sigPi,pi);
-      //cout<<"pi="<<pi<<endl;
-      //cout<<"sigPi="<<sigPi<<endl;
-      //cout<<"mGamma="<<mGamma[d]<<endl;
-      for (uint32_t i=0; i<T; ++i){
-        c[i] = multinomialMode(zeta.row(i));
-      }
-      return true;
-    };
-
-
+  /*
+   * Gets the indicators for each word pointing to a doc level topic.
+   * Need to give it the doc of interest, because all documents have
+   * different numbers of words and hence z is different for all docs
+   *
+   * @param d points to the document of interest. 
+   */
     bool getWordTopics(Col<uint32_t>& z, uint32_t d) const {
+      cout<<"mPhi -> D="<<mPhi.size()<<endl;
+      if (z.n_rows != mPhi[d].n_rows)
+      {
+        cout<<"z.rows="<<z.n_rows<<" vs phi_d.rows="<<mPhi[d].n_rows<<endl;
+        return false;
+      }else{
       return getWordTopics(z,mPhi[d]);
-    };
-
-    bool getWordTopics(Col<uint32_t>& z, const Mat<double>& phi) const {
-      z.set_size(phi.n_rows);
-      for (uint32_t i=0; i<z.n_elem; ++i){
-        z[i] = multinomialMode(phi.row(i));
       }
-      return true;
     };
 
     bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV) const
@@ -173,20 +172,6 @@ class HDP_var_base
       return getCorpTopicProportions(v,sigV,mA);
     };
 
-    /* a are the parameters of the beta distribution from which v is drawn
-     *
-     */
-    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV, const Mat<double>& a) const
-    {
-      uint32_t K = a.n_rows; // corp level topics
-
-      sigV.set_size(K+1);
-      v.set_size(K);
-
-      betaMode(v, a.col(0), a.col(1));
-      stickBreaking(sigV,v);
-      return true;
-    };
 
     /* The mode of the estimate dirichlet distribution parameterized by lambda is used
      * as an estimate for the Multinomial distribution of the respective topics
@@ -201,34 +186,18 @@ class HDP_var_base
         return false;
       }
     };
-
-    bool getCorpTopic(Col<double>& topic, const Row<double>& lambda) const
+    
+    bool getCorpTopics(Mat<double>& topics) const
     {
-      // mode of dirichlet (MAP estimate)
-      dirMode(topic, lambda.t());
-      return true;
+      return getCorpTopics(topics,mLambda);
     };
 
-    bool getCorpTopic(Mat<double>& topics, const Mat<double>& lambda) const
+    virtual Row<double> logP_w(uint32_t d) const 
     {
-      uint32_t K = lambda.n_rows;
-      uint32_t Nw = lambda.n_cols;
-      topics.set_size(K,Nw);
-      for (uint32_t k=0; k<K; k++){
-        // mode of dirichlet (MAP estimate)
-        Row<double> lamb = lambda.row(k);
-        Row<double> beta(Nw);
-        dirMode(beta, lamb);
-        topics.row(k) = beta;
-//        cout<<"lambda_"<<k<<"="<<lambda.row(k)<<endl;
-//        cout<<"topic_"<<k<<"="<<topics.row(k)<<endl;
-//        cout<<"sum over topic_"<<k<<"="<<sum(topics.row(k))<<endl<<endl;
-        //dirMode(topics.row(k), lambda.row(k));
-      }
-      return true;
+      cout<<"has to be implemented in the child classes!!"<<endl;
+      assert(false);
+      return Row<double>(1);
     };
-
-    virtual Row<double> logP_w(uint32_t d) const = 0;
 
     bool getWordDistr(Mat<double>& p){
       uint32_t D=mZeta.size();
@@ -255,6 +224,78 @@ class HDP_var_base
     uint32_t mT; // Doc level truncation
     uint32_t mNw; // size of dictionary
 
+
+
+    bool getCorpTopic(Col<double>& topic, const Row<double>& lambda) const
+    {
+      // mode of dirichlet (MAP estimate)
+      dirMode(topic, lambda.t());
+      return true;
+    };
+
+    bool getCorpTopics(Mat<double>& topics, const Mat<double>& lambda) const
+    {
+      uint32_t K = lambda.n_rows;
+      uint32_t Nw = lambda.n_cols;
+      topics.set_size(K,Nw);
+      for (uint32_t k=0; k<K; k++){
+        // mode of dirichlet (MAP estimate)
+        Row<double> lamb = lambda.row(k);
+        Row<double> beta(Nw);
+        dirMode(beta, lamb);
+        topics.row(k) = beta;
+//        cout<<"lambda_"<<k<<"="<<lambda.row(k)<<endl;
+//        cout<<"topic_"<<k<<"="<<topics.row(k)<<endl;
+//        cout<<"sum over topic_"<<k<<"="<<sum(topics.row(k))<<endl<<endl;
+        //dirMode(topics.row(k), lambda.row(k));
+      }
+      return true;
+    };
+
+    /* 
+     * @param a are the parameters of the beta distribution from which v is drawn
+     */
+    bool getCorpTopicProportions(Col<double>& v, Col<double>& sigV, const Mat<double>& a) const
+    {
+      uint32_t K = a.n_rows; // corp level topics
+
+      sigV.set_size(K+1);
+      v.set_size(K);
+
+      betaMode(v, a.col(0), a.col(1));
+      stickBreaking(sigV,v);
+      return true;
+    };
+
+    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, const Mat<double>& gamma, const Mat<double>& zeta) const
+    {
+      uint32_t T = gamma.n_rows; // doc level topics
+
+      sigPi.set_size(T+1);
+      pi.set_size(T);
+      c.set_size(T);
+
+      //cout<<"K="<<K<<" T="<<T<<endl;
+      betaMode(pi,gamma.col(0),gamma.col(1));
+      stickBreaking(sigPi,pi);
+      //cout<<"pi="<<pi<<endl;
+      //cout<<"sigPi="<<sigPi<<endl;
+      //cout<<"mGamma="<<mGamma[d]<<endl;
+      for (uint32_t i=0; i<T; ++i){
+        c[i] = multinomialMode(zeta.row(i));
+      }
+      return true;
+    };
+
+
+    bool getWordTopics(Col<uint32_t>& z, const Mat<double>& phi) const {
+      cout<<phi.n_rows<<" x "<<phi.n_cols<<endl;
+      z.set_size(phi.n_rows);
+      for (uint32_t i=0; i<z.n_elem; ++i){
+        z[i] = multinomialMode(phi.row(i));
+      }
+      return true;
+    };
 };
 
 

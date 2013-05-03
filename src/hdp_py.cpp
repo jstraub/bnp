@@ -246,11 +246,138 @@ public:
 typedef HDP_py<uint32_t> HDP_Dir;
 typedef HDP_py<double> HDP_INW;
 
-class HDP_var_py : public HDP_var
+
+class HDP_var_base_py : public virtual HDP_var_base 
+{
+  public:
+  HDP_var_base_py(uint32_t K, uint32_t T, uint32_t Nw)
+    : HDP_var_base(K,T,Nw)
+  {};
+
+  bool getWordDistr_py(const numeric::array& p)
+  {
+    Mat<double> p_mat=np2mat<double>(p); // can do this since x_mat gets copied inside    
+    return HDP_var_base::getWordDistr(p_mat);
+  }
+
+  /* 
+   * works on the data in lambda -> size has to be correct in order for this to work!
+   * makes a copy of the internal labels vector
+   */
+  bool getLambda_py(numeric::array& lambda, uint32_t k)
+  {
+    Col<double> lambda_col;
+    if(!HDP_var_base::getLambda(lambda_col, k)){return false;} // works on the data in _mat
+    Col<double> lambda_wrap=np2col<double>(lambda); 
+    if(lambda_col.n_rows != lambda_wrap.n_rows)
+      return false;
+    else{
+      for (uint32_t i=0; i<lambda_wrap.n_rows; ++i)
+        lambda_wrap.at(i)=lambda_col.at(i);
+      return true;
+    }
+  };
+
+  void getA_py(numeric::array& a)
+  {
+    Mat<double> a_wrap=np2mat<double>(a); 
+    a_wrap = HDP_var_base::mA;
+  };
+
+  void getPerplexity_py(numeric::array& perp)
+  {
+    Col<double> perp_wrap=np2col<double>(perp); 
+    HDP_var_base::getPerplexity(perp_wrap);
+
+   //perp_wrap = HDP_var_base::mPerp;
+    //perp_wrap = mPerp;
+//    for (uint32_t i=0; i<perp_wrap.n_rows; ++i)
+//      perp_wrap.at(i)=mPerp.at(i);
+  };
+
+  /*
+   * @param sigPi get topic probabilities sigPi
+   * @param c pointer to corpus level topics
+   */
+  bool getDocTopics_py(numeric::array& pi, numeric::array& sigPi, numeric::array& c)
+  {
+    Mat<double> sigPi_mat;
+    Mat<double> pi_mat;
+    Mat<uint32_t> c_mat;
+    if(!HDP_var_base::getDocTopics(pi_mat, sigPi_mat, c_mat)){return false;} // works on the data in _mat
+    Mat<double> sigPi_wrap=np2mat<double>(sigPi); 
+    Mat<double> pi_wrap=np2mat<double>(pi); 
+    Mat<uint32_t> c_wrap=np2mat<uint32_t>(c); 
+    if((sigPi_mat.n_rows != sigPi_wrap.n_rows) || (c_mat.n_rows != c_wrap.n_rows) || (pi_mat.n_rows != pi_wrap.n_rows) || 
+        (sigPi_mat.n_cols != sigPi_wrap.n_cols) || (c_mat.n_cols != c_wrap.n_cols) || (pi_mat.n_cols != pi_wrap.n_cols))
+      return false;
+    else{
+      pi_wrap=pi_mat;
+      sigPi_wrap=sigPi_mat;
+      c_wrap=c_mat;
+      return true;
+    }
+  };
+
+  bool getCorpTopicProportions_py(numeric::array& v, numeric::array& sigV)
+  {
+    Col<double> sigV_col;
+    Col<double> v_col;
+    if(!HDP_var_base::getCorpTopicProportions(v_col,sigV_col)){return false;} // works on the data in _mat
+    Col<double> sigV_wrap=np2col<double>(sigV); 
+    Col<double> v_wrap=np2col<double>(v); 
+    if((sigV_col.n_rows != sigV_wrap.n_rows) || (v_col.n_rows != v_wrap.n_rows))
+      return false;
+    else{
+      for (uint32_t i=0; i<v_wrap.n_rows; ++i)
+        v_wrap.at(i)=v_col.at(i);
+      for (uint32_t i=0; i<sigV_wrap.n_rows; ++i)
+        sigV_wrap.at(i)=sigV_col.at(i);
+      return true;
+    }
+  }; 
+
+  bool getCorpTopics_py(numeric::array& beta)
+  {
+    Mat<double> beta_mat;
+    if(!HDP_var_base::getCorpTopics(beta_mat)){return false;} // works on the data in _mat
+    Mat<double> beta_wrap=np2mat<double>(beta); 
+    if((beta_mat.n_rows != beta_wrap.n_rows)||(beta_mat.n_cols != beta_wrap.n_cols))
+      return false;
+    else{
+      beta_wrap = beta_mat;
+      return true;
+    }
+  };
+
+  /*
+   * Gets the indicators for each word pointing to a doc level topic.
+   * Need to give it the doc of interest, because all documents have 
+   * different numbers of words and hence z is different for all docs
+   *
+   * @param d points to the document of interest. 
+   */
+  bool getWordTopics_py(numeric::array& z, uint32_t d)
+  {
+    Col<uint32_t> z_col;
+    if(!HDP_var_base::getWordTopics(z_col, d)){return false;} // works on the data in _mat
+    cout<<"x_col="<<z_col.t()<<endl;
+    Col<uint32_t> z_wrap=np2col<uint32_t>(z); 
+    if(z_col.n_rows != z_wrap.n_rows)
+      return false;
+    else{
+      for (uint32_t i=0; i<z_wrap.n_rows; ++i)
+        z_wrap.at(i)=z_col.at(i);
+      return true;
+    }
+  };
+};
+
+class HDP_var_py : public HDP_var_base_py, public HDP_var
 {
 public:
   HDP_var_py(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
-  : HDP_var(base,alpha,gamma)
+  :  HDP_var_base_py(0,0,0), HDP_var(base,alpha,gamma)
   {
     //cout<<"Creating "<<typeid(this).name()<<endl;
   };
@@ -268,7 +395,7 @@ public:
   // makes no copy of the external data x_i
   uint32_t addDoc(const numeric::array& x_i)
   {
-    Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
+    Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied insidez
     return HDP_var::addDoc(x_i_mat);
   };
 
@@ -291,148 +418,127 @@ public:
     return HDP_var::updateEst_batch(kappa,S);
   }
 
-  bool getWordDistr(const numeric::array& p)
-  {
-    Mat<double> p_mat=np2mat<double>(p); // can do this since x_mat gets copied inside    
-    return HDP_var::getWordDistr(p_mat);
-  }
-
-//  // works on the data in z_i -> size has to be correct in order for this to work!
-//  // makes a copy of the internal labels vector
-//  bool getClassLabels(numeric::array& z_i, uint32_t i)
+//  bool getWordDistr(const numeric::array& p)
 //  {
-//    Col<uint32_t> z_i_col;
-//    if(!HDP_var::getClassLabels(z_i_col, i)){return false;} // works on the data in z_i_mat
-//    Col<uint32_t> z_i_wrap=np2col<uint32_t>(z_i); // can do this since x_i_mat gets copied inside
-//    if(z_i_col.n_rows != z_i_wrap.n_rows)
+//    Mat<double> p_mat=np2mat<double>(p); // can do this since x_mat gets copied inside    
+//    return HDP_var::getWordDistr(p_mat);
+//  }
+//
+//
+//  // works on the data in lambda -> size has to be correct in order for this to work!
+//  // makes a copy of the internal labels vector
+//  bool getLambda(numeric::array& lambda, uint32_t k)
+//  {
+//    Col<double> lambda_col;
+//    if(!HDP_var::getLambda(lambda_col, k)){return false;} // works on the data in _mat
+//    Col<double> lambda_wrap=np2col<double>(lambda); 
+//    if(lambda_col.n_rows != lambda_wrap.n_rows)
 //      return false;
 //    else{
-//      for (uint32_t i=0; i<z_i_wrap.n_rows; ++i)
-//        z_i_wrap.at(i)=z_i_col.at(i);
+//      for (uint32_t i=0; i<lambda_wrap.n_rows; ++i)
+//        lambda_wrap.at(i)=lambda_col.at(i);
+//      return true;
+//    }
+//  };
+//
+//  void getA(numeric::array& a)
+//  {
+//    Col<double> a_wrap=np2col<double>(a); 
+//     for (uint32_t i=0; i<a_wrap.n_rows; ++i)
+//        a_wrap.at(i)=HDP_var::mA.at(0,i);
+//  };
+//
+//  void getB(numeric::array& b)
+//  {
+//    Col<double> b_wrap=np2col<double>(b); 
+//     for (uint32_t i=0; i<b_wrap.n_rows; ++i)
+//        b_wrap.at(i)=HDP_var::mA.at(1,i);
+//  };
+//
+//  void getPerplexity(numeric::array& perp)
+//  {
+//    Col<double> perp_wrap=np2col<double>(perp); 
+//     for (uint32_t i=0; i<perp_wrap.n_rows; ++i)
+//        perp_wrap.at(i)=HDP_var::mPerp.at(i);
+//  };
+//
+//  bool getDocTopics(numeric::array& pi, numeric::array& prop, numeric::array& topicInd, uint32_t d)
+//  {
+//    Col<double> prop_col;
+//    Col<double> pi_col;
+//    Col<uint32_t> topicInd_col;
+//    if(!HDP_var::getDocTopics(pi_col, prop_col, topicInd_col, d)){return false;} // works on the data in _mat
+//    Col<double> prop_wrap=np2col<double>(prop); 
+//    Col<double> pi_wrap=np2col<double>(pi); 
+//    Col<uint32_t> topicInd_wrap=np2col<uint32_t>(topicInd); 
+//    if((prop_col.n_rows != prop_wrap.n_rows) || (topicInd_col.n_rows != topicInd_wrap.n_rows) || (pi_col.n_rows != pi_wrap.n_rows))
+//      return false;
+//    else{
+//     for (uint32_t i=0; i<pi_col.n_rows; ++i)
+//        pi_wrap.at(i)=pi_col.at(i);
+//     for (uint32_t i=0; i<topicInd_wrap.n_rows; ++i)
+//        topicInd_wrap.at(i)=topicInd_col.at(i);
+//      for (uint32_t i=0; i<prop_wrap.n_rows; ++i)
+//        prop_wrap.at(i)=prop_col.at(i);
 //      return true;
 //    }
 //  };
 
-  // works on the data in lambda -> size has to be correct in order for this to work!
-  // makes a copy of the internal labels vector
-  bool getLambda(numeric::array& lambda, uint32_t k)
-  {
-    Col<double> lambda_col;
-    if(!HDP_var::getLambda(lambda_col, k)){return false;} // works on the data in _mat
-    Col<double> lambda_wrap=np2col<double>(lambda); 
-    if(lambda_col.n_rows != lambda_wrap.n_rows)
-      return false;
-    else{
-      for (uint32_t i=0; i<lambda_wrap.n_rows; ++i)
-        lambda_wrap.at(i)=lambda_col.at(i);
-      return true;
-    }
-  };
-
-  void getA(numeric::array& a)
-  {
-    Col<double> a_wrap=np2col<double>(a); 
-     for (uint32_t i=0; i<a_wrap.n_rows; ++i)
-        a_wrap.at(i)=HDP_var::mA.at(0,i);
-  };
-
-  void getB(numeric::array& b)
-  {
-    Col<double> b_wrap=np2col<double>(b); 
-     for (uint32_t i=0; i<b_wrap.n_rows; ++i)
-        b_wrap.at(i)=HDP_var::mA.at(1,i);
-  };
-
-  void getPerplexity(numeric::array& perp)
-  {
-    Col<double> perp_wrap=np2col<double>(perp); 
-     for (uint32_t i=0; i<perp_wrap.n_rows; ++i)
-        perp_wrap.at(i)=HDP_var::mPerp.at(i);
-  };
-
-  bool getDocTopics(numeric::array& pi, numeric::array& prop, numeric::array& topicInd, uint32_t d)
-  {
-    Col<double> prop_col;
-    Col<double> pi_col;
-    Col<uint32_t> topicInd_col;
-    if(!HDP_var::getDocTopics(pi_col, prop_col, topicInd_col, d)){return false;} // works on the data in _mat
-    Col<double> prop_wrap=np2col<double>(prop); 
-    Col<double> pi_wrap=np2col<double>(pi); 
-    Col<uint32_t> topicInd_wrap=np2col<uint32_t>(topicInd); 
-    if((prop_col.n_rows != prop_wrap.n_rows) || (topicInd_col.n_rows != topicInd_wrap.n_rows) || (pi_col.n_rows != pi_wrap.n_rows))
-      return false;
-    else{
-     for (uint32_t i=0; i<pi_col.n_rows; ++i)
-        pi_wrap.at(i)=pi_col.at(i);
-     for (uint32_t i=0; i<topicInd_wrap.n_rows; ++i)
-        topicInd_wrap.at(i)=topicInd_col.at(i);
-      for (uint32_t i=0; i<prop_wrap.n_rows; ++i)
-        prop_wrap.at(i)=prop_col.at(i);
-      return true;
-    }
-  };
-
-  bool getCorpTopicProportions(numeric::array& v, numeric::array& sigV)
-  {
-    Col<double> sigV_col;
-    Col<double> v_col;
-    if(!HDP_var::getCorpTopicProportions(v_col,sigV_col)){return false;} // works on the data in _mat
-    Col<double> sigV_wrap=np2col<double>(sigV); 
-    Col<double> v_wrap=np2col<double>(v); 
-    if((sigV_col.n_rows != sigV_wrap.n_rows) || (v_col.n_rows != v_wrap.n_rows))
-      return false;
-    else{
-      for (uint32_t i=0; i<v_wrap.n_rows; ++i)
-        v_wrap.at(i)=v_col.at(i);
-      for (uint32_t i=0; i<sigV_wrap.n_rows; ++i)
-        sigV_wrap.at(i)=sigV_col.at(i);
-      return true;
-    }
-  }; 
-
-  bool getCorpTopic(numeric::array& beta, uint32_t k)
-  {
-    Col<double> beta_col;
-    if(!HDP_var::getCorpTopic(beta_col, k)){return false;} // works on the data in _mat
-    Col<double> beta_wrap=np2col<double>(beta); 
-    if(beta_col.n_rows != beta_wrap.n_rows)
-      return false;
-    else{
-      for (uint32_t i=0; i<beta_wrap.n_rows; ++i)
-        beta_wrap.at(i)=beta_col.at(i);
-      return true;
-    }
-  };
-
-  bool getWordTopics(numeric::array& z, uint32_t d)
-  {
-    Col<uint32_t> z_col;
-    if(!HDP_var::getWordTopics(z_col, d)){return false;} // works on the data in _mat
-    Col<uint32_t> z_wrap=np2col<uint32_t>(z); 
-    if(z_col.n_rows != z_wrap.n_rows)
-      return false;
-    else{
-      for (uint32_t i=0; i<z_wrap.n_rows; ++i)
-        z_wrap.at(i)=z_col.at(i);
-      return true;
-    }
-  };
-
-//  double perplexity(numeric::array& x, uint32_t d, double kappa)
+//  bool getCorpTopicProportions(numeric::array& v, numeric::array& sigV)
 //  {
-//    Row<uint32_t> x_mat=np2col<uint32_t>(x); // can do this since x_mat gets copied inside    
-//    return HDP_var::perplexity(x_mat,d,kappa);
+//    Col<double> sigV_col;
+//    Col<double> v_col;
+//    if(!HDP_var::getCorpTopicProportions(v_col,sigV_col)){return false;} // works on the data in _mat
+//    Col<double> sigV_wrap=np2col<double>(sigV); 
+//    Col<double> v_wrap=np2col<double>(v); 
+//    if((sigV_col.n_rows != sigV_wrap.n_rows) || (v_col.n_rows != v_wrap.n_rows))
+//      return false;
+//    else{
+//      for (uint32_t i=0; i<v_wrap.n_rows; ++i)
+//        v_wrap.at(i)=v_col.at(i);
+//      for (uint32_t i=0; i<sigV_wrap.n_rows; ++i)
+//        sigV_wrap.at(i)=sigV_col.at(i);
+//      return true;
+//    }
+//  }; 
+//
+//  bool getCorpTopic(numeric::array& beta, uint32_t k)
+//  {
+//    Col<double> beta_col;
+//    if(!HDP_var::getCorpTopic(beta_col, k)){return false;} // works on the data in _mat
+//    Col<double> beta_wrap=np2col<double>(beta); 
+//    if(beta_col.n_rows != beta_wrap.n_rows)
+//      return false;
+//    else{
+//      for (uint32_t i=0; i<beta_wrap.n_rows; ++i)
+//        beta_wrap.at(i)=beta_col.at(i);
+//      return true;
+//    }
 //  };
-
+//
+//  bool getWordTopics(numeric::array& z, uint32_t d)
+//  {
+//    Col<uint32_t> z_col;
+//    if(!HDP_var::getWordTopics(z_col, d)){return false;} // works on the data in _mat
+//    Col<uint32_t> z_wrap=np2col<uint32_t>(z); 
+//    if(z_col.n_rows != z_wrap.n_rows)
+//      return false;
+//    else{
+//      for (uint32_t i=0; i<z_wrap.n_rows; ++i)
+//        z_wrap.at(i)=z_col.at(i);
+//      return true;
+//    }
+//  };
+//
 };
 
 
 
-class HDP_var_ss_py : public HDP_var_ss
+class HDP_var_ss_py : public HDP_var_base_py, public HDP_var_ss
 {
 public:
   HDP_var_ss_py(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
-  : HDP_var_ss(base,alpha,gamma)
+  : HDP_var_base_py(0,0,0), HDP_var_ss(base,alpha,gamma)
   {
     //cout<<"Creating "<<typeid(this).name()<<endl;
   };
@@ -460,124 +566,6 @@ public:
     return HDP_var_ss::updateEst(x_mat,kappa);
   }
 
-  bool getWordDistr(const numeric::array& p)
-  {
-    Mat<double> p_mat=np2mat<double>(p); // can do this since x_mat gets copied inside    
-    return HDP_var_ss::getWordDistr(p_mat);
-  }
-
-  /* 
-   * works on the data in lambda -> size has to be correct in order for this to work!
-   * makes a copy of the internal labels vector
-   */
-  bool getLambda(numeric::array& lambda, uint32_t k)
-  {
-    Col<double> lambda_col;
-    if(!HDP_var_ss::getLambda(lambda_col, k)){return false;} // works on the data in _mat
-    Col<double> lambda_wrap=np2col<double>(lambda); 
-    if(lambda_col.n_rows != lambda_wrap.n_rows)
-      return false;
-    else{
-      for (uint32_t i=0; i<lambda_wrap.n_rows; ++i)
-        lambda_wrap.at(i)=lambda_col.at(i);
-      return true;
-    }
-  };
-
-  void getA(numeric::array& a)
-  {
-    Col<double> a_wrap=np2col<double>(a); 
-     for (uint32_t i=0; i<a_wrap.n_rows; ++i)
-        a_wrap.at(i)=HDP_var_ss::mA.at(0,i);
-  };
-
-  void getB(numeric::array& b)
-  {
-    Col<double> b_wrap=np2col<double>(b); 
-     for (uint32_t i=0; i<b_wrap.n_rows; ++i)
-        b_wrap.at(i)=HDP_var_ss::mA.at(1,i);
-  };
-
-  void getPerplexity(numeric::array& perp)
-  {
-    Col<double> perp_wrap=np2col<double>(perp); 
-     for (uint32_t i=0; i<perp_wrap.n_rows; ++i)
-        perp_wrap.at(i)=HDP_var_ss::mPerp.at(i);
-  };
-
-  bool getDocTopics(numeric::array& pi, numeric::array& prop, numeric::array& topicInd, uint32_t d)
-  {
-    Col<double> prop_col;
-    Col<double> pi_col;
-    Col<uint32_t> topicInd_col;
-    if(!HDP_var_ss::getDocTopics(pi_col, prop_col, topicInd_col, d)){return false;} // works on the data in _mat
-    Col<double> prop_wrap=np2col<double>(prop); 
-    Col<double> pi_wrap=np2col<double>(pi); 
-    Col<uint32_t> topicInd_wrap=np2col<uint32_t>(topicInd); 
-    if((prop_col.n_rows != prop_wrap.n_rows) || (topicInd_col.n_rows != topicInd_wrap.n_rows) || (pi_col.n_rows != pi_wrap.n_rows))
-      return false;
-    else{
-     for (uint32_t i=0; i<pi_col.n_rows; ++i)
-        pi_wrap.at(i)=pi_col.at(i);
-     for (uint32_t i=0; i<topicInd_wrap.n_rows; ++i)
-        topicInd_wrap.at(i)=topicInd_col.at(i);
-      for (uint32_t i=0; i<prop_wrap.n_rows; ++i)
-        prop_wrap.at(i)=prop_col.at(i);
-      return true;
-    }
-  };
-
-  bool getCorpTopicProportions(numeric::array& v, numeric::array& sigV)
-  {
-    Col<double> sigV_col;
-    Col<double> v_col;
-    if(!HDP_var_ss::getCorpTopicProportions(v_col,sigV_col)){return false;} // works on the data in _mat
-    Col<double> sigV_wrap=np2col<double>(sigV); 
-    Col<double> v_wrap=np2col<double>(v); 
-    if((sigV_col.n_rows != sigV_wrap.n_rows) || (v_col.n_rows != v_wrap.n_rows))
-      return false;
-    else{
-      for (uint32_t i=0; i<v_wrap.n_rows; ++i)
-        v_wrap.at(i)=v_col.at(i);
-      for (uint32_t i=0; i<sigV_wrap.n_rows; ++i)
-        sigV_wrap.at(i)=sigV_col.at(i);
-      return true;
-    }
-  }; 
-
-  bool getCorpTopic(numeric::array& beta, uint32_t k)
-  {
-    Col<double> beta_col;
-    if(!HDP_var_ss::getCorpTopic(beta_col, k)){return false;} // works on the data in _mat
-    Col<double> beta_wrap=np2col<double>(beta); 
-    if(beta_col.n_rows != beta_wrap.n_rows)
-      return false;
-    else{
-      for (uint32_t i=0; i<beta_wrap.n_rows; ++i)
-        beta_wrap.at(i)=beta_col.at(i);
-      return true;
-    }
-  };
-
-  bool getWordTopics(numeric::array& z, uint32_t d)
-  {
-    Col<uint32_t> z_col;
-    if(!HDP_var_ss::getWordTopics(z_col, d)){return false;} // works on the data in _mat
-    Col<uint32_t> z_wrap=np2col<uint32_t>(z); 
-    if(z_col.n_rows != z_wrap.n_rows)
-      return false;
-    else{
-      for (uint32_t i=0; i<z_wrap.n_rows; ++i)
-        z_wrap.at(i)=z_col.at(i);
-      return true;
-    }
-  };
-
-//  double perplexity(numeric::array& x, uint32_t d, double kappa)
-//  {
-//    Row<uint32_t> x_mat=np2col<uint32_t>(x); // can do this since x_mat gets copied inside    
-//    return HDP_var_ss::perplexity(x_mat,d,kappa);
-//  };
 
 };
 
@@ -612,35 +600,33 @@ BOOST_PYTHON_MODULE(libbnp)
 
 	class_<HDP_var_py>("HDP_var",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_var_py::densityEst)
-        .def("updateEst",&HDP_var_py::updateEst)
+        //TODO: not sure that one works: .def("updateEst",&HDP_var_py::updateEst)
         .def("updateEst_batch",&HDP_var_py::updateEst_batch)
         .def("addDoc",&HDP_var_py::addDoc)
         .def("addHeldOut",&HDP_var_py::addHeldOut)
-        .def("getPerplexity",&HDP_var_py::getPerplexity)
-        .def("getA",&HDP_var_py::getA)
-        .def("getB",&HDP_var_py::getB)
-        .def("getLambda",&HDP_var_py::getLambda)
-        .def("getDocTopics",&HDP_var_py::getDocTopics)
-        .def("getWordTopics",&HDP_var_py::getWordTopics)
-        .def("getCorpTopicProportions",&HDP_var_py::getCorpTopicProportions)
-        .def("getCorpTopic",&HDP_var_py::getCorpTopic)
-        .def("getWordDistr",&HDP_var_py::getWordDistr);
+        .def("getPerplexity",&HDP_var_py::getPerplexity_py)
+        .def("getA",&HDP_var_py::getA_py)
+        .def("getLambda",&HDP_var_py::getLambda_py)
+        .def("getDocTopics",&HDP_var_py::getDocTopics_py)
+        .def("getWordTopics",&HDP_var_py::getWordTopics_py)
+        .def("getCorpTopicProportions",&HDP_var_py::getCorpTopicProportions_py)
+        .def("getCorpTopics",&HDP_var_py::getCorpTopics_py)
+        .def("getWordDistr",&HDP_var_py::getWordDistr_py);
    //     .def_readonly("mGamma", &HDP_var_py::mGamma);
 //        .def("perplexity",&HDP_var_py::perplexity)
 
 
 	class_<HDP_var_ss_py>("HDP_var_ss",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_var_ss_py::densityEst)
-        .def("updateEst",&HDP_var_ss_py::updateEst)
-        .def("getPerplexity",&HDP_var_ss_py::getPerplexity)
-        .def("getA",&HDP_var_ss_py::getA)
-        .def("getB",&HDP_var_ss_py::getB)
-        .def("getLambda",&HDP_var_ss_py::getLambda)
-        .def("getDocTopics",&HDP_var_ss_py::getDocTopics)
-        .def("getWordTopics",&HDP_var_ss_py::getWordTopics)
-        .def("getCorpTopicProportions",&HDP_var_ss_py::getCorpTopicProportions)
-        .def("getCorpTopic",&HDP_var_ss_py::getCorpTopic)
-        .def("getWordDistr",&HDP_var_ss_py::getWordDistr);
+        //TODO: not sure that one works .def("updateEst",&HDP_var_ss_py::updateEst)
+        .def("getPerplexity",&HDP_var_ss_py::getPerplexity_py)
+        .def("getA",&HDP_var_ss_py::getA_py)
+        .def("getLambda",&HDP_var_ss_py::getLambda_py)
+        .def("getDocTopics",&HDP_var_ss_py::getDocTopics_py)
+        .def("getWordTopics",&HDP_var_ss_py::getWordTopics_py)
+        .def("getCorpTopicProportions",&HDP_var_ss_py::getCorpTopicProportions_py)
+        .def("getCorpTopics",&HDP_var_ss_py::getCorpTopics_py)
+        .def("getWordDistr",&HDP_var_ss_py::getWordDistr_py);
 //        .def("perplexity",&HDP_var_ss_py::perplexity)
 
 }

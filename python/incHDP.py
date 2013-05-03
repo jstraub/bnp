@@ -70,11 +70,11 @@ if __name__ == '__main__':
       x=[]
 
   hdp.loadHDPSample(x_tr,x_te, hdp.hdp_var)
-  print('{}'.format(hdp.logP_w))
+  print('{}'.format(hdp.state['logP_w']))
   hdp.save('incTest.mat')
 
 
 
   hdp2 = HDP_var_inc(K,T,Nw,omega,alpha,dirAlphas)
   hdp2.load('incTest.mat')
-  print('{}'.format(hdp2.logP_w))
+  print('{}'.format(hdp2.state['logP_w']))

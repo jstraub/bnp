@@ -72,12 +72,12 @@ protected:
 
 // this one assumes that the number of words per document are bigger than the number of individual words
 // and is optimized for that case
-class HDP_var_ss: public HDP_ss<uint32_t>, public HDP_var_base<uint32_t>
+class HDP_var_ss: public HDP_ss<uint32_t>, public virtual HDP_var_base
 {
   public:
 
     HDP_var_ss(const BaseMeasure<uint32_t>& base, double alpha, double omega)
-      : HDP_ss<uint32_t>(base, alpha, omega), HDP_var_base<uint32_t>(0,0,0)
+      : HDP_var_base(0,0,0), HDP_ss<uint32_t>(base, alpha, omega)
     {};
 
     ~HDP_var_ss()
@@ -448,7 +448,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>, public HDP_var_base<uint32_t>
       cout<<"getWordTopics done"<<endl;
       cout<<"z="<<z<<endl;
       Mat<double> beta;
-      getCorpTopic(beta,lambda);
+      getCorpTopics(beta,lambda);
       cout<<"getCorpTopics done"<<endl;
       cout<<"beta:\t"<<size(beta);
 
@@ -485,7 +485,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>, public HDP_var_base<uint32_t>
       Col<uint32_t> z(mNw);
       getWordTopics(z, phi);
       Mat<double> beta;
-      getCorpTopic(beta,lambda);
+      getCorpTopics(beta,lambda);
 
       for (uint32_t w=0; w<mNw; ++w){
         p[w] = logCat(w, beta.row( c[ z[w] ]).t()) + 

@@ -94,45 +94,31 @@ class HDP_base:
   toSave = dict()
   loaded = dict()
   
-  def __init__(self, K=None,T=None,Nw=None,omega=None,alpha=None,Lambda=None, pathToModel=None):
-    s.states=['K','T','Nw','omega','alpha','Lambda','c','z','beta','v','sigV','pi','sigPi','x_tr','x_ho','perp','logP_w']
+  def __init__(s, K=None,T=None,Nw=None,omega=None,alpha=None,Lambda=None, pathToModel=None):
+
+    s.scalars = ['K','T','Nw','omega','alpha']
+    s.matrices = ['Lambda','beta','sigV','v','perp','logP_w']
+
+#    s.states=[]
+#    s.states.expand(s.scalars)
+#    s.states.expand(s.matrices)
+#    s.states.expand(s.listMatrices)
+
     s.state=dict()
     if pathToModel is None:
-      self.K = K
-      self.T = T
-      self.Nw = Nw
+      s.state['K'] = K
+      s.state['T'] = T
+      s.state['Nw'] = Nw
       # hyper parameters
-      self.omega = omega
-      self.alpha = alpha
-      self.Lambda = Lambda
-      print('in HDP_base setting K={}; T={}; Nw={}; omega={}; alpha={};'.format(self.K,self.T,self.Nw,self.omega,self.alpha))
+      s.state['omega'] = omega
+      s.state['alpha'] = alpha
+      s.state['Lambda'] = Lambda
+      print('in HDP_base setting K={}; T={}; Nw={}; omega={}; alpha={};'.format(s.state['K'],s.state['T'],s.state['Nw'],s.state['omega'],s.state['alpha']))
     else:
-      self.load(pathToModel)
-
-  def collectToSave(s):
-    s.toSave['K']=s.K
-    s.toSave['T']=s.T
-    s.toSave['Nw']=s.Nw
-    s.toSave['omega']=s.omega
-    s.toSave['alpha']=s.alpha
-    s.toSave['Lambda']=s.Lambda
-    s.toSave['c']=s.c
-    s.toSave['z']=s.z
-    s.toSave['beta']=s.beta
-    s.toSave['v']=s.v
-    s.toSave['sigV']=s.sigV
-    s.toSave['pi']=s.pi
-    s.toSave['sigPi']=s.sigPi
-    s.toSave['x_tr']=s.x_tr
-    s.toSave['x_ho']=s.x_ho
-    s.toSave['perp']=s.perp
-    s.toSave['logP_w']=s.logP_w
-    #{'K':s.K,'T':s.T,'Nw':s.Nw,'omega':s.omega,'alpha':s.alpha,'Lambda':s.Lambda,'c':s.c,'z':s.z,'beta':s.beta,'v':s.v,'sigV':s.sigV,'pi':s.pi,'sigPi':s.sigPi,'x_tr':s.x_tr,'x_ho':s.x_ho,'perp':s.perp}
+      s.load(pathToModel)
 
   def save(s,path):
-    print('len(x_tr)={0}'.format(len(s.x_tr)))
-    HDP_base.collectToSave(s)
-    sio.savemat(path,s.toSave)
+    sio.savemat(path,s.state)
 
   def load(s,path):
     try:
@@ -145,107 +131,112 @@ class HDP_base:
     return True
 
   def parseLoad(s,mat):
-    s.K=mat['K'][0][0]
-    print('loaded K\t {0}'.format(s.K))
-    s.T=mat['T'][0][0]
-    print('loaded T\t {0}'.format(s.T))
-    s.Nw=mat['Nw'][0][0]
-    print('loaded Nw\t {0}'.format(s.Nw))
-    s.omega=mat['omega'][0][0]
-    print('loaded omega\t {0}'.format(s.omega))
-    s.alpha=mat['alpha'][0][0]
-    print('loaded alpha\t {0}'.format(s.alpha))
-    s.Lambda=mat['Lambda']
-    print('loaded Lambda\t {0}'.format(s.Lambda.shape))
-    s.beta=mat['beta']
-    print('loaded beta\t {0}'.format(s.beta.shape))
-    s.sigV=mat['sigV']
-    print('loaded sigV\t {0}'.format(s.sigV.shape))
-    s.v=mat['v']
-    print('loaded v\t {0}'.format(s.v.shape))
-    s.perp = mat['perp']
-    s.logP_w = mat['logP_w']
+    for scalar in s.scalars:
+      s.state[scalar]=mat[scalar][0][0]
+      print('loaded {}\t {}'.format(scalar,s.state[scalar]))
+    for matrix in s.matrices:
+      s.state[matrix]=mat[matrix]
+      print('loaded {}\t {}'.format(matrix,s.state[matrix].shape))
 
-    s.x_tr = mat['x_tr']
-    print('loaded x_tr\t {}'.format(s.x_tr.shape))
-    s.x_ho = mat['x_ho']
+# have to be added to the appropriate matrices or listMatrices
+#    s.state['x_tr'] = mat['x_tr']
+#    print('loaded x_tr\t {}'.format(s.state['x_tr'].shape))
+#    s.state['x_ho'] = mat['x_ho']
 
-    s.z=[]; s.c=[]; s.pi=[]; s.sigPi=[]
+    listMatrices=['c','pi','sigPi','z']
+ 
+    print('{}'.format(mat['pi']))
+    print('{}'.format(mat['pi'].shape))
+    print('{}'.format(mat['pi'][0].shape))
+    D=mat['pi'].shape[0]
+
+    for listMatrix in listMatrices:
+      s.state[listMatrix] = []
+      for d in range(0,D):
+        s.state[listMatrix].append(mat[listMatrix][d])
+
     #for d in range(0,mat['x_ho'].shape[0]):
-    #  s.x_ho.append(mat['x_ho'][d][0])
+    #  s.state['x_ho'].append(mat['x_ho'][d][0])
 
-    for d in range(0,mat['x_tr'].shape[0]):
-      s.z.append(mat['z'][d][0])
-      #print('loaded z[{}]\t {}'.format(d,s.z[d].shape))
-      s.c.append(mat['c'][d,:])
-      #print('loaded c[{}]\t {}'.format(d,s.c[d].shape))
-      s.pi.append(mat['pi'][d,:])
-      #print('loaded pi[{}]\t {}'.format(d,s.pi[d].shape))
-      s.sigPi.append(mat['sigPi'][d,:])
-      #print('loaded sigPi[{}]\t {}'.format(d,s.sigPi[d].shape))
+#    for d in range(0,mat['x_tr'].shape[0]):
+#      s.state['z'].append(mat['z'][d][0])
+#      #print('loaded z[{}]\t {}'.format(d,s.state['z'][d].shape))
+#      s.state['c'].append(mat['c'][d,:])
+#      #print('loaded c[{}]\t {}'.format(d,s.state['c'][d].shape))
+#      s.state['pi'].append(mat['pi'][d,:])
+#      #print('loaded pi[{}]\t {}'.format(d,s.state['pi'][d].shape))
+#      s.state['sigPi'].append(mat['sigPi'][d,:])
+#      #print('loaded sigPi[{}]\t {}'.format(d,s.state['sigPi'][d].shape))
 
 
   def loadHDPSample(s, x_tr, x_ho, hdp):
-    s.x_tr = x_tr
-    s.x_ho = x_ho
+    print("---------------------- obtaining results -------------------------");
+    s.state['x_tr'] = x_tr
+    s.state['x_ho'] = x_ho
     if isinstance(hdp,bnp.HDP_var) or isinstance(hdp,bnp.HDP_var_ss):
-      D=len(s.x_tr)
-      D_ho=len(s.x_ho)
-      print("---------------------- obtaining results -------------------------");
-      s.sigV = np.zeros(s.K+1,dtype=np.double)
-      s.v = np.zeros(s.K,dtype=np.double)
-      hdp.getCorpTopicProportions(s.v,s.sigV)
-      s.logP_w =np.zeros((D+D_ho,s.Nw),dtype=np.double)
-      hdp.getWordDistr(s.logP_w)
+      D=len(s.state['x_tr'])
+      D_ho=len(s.state['x_ho'])
+      print('D={}; D={};'.format(D,D_ho))
 
-      #print('topic proportions: \t{}\t{}'.format(s.sigV,np.sum(s.sigV)))
-      #print('GT topic proportions: \t{}\t{}'.format(gtCorpProp,np.sum(gtCorpProp)))
-      #print("---------------------- Corpus Topics -------------------------");
-      s.beta=[]
-      for k in range(0,s.K):
-        s.beta.append(np.zeros(s.Nw,dtype=np.double))
-        hdp.getCorpTopic(s.beta[k],k)
-        #print('s.beta_{}=\t{}'.format(k,topic[k]))
-        #print('gtTopic_{}=\t{}'.format(k,gtTopic[k,:]))
-      s.sigPi=[]
-      s.pi=[]
-      s.c=[]
-      s.z=[] # word indices to doc topics
+      s.state['sigV'] = np.zeros(s.state['K']+1,dtype=np.double)
+      s.state['v'] = np.zeros(s.state['K'],dtype=np.double)
+      hdp.getCorpTopicProportions(s.state['v'],s.state['sigV'])
+      print('gotCorpTopicProportions {} {}'.format(s.state['v'].shape,s.state['sigV'].shape))
+
+      s.state['logP_w'] =np.zeros((D+D_ho,s.state['Nw']),dtype=np.double)
+      hdp.getWordDistr(s.state['logP_w'])
+      print('gotWordDistr {}'.format(s.state['logP_w'].shape))
+      print('gotWordDistr {}'.format(s.state['logP_w']))
+      
+      s.state['perp'] = np.zeros(D)
+      hdp.getPerplexity(s.state['perp'])
+      print('Perplexity of iterations: {}'.format(s.state['perp']))
+
+      s.state['beta']= np.zeros((s.state['K'],s.state['Nw']),dtype=np.double)
+      hdp.getCorpTopics(s.state['beta'])
+      print('beta={}'.format(s.state['beta'].shape))
+      print('beta={}'.format(s.state['beta']))
+
+      s.state['sigPi']=np.zeros((D,s.state['T']+1),dtype=np.double)
+      s.state['pi']=np.zeros((D,s.state['T']),dtype=np.double)
+      s.state['c']=np.zeros((D,s.state['T']),dtype=np.uint32)
+      hdp.getDocTopics(s.state['pi'],s.state['sigPi'],s.state['c'])
+      print('pi: {}'.format(s.state['pi'].shape))
+      print('pi: {}'.format(s.state['pi']))
+      print('sigPi: {}'.format(s.state['sigPi'].shape))
+      print('sigPi: {}'.format(s.state['sigPi']))
+
+      s.state['z']=[] # word indices to doc topics
       for d in range(0,D):
-        s.sigPi.append(np.zeros(s.T+1,dtype=np.double))
-        s.pi.append(np.zeros(s.T,dtype=np.double))
-        s.c.append(np.zeros(s.T,dtype=np.uint32))
-        print('getting {}'.format(d))
-        hdp.getDocTopics(s.pi[d],s.sigPi[d],s.c[d],d)
-        print('pi({0}): {1}'.format(d,s.pi[d]))
-        print('sigPi({0}): {1}'.format(d,s.sigPi[d]))
-        #print('c({0}): {1}'.format(d,s.c[d]))
-        s.z.append(np.zeros(s.x_tr[d].size,dtype=np.uint32))
-        hdp.getWordTopics(s.z[d],d)
-        print('word topics ({}) size: {}'.format(d,s.z[d].shape))
-      s.perp = np.zeros(D)
-      hdp.getPerplexity(s.perp)
-      print('Perplexity of iterations: {}'.format(s.perp))
+        N_d = s.state['x_tr'][d].size
+        print('N_d={}'.format(N_d))
+
+#        print('getting {}'.format(d))
+#        hdp.getDocTopics(s.state['pi'][d,:],s.state['sigPi'][d,:],s.state['c'][d,:],d)
+        #print('c({0}): {1}'.format(d,s.state['c'][d]))
+        s.state['z'].append(np.zeros(N_d,dtype=np.uint32))
+        hdp.getWordTopics(s.state['z'][d],d)
+        print('word topics ({}) size: {}'.format(d,s.state['z'][d].shape))
     else:
       print('Error loading hdp of type {}'.format(type(hdp)))
 
-  def checkSticks(self):
+  def checkSticks(s):
     print('--------------------- Checking Stick pieces -----------------')
-    print('sigV = {0}; {1}'.format(self.sigV,np.sum(self.sigV)))
-    D=len(self.x_tr)
+    print('sigV = {0}; {1}'.format(s.state['sigV'],np.sum(self.sigV)))
+    D=len(s.state['x_tr'])
     for d in range(0,D):
-      np.sum(self.sigPi[d])
-      print('sigPi = {0}; {1}'.format(self.sigPi[d],np.sum(self.sigPi[d])))
+      np.sum(s.state['sigPi'][d])
+      print('sigPi = {0}; {1}'.format(s.state['sigPi'][d],np.sum(self.sigPi[d])))
 
-  def KLdivergence(self,q):
+  def KLdivergence(s,q):
     kl = 0.0
     logP_joint = 0.0
     logQ_joint = 0.0
-    D=len(self.x_tr)
+    D=len(s.x_tr)
     for d in range(0,D):
-      N=self.x_tr[d].size
+      N=s.x_tr[d].size
       for n in range(0,N):
-        logP = self.logP_wordJoint(d,n)
+        logP = s.logP_wordJoint(d,n)
         logQ = q.logP_wordJoint(d,n)
         logP_joint += logP
         logQ_joint += logQ
@@ -253,54 +244,54 @@ class HDP_base:
     return kl, logP_joint, logQ_joint
 
   # x is the heldout data i.e. a document from the same dataset as was trained on
-  #def Perplexity(self,x):
+  #def Perplexity(s,x):
 
-  def CrossEntropy(self,x):
+  def CrossEntropy(s,x):
     H=0
     N = x.size
-    for w in range(0,self.Nw):
+    for w in range(0,s.Nw):
       n_w = np.sum(x==w)
       q = 0.5 # TODO: computation of q given x 
       H -= (n_w/N) * np.log(q)
 
-  def docTopicsImg(self):
-    D = len(self.x_tr)
+  def docTopicsImg(s):
+    D = len(s.x_tr)
     # create image for topic
-    vT = np.zeros((self.K,D))
+    vT = np.zeros((s.K,D))
     for d in range(0,D):
-      for t in range(0,self.T):
-        #print('{0} {1} c.shape={2}'.format(d,t,self.c[d].shape))
-        k=self.c[d][t]
-        vT[k,d] += self.sigPi[d][t]
+      for t in range(0,s.T):
+        #print('{0} {1} c.shape={2}'.format(d,t,s.c[d].shape))
+        k=s.c[d][t]
+        vT[k,d] += s.sigPi[d][t]
 #    print('vT={0}'.format(vT))
 #    print('vT_norm={0}'.format(np.sum(vT,0)))
-#    print('sigPi_d={0}'.format(self.sigPi[d]))
+#    print('sigPi_d={0}'.format(s.sigPi[d]))
     return vT
 
-  def plotTopics(self,minSupport=None):
-    D = len(self.x_tr)
+  def plotTopics(s,minSupport=None):
+    D = len(s.x_tr)
     ks=np.zeros(D)
     for d in range(0,D):
 
       # necessaary since topics may be selected several times!
-      c_u=np.unique(self.c[d])
+      c_u=np.unique(s.c[d])
       sigPi_u = np.zeros(c_u.size)
       for i in range(0,c_u.size):
-        #print('{}'.format(c_u[i] == self.c[d]))
-        #print('{}'.format(self.sigPi[d]))
-        sigPi_u[i] = np.sum(self.sigPi[d][c_u[i] == self.c[d]])
+        #print('{}'.format(c_u[i] == s.c[d]))
+        #print('{}'.format(s.sigPi[d]))
+        sigPi_u[i] = np.sum(s.sigPi[d][c_u[i] == s.c[d]])
       k_max = c_u[sigPi_u == np.max(sigPi_u)]
-#      print('c={};'.format(self.c[d]))
-#      print('sigPi={};'.format(self.sigPi[d]))
+#      print('c={};'.format(s.c[d]))
+#      print('sigPi={};'.format(s.sigPi[d]))
 #      print('sigPi_u = {};\tc_u={};\tk_max={}'.format(sigPi_u,c_u,k_max))
 
-#      t_max=np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))[0][0]
+#      t_max=np.nonzero(s.sigPi[d]==np.max(s.sigPi[d]))[0][0]
 #      print('d={}; D={}'.format(d,D))
-#      print('t_max={};'.format(np.nonzero(self.sigPi[d]==np.max(self.sigPi[d]))))
-#      print('sigPi={}; sum={}'.format(self.sigPi[d],np.sum(self.sigPi[d])))
-#      print('c[{}]={};'.format(d,self.c[d]))
-#      if t_max < self.c[d].size:
-#        k_max = self.c[d][t_max]
+#      print('t_max={};'.format(np.nonzero(s.sigPi[d]==np.max(s.sigPi[d]))))
+#      print('sigPi={}; sum={}'.format(s.sigPi[d],np.sum(s.sigPi[d])))
+#      print('c[{}]={};'.format(d,s.c[d]))
+#      if t_max < s.c[d].size:
+#        k_max = s.c[d][t_max]
 #      else:
 #        k_max = np.nan # this means that we arre not selecting one of the estimated models!! (the last element in sigPi is 1-sum(sigPi(0:end-1)) and represents the "other" models
       ks[d]=k_max
@@ -325,81 +316,81 @@ class HDP_base:
     fig=plt.figure()
     for i in range(0,Np):
       plt.subplot(Ncol,Nrow,i+1)
-      x = np.linspace(0,self.beta[int(ks_unique[i])].size-1,self.beta[int(ks_unique[i])].size)
-      plt.stem(x,self.beta[int(ks_unique[i])])
+      x = np.linspace(0,s.beta[int(ks_unique[i])].size-1,s.beta[int(ks_unique[i])].size)
+      plt.stem(x,s.beta[int(ks_unique[i])])
       plt.ylim([0.0,1.0])
       plt.xlabel('topic '+str(ks_unique[i]))
     return fig
 
-  def logP_fullJoint(self):
+  def logP_fullJoint(s):
     logP = 0.0
-    D = len(self.x_tr)
+    D = len(s.x_tr)
     for d in range(0,D):
-      N = self.x_tr[d].size
+      N = s.x_tr[d].size
       for n in range(0,N):
-        logP_w = self.logP_wordJoint(d,n)
+        logP_w = s.logP_wordJoint(d,n)
 #        print('logP({},{})={}'.format(d,n,logP_w))
         logP += logP_w
     return logP
 
-  def logP_wordJoint(self, d, n):
+  def logP_wordJoint(s, d, n):
     #print('d={}, n={}'.format(d,n))
-    #print('x={}; x.len={}; x[d].size={}; c.len={}; z.len={}; v.size={}; sigV.size={}; pi.len={}; sigPi.len={}'.format(self.x[d][n],len(self.x),self.x[d].size,len(self.c),len(self.z),self.v.size,self.sigV.size,len(self.pi),len(self.sigPi)))
-    #print('z={}; c={}; beta.size {}\n'.format(self.z[d][n], self.c[d][ self.z[d][n]],self.beta.shape))
+    #print('x={}; x.len={}; x[d].size={}; c.len={}; z.len={}; v.size={}; sigV.size={}; pi.len={}; sigPi.len={}'.format(s.x[d][n],len(s.x),s.x[d].size,len(s.c),len(s.z),s.v.size,s.sigV.size,len(s.pi),len(s.sigPi)))
+    #print('z={}; c={}; beta.size {}\n'.format(s.z[d][n], s.c[d][ s.z[d][n]],s.beta.shape))
 
-#    print('\tx|beta =    {}'.format(logCat(self.x[d][n], self.beta[ self.c[d][ self.z[d][n]]])))
-#    print('\tc|sigV =    {}'.format(logCat(self.c[d][ self.z[d][n]], self.sigV)))
-#    print('\tv|omega =   {}'.format(logBeta(self.v, 1.0, self.omega)))
-#    print('\tz|sigPi =   {}'.format(logCat(self.z[d][n], self.sigPi[d])))
-#    print('\tpi|alpha =  {}'.format(logBeta(self.pi[d], 1.0, self.alpha)))
-#    print('\tbeta|lambda={}'.format(logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)))
-    return logCat(self.x_tr[d][n], self.beta[ self.c[d][ self.z[d][n]]]) \
-    + logCat(self.c[d][ self.z[d][n]], self.sigV) \
-    + logBeta(self.v, 1.0, self.omega) \
-    + logCat(self.z[d][n], self.sigPi[d]) \
-    + logBeta(self.pi[d], 1.0, self.alpha) \
-    + logDir(self.beta[ self.c[d][ self.z[d][n]]], self.Lambda)
+#    print('\tx|beta =    {}'.format(logCat(s.x[d][n], s.beta[ s.c[d][ s.z[d][n]]])))
+#    print('\tc|sigV =    {}'.format(logCat(s.c[d][ s.z[d][n]], s.sigV)))
+#    print('\tv|omega =   {}'.format(logBeta(s.v, 1.0, s.omega)))
+#    print('\tz|sigPi =   {}'.format(logCat(s.z[d][n], s.sigPi[d])))
+#    print('\tpi|alpha =  {}'.format(logBeta(s.pi[d], 1.0, s.alpha)))
+#    print('\tbeta|lambda={}'.format(logDir(s.beta[ s.c[d][ s.z[d][n]]], s.Lambda)))
+    return logCat(s.x_tr[d][n], s.beta[ s.c[d][ s.z[d][n]]]) \
+    + logCat(s.c[d][ s.z[d][n]], s.sigV) \
+    + logBeta(s.v, 1.0, s.omega) \
+    + logCat(s.z[d][n], s.sigPi[d]) \
+    + logBeta(s.pi[d], 1.0, s.alpha) \
+    + logDir(s.beta[ s.c[d][ s.z[d][n]]], s.Lambda)
 
 class HDP_sample(HDP_base):
 
-  def generateDirHDPSample(self,D,N):
+  def generateDirHDPSample(s,D,N):
     # doc level
-    self.x_tr=[]
+    s.x_tr=[]
     # draw K topics from Dirichlet
-    self.beta = np.random.dirichlet(self.Lambda,self.K)
+    s.beta = np.random.dirichlet(s.Lambda,s.K)
     # draw breaking proportions using Beta
-    self.v = np.random.beta(1,self.omega,self.K-1)
-    self.sigV = stickBreaking(self.v)
+    s.v = np.random.beta(1,s.omega,s.K-1)
+    s.sigV = stickBreaking(s.v)
   
-    self.c=[]  # pointers to corp level topics
-    self.pi=[] # breaking proportions for selected doc level topics
-    self.sigPi=[]
-    self.z=[]
+    s.c=[]  # pointers to corp level topics
+    s.pi=[] # breaking proportions for selected doc level topics
+    s.sigPi=[]
+    s.z=[]
   
     for d in range(0,D): # for each document
       # draw T doc level pointers to topics (multinomial)
-      self.c.append(np.zeros(self.T))
-      _, self.c[d] = np.nonzero(np.random.multinomial(1,self.sigV,self.T))
+      s.c.append(np.zeros(s.T))
+      _, s.c[d] = np.nonzero(np.random.multinomial(1,s.sigV,s.T))
       # draw T doc level breaking proportions using Beta
-      self.pi.append(np.zeros(self.T-1))
-      self.sigPi.append(np.zeros(self.T))
-      self.pi[d] = np.random.beta(1,self.alpha,self.T-1)
-      self.sigPi[d] = stickBreaking(self.pi[d])
+      s.pi.append(np.zeros(s.T-1))
+      s.sigPi.append(np.zeros(s.T))
+      s.pi[d] = np.random.beta(1,s.alpha,s.T-1)
+      s.sigPi[d] = stickBreaking(s.pi[d])
   
-      self.x_tr.append(np.zeros(N))
+      s.x_tr.append(np.zeros(N))
       # draw topic assignment of word (multinomial)
-      self.z.append(np.zeros(N))
-      _, self.z[d] = np.nonzero(np.random.multinomial(1,self.sigPi[d],N))
+      s.z.append(np.zeros(N))
+      _, s.z[d] = np.nonzero(np.random.multinomial(1,s.sigPi[d],N))
       for i in range(0,N): # for each word
         # draw words
-        _, self.x_tr[d][i] = np.nonzero(np.random.multinomial(1,self.beta[ self.c[d][ self.z[d][i]], :],1))
+        _, s.x_tr[d][i] = np.nonzero(np.random.multinomial(1,s.beta[ s.c[d][ s.z[d][i]], :],1))
   
-      self.x_tr[d] = self.x_tr[d].astype(np.uint32)
+      s.x_tr[d] = s.x_tr[d].astype(np.uint32)
   
 #    for d in range(0,D):
-#      print('d={0}: {1}'.format(d,self.x_tr[d]))
+#      print('d={0}: {1}'.format(d,s.x_tr[d]))
   
-    return self.x_tr, self.sigV, self.beta, self.pi, self.c
+    return s.x_tr, s.sigV, s.beta, s.pi, s.c
 
   
     
