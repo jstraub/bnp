@@ -103,6 +103,7 @@ class HDP_var_base
     HDP_var_base(uint32_t K, uint32_t T, uint32_t Nw)
       : mK(K), mT(T), mNw(Nw)
     {};
+
 //    void getA(Col<double>& a)
 //    {
 //      a=mA.col(0);
