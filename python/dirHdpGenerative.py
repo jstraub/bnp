@@ -124,6 +124,7 @@ class HDP_base:
     s.toSave['x_tr']=s.x_tr
     s.toSave['x_ho']=s.x_ho
     s.toSave['perp']=s.perp
+    s.toSave['logP_w']=s.logP_w
     #{'K':s.K,'T':s.T,'Nw':s.Nw,'omega':s.omega,'alpha':s.alpha,'Lambda':s.Lambda,'c':s.c,'z':s.z,'beta':s.beta,'v':s.v,'sigV':s.sigV,'pi':s.pi,'sigPi':s.sigPi,'x_tr':s.x_tr,'x_ho':s.x_ho,'perp':s.perp}
 
   def save(s,path):
@@ -161,6 +162,7 @@ class HDP_base:
     s.v=mat['v']
     print('loaded v\t {0}'.format(s.v.shape))
     s.perp = mat['perp']
+    s.logP_w = mat['logP_w']
 
     s.x_tr = mat['x_tr']
     print('loaded x_tr\t {}'.format(s.x_tr.shape))
