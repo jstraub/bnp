@@ -230,13 +230,14 @@ class HDP_var_base
 
     virtual Row<double> logP_w(uint32_t d) const = 0;
 
-    void getWordDistr(Mat<double>& p){
+    bool getWordDistr(Mat<double>& p){
       uint32_t D=mZeta.size();
       assert(p.n_rows == D);
       assert(p.n_cols == mNw);
       for (uint32_t d=0; d<D; ++d){
         p.row(d) = logP_w(d);
       }
+      return true;
     };
 
 
@@ -249,8 +250,8 @@ class HDP_var_base
 
     Col<double> mPerp; // perplexity for each document
 
-    uint32_t mT; // Doc level truncation
     uint32_t mK; // Corp level truncation
+    uint32_t mT; // Doc level truncation
     uint32_t mNw; // size of dictionary
 
 };

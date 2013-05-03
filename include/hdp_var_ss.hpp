@@ -324,7 +324,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>, public HDP_var_base<uint32_t>
         //cout<<"updating copied model with x"<<endl;
         updateEst(x_te,zeta,phi,gamma,a,lambda,omega,d,kappa);
         //cout<<"computing perplexity under updated model"<<endl;
-        Row<double> logP=HDP_var_base<uint32_t>::logP_w(phi, zeta, gamma, lambda);
+        Row<double> logP=logP_w(phi, zeta, gamma, lambda);
         return HDP_ss<uint32_t>::perplexity(x_ho, logP);
         //return perplexity(x_ho, zeta, phi, gamma, lambda);
       }else{
