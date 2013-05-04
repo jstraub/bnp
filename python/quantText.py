@@ -16,27 +16,26 @@ import fileinput
 if __name__ == '__main__':
 
   dicts = ['../data/ispell/english.0','../data/ispell/english.1','../data/ispell/english.2','../data/ispell/english.3']
-  book=[]
+  book=dict()
+  i=0
   for d in dicts:
     f=open(d)
     for line in f:
-      book.append(line.strip())
+      book[line.strip()] = i
+      i+=1
     f.close()
-  #print('book.size={}'.format(len(book)))
-  #print(' '.join(book))
+  print('book.size={}'.format(len(book)))
+
+  stopWords=set(['the','of','to','for','is','are','on'])
 
   for line in fileinput.input():
     words=re.split('[ .,;:]',line)
     quant=[]
     for word in words:
-      nr = 0
-      #print('checking {}'.format(word))
-      for bookw in book:
-        if word == bookw:
-          quant.append(str(nr))
-          #print('{} = #{}'.format(word,nr))
-          break
-        nr += 1
+      if word not in stopWords:
+        if word in book:
+          print('word: {} = {}'.format(word,book[word]))
+          quant.append(str( book[word] ))
     print(' '.join(quant))
 
 
