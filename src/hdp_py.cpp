@@ -246,7 +246,11 @@ public:
 typedef HDP_py<uint32_t> HDP_Dir;
 typedef HDP_py<double> HDP_INW;
 
-
+/*
+ * Class to handle access to all comon variables for var HDPs
+ *
+ * http://en.wikipedia.org/wiki/Virtual_inheritance
+ */
 class HDP_var_base_py : public virtual HDP_var_base 
 {
   public:

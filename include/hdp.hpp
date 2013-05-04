@@ -157,7 +157,7 @@ class HDP_var_base
    * @param d points to the document of interest. 
    */
     bool getWordTopics(Col<uint32_t>& z, uint32_t d) const {
-      cout<<"mPhi -> D="<<mPhi.size()<<endl;
+//      cout<<"mPhi -> D="<<mPhi.size()<<endl;
       if (z.n_rows != mPhi[d].n_rows)
       {
         cout<<"z.rows="<<z.n_rows<<" vs phi_d.rows="<<mPhi[d].n_rows<<endl;

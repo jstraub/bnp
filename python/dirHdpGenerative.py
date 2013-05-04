@@ -91,13 +91,15 @@ class HDP_base:
   # results
   perp = np.zeros(1)
 
-  toSave = dict()
   loaded = dict()
   
   def __init__(s, K=None,T=None,Nw=None,omega=None,alpha=None,Lambda=None, pathToModel=None):
 
-    s.scalars = ['K','T','Nw','omega','alpha']
-    s.matrices = ['Lambda','beta','sigV','v','perp','logP_w']
+    s.scalars = ['K','T','Nw','omega','alpha','D_tr','D_te']
+    s.matrices = ['c','pi','sigPi','Lambda','beta','sigV','v','perp','logP_w']
+    s.listMatrices=['z','x_tr','x_te']
+    
+    s.shape=dict()
 
 #    s.states=[]
 #    s.states.expand(s.scalars)
@@ -127,15 +129,21 @@ class HDP_base:
     except Exception, err:
       print('Did not find model under {0}'.format(path))
       return False
-    HDP_base.parseLoad(s,s.loaded)
+    print('--- loading state from mat file at {}'.format(path))
+    if HDP_base.__parseLoad(s,s.loaded):
+      print('--- loaded state successfully!')
+    else:
+      print('--- error while loading state!')
     return True
 
-  def parseLoad(s,mat):
+  def __parseLoad(s,mat):
     for scalar in s.scalars:
       s.state[scalar]=mat[scalar][0][0]
       print('loaded {}\t {}'.format(scalar,s.state[scalar]))
     for matrix in s.matrices:
       s.state[matrix]=mat[matrix]
+      if s.state[matrix].shape[1] == 1: # savemat/loadmat puts vectors always as column vectors
+        s.state[matrix] = s.state[matrix].ravel()
       print('loaded {}\t {}'.format(matrix,s.state[matrix].shape))
 
 # have to be added to the appropriate matrices or listMatrices
@@ -143,52 +151,69 @@ class HDP_base:
 #    print('loaded x_tr\t {}'.format(s.state['x_tr'].shape))
 #    s.state['x_ho'] = mat['x_ho']
 
-    listMatrices=['c','pi','sigPi','z']
- 
-    print('{}'.format(mat['pi']))
-    print('{}'.format(mat['pi'].shape))
-    print('{}'.format(mat['pi'][0].shape))
-    D=mat['pi'].shape[0]
-
-    for listMatrix in listMatrices:
+    for listMatrix in s.listMatrices:
       s.state[listMatrix] = []
-      for d in range(0,D):
-        s.state[listMatrix].append(mat[listMatrix][d])
-
-    #for d in range(0,mat['x_ho'].shape[0]):
-    #  s.state['x_ho'].append(mat['x_ho'][d][0])
-
-#    for d in range(0,mat['x_tr'].shape[0]):
-#      s.state['z'].append(mat['z'][d][0])
-#      #print('loaded z[{}]\t {}'.format(d,s.state['z'][d].shape))
-#      s.state['c'].append(mat['c'][d,:])
-#      #print('loaded c[{}]\t {}'.format(d,s.state['c'][d].shape))
-#      s.state['pi'].append(mat['pi'][d,:])
-#      #print('loaded pi[{}]\t {}'.format(d,s.state['pi'][d].shape))
-#      s.state['sigPi'].append(mat['sigPi'][d,:])
-#      #print('loaded sigPi[{}]\t {}'.format(d,s.state['sigPi'][d].shape))
+      D=s.state['D_tr'] #mat[listMatrix].size
+      if listMatrix == 'x_te':
+        D=s.state['D_te']
+      print('{} D={}'.format(listMatrix,D))
+      if D==1:
+        s.state[listMatrix].append(mat[listMatrix].ravel())
+        print('loaded {}_{}\t {}'.format(listMatrix,d,s.state[listMatrix][0].shape))
+      else:
+        for d in range(0,D):
+          s.state[listMatrix].append(mat[listMatrix][d][0])
+          if s.state[listMatrix][d].shape[1] == 1: # savemat/loadmat puts vectors always as column vectors
+            s.state[listMatrix][d] = s.state[listMatrix][d].ravel()
+          print('loaded {}_{}\t {}'.format(listMatrix,d,s.state[listMatrix][d].shape))
 
 
-  def loadHDPSample(s, x_tr, x_ho, hdp):
-    print("---------------------- obtaining results -------------------------");
-    s.state['x_tr'] = x_tr
-    s.state['x_ho'] = x_ho
+  def stateEquals(s,hdp):
+    print('--- checking whether state of two hdps is equal')
+    for key, val in s.state.iteritems():
+      print('checking {}'.format(key))
+      if key in s.scalars:
+        if hdp.state[key] != val:
+          print('keys {} differ'.format(key))
+          return False
+      elif key in s.matrices:
+        if np.any(hdp.state[key] != val):
+          print('keys {} differ'.format(key))
+          print('{}\nvs\n{}'.format(val,hdp.state[key]))
+          return False
+      elif key in s.listMatrices:
+        D=len(val)
+        for d in range(0,D):
+          if np.any(hdp.state[key][d] != val[d]):
+            print('keys {} at d={} differ'.format(key,d))
+            print('{}\nvs\n{}'.format(val[d],hdp.state[key][d]))
+            return False
+    print('--- HDPs state is equal!')
+    return True
+
+
+  def loadHDPSample(s, x_tr, x_te, hdp):
     if isinstance(hdp,bnp.HDP_var) or isinstance(hdp,bnp.HDP_var_ss):
-      D=len(s.state['x_tr'])
-      D_ho=len(s.state['x_ho'])
-      print('D={}; D={};'.format(D,D_ho))
+      print("---------------------- obtaining results -------------------------");
+      s.state['x_tr'] = x_tr
+      s.state['x_te'] = x_te
+      print('{}'.format(s.state['x_tr']))
+
+      D_tr=s.state['D_tr']=len(s.state['x_tr'])
+      D_te=s.state['D_te']=len(s.state['x_te'])
+      print('D_tr={}; D_te={};'.format(s.state['D_tr'],s.state['D_te']))
 
       s.state['sigV'] = np.zeros(s.state['K']+1,dtype=np.double)
       s.state['v'] = np.zeros(s.state['K'],dtype=np.double)
       hdp.getCorpTopicProportions(s.state['v'],s.state['sigV'])
       print('gotCorpTopicProportions {} {}'.format(s.state['v'].shape,s.state['sigV'].shape))
 
-      s.state['logP_w'] =np.zeros((D+D_ho,s.state['Nw']),dtype=np.double)
+      s.state['logP_w'] =np.zeros((D_tr,s.state['Nw']),dtype=np.double)
       hdp.getWordDistr(s.state['logP_w'])
       print('gotWordDistr {}'.format(s.state['logP_w'].shape))
       print('gotWordDistr {}'.format(s.state['logP_w']))
       
-      s.state['perp'] = np.zeros(D)
+      s.state['perp'] = np.zeros(D_tr)
       hdp.getPerplexity(s.state['perp'])
       print('Perplexity of iterations: {}'.format(s.state['perp']))
 
@@ -197,9 +222,9 @@ class HDP_base:
       print('beta={}'.format(s.state['beta'].shape))
       print('beta={}'.format(s.state['beta']))
 
-      s.state['sigPi']=np.zeros((D,s.state['T']+1),dtype=np.double)
-      s.state['pi']=np.zeros((D,s.state['T']),dtype=np.double)
-      s.state['c']=np.zeros((D,s.state['T']),dtype=np.uint32)
+      s.state['sigPi']=np.zeros((D_tr,s.state['T']+1),dtype=np.double)
+      s.state['pi']=np.zeros((D_tr,s.state['T']),dtype=np.double)
+      s.state['c']=np.zeros((D_tr,s.state['T']),dtype=np.uint32)
       hdp.getDocTopics(s.state['pi'],s.state['sigPi'],s.state['c'])
       print('pi: {}'.format(s.state['pi'].shape))
       print('pi: {}'.format(s.state['pi']))
@@ -207,7 +232,7 @@ class HDP_base:
       print('sigPi: {}'.format(s.state['sigPi']))
 
       s.state['z']=[] # word indices to doc topics
-      for d in range(0,D):
+      for d in range(0,D_tr):
         N_d = s.state['x_tr'][d].size
         print('N_d={}'.format(N_d))
 
@@ -216,7 +241,6 @@ class HDP_base:
         #print('c({0}): {1}'.format(d,s.state['c'][d]))
         s.state['z'].append(np.zeros(N_d,dtype=np.uint32))
         hdp.getWordTopics(s.state['z'][d],d)
-        print('word topics ({}) size: {}'.format(d,s.state['z'][d].shape))
     else:
       print('Error loading hdp of type {}'.format(type(hdp)))
 
@@ -242,6 +266,10 @@ class HDP_base:
         logQ_joint += logQ
         kl += (logP - logQ)* np.exp(logP)
     return kl, logP_joint, logQ_joint
+  
+  # Jensen-Shannon Divergence - symmeterised divergence
+  def symKL(s,logP,logQ):
+    return np.sum((logP-logQ)*(np.exp(logP)-np.exp(logQ)))
 
   # x is the heldout data i.e. a document from the same dataset as was trained on
   #def Perplexity(s,x):
@@ -255,18 +283,31 @@ class HDP_base:
       H -= (n_w/N) * np.log(q)
 
   def docTopicsImg(s):
-    D = len(s.x_tr)
+    D_tr = s.state['D_tr']
+    K = s.state['K']
+    T = s.state['T']
     # create image for topic
-    vT = np.zeros((s.K,D))
-    for d in range(0,D):
-      for t in range(0,s.T):
+    vT = np.zeros((K,D_tr))
+    for d in range(0,D_tr):
+      for t in range(0,T):
         #print('{0} {1} c.shape={2}'.format(d,t,s.c[d].shape))
-        k=s.c[d][t]
-        vT[k,d] += s.sigPi[d][t]
+        k=s.state['c'][d][t]
+        vT[k,d] += s.state['sigPi'][d][t]
 #    print('vT={0}'.format(vT))
 #    print('vT_norm={0}'.format(np.sum(vT,0)))
 #    print('sigPi_d={0}'.format(s.sigPi[d]))
     return vT
+
+  def symKLImg(s):
+    D_tr = s.state['D_tr']
+    K = s.state['K']
+    T = s.state['T']
+    # create image for topic
+    symKLd = np.zeros((D_tr,D_tr))
+    for di in range(0,D_tr):
+      for dj in range(0,D_tr):
+        symKLd[di,dj] = s.symKL(s.state['logP_w'][di],s.state['logP_w'][di])
+    return symKLd
 
   def plotTopics(s,minSupport=None):
     D = len(s.x_tr)

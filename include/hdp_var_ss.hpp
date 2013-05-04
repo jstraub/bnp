@@ -70,8 +70,12 @@ protected:
 };
 
 
-// this one assumes that the number of words per document are bigger than the number of individual words
-// and is optimized for that case
+/* 
+ * this one assumes that the number of words per document are bigger 
+ * than the number of individual words and is optimized for that case
+ * 
+ * http://en.wikipedia.org/wiki/Virtual_inheritance
+ */
 class HDP_var_ss: public HDP_ss<uint32_t>, public virtual HDP_var_base
 {
   public:

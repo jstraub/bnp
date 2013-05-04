@@ -8,7 +8,6 @@
 
 #include "random.hpp"
 #include "baseMeasure.hpp"
-//#include "dp.hpp"
 #include "probabilityHelpers.hpp"
 
 #include <stddef.h>
@@ -23,7 +22,12 @@
 using namespace std;
 using namespace arma;
 
-// this one assumes that the number of words per document is smaller than the dictionary size
+/*
+ * this one assumes that the number of words per document is 
+ * smaller than the dictionary size
+ *
+ * http://en.wikipedia.org/wiki/Virtual_inheritance
+ */
 class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 {
   public:
@@ -48,7 +52,9 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
 
     /* 
-     * Initializes the corpus level parameters mA and mLambda according to Blei's Stochastic Variational paper
+     * Initializes the corpus level parameters mA and mLambda according 
+     * to Blei's Stochastic Variational paper
+     *
      * @param D is the assumed number of documents for init
      */
     void initCorpusParams(uint32_t Nw, uint32_t K, uint32_t T, uint32_t D)
@@ -93,9 +99,9 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       initCorpusParams(mNw,mK,mT,D);
       cout<<"Init of corpus params done"<<endl;
       Row<uint32_t> ind = updateEst_batch(mInd2Proc,mZeta,mPhi,mGamma,mA,mLambda,mPerp,mOmega,kappa,S,true);
-      cout<<"mPhi -> D="<<mPhi.size()<<endl;
-      cout<<"mPhi -> D="<<HDP_var_base::mPhi.size()<<endl;
-      cout<<"mPerp="<<mPerp.t()<<endl;
+//      cout<<"mPhi -> D="<<mPhi.size()<<endl;
+//      cout<<"mPhi -> D="<<HDP_var_base::mPhi.size()<<endl;
+//      cout<<"mPerp="<<mPerp.t()<<endl;
 
       mInd2Proc.set_size(0); // all processed
 
@@ -109,8 +115,6 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       if(mX.size() > 0)
       {
         densityEst(mX,Nw,kappa,K,T,S);
-        cout<<"mPerp="<<mPerp.t()<<endl;
-        cout<<"mPhi -> D="<<mPhi.size()<<endl;
         //TODO: return p_d(x)
         return true;
       }else{
@@ -382,7 +386,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      * TODO: so is that here not some MAP or ML estimate?!
      */
     Row<double> logP_w(uint32_t d) const {
-      cout<<"mX.size="<<mX.size()<<endl;
+//      cout<<"mX.size="<<mX.size()<<endl;
       return logP_w(mX[d],mPhi[d],mZeta[d],mGamma[d],mLambda);
     };
 
@@ -394,36 +398,36 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       Row<double> p(mNw);
       p.zeros();
 
-      cout<<"x:\t"<<size(x);
-      cout<<"phi:\t"<<size(phi);
-      cout<<"zeta:\t"<<size(zeta);
-      cout<<"gamma:\t"<<size(gamma);
-      cout<<"lambda:\t"<<size(lambda);
+//      cout<<"x:\t"<<size(x);
+//      cout<<"phi:\t"<<size(phi);
+//      cout<<"zeta:\t"<<size(zeta);
+//      cout<<"gamma:\t"<<size(gamma);
+//      cout<<"lambda:\t"<<size(lambda);
 
       Col<double> pi;
       Col<double> sigPi;
       Col<uint32_t> c;
       getDocTopics(pi,sigPi,c,gamma,zeta);
-      cout<<"getDocTopics done"<<endl;
-      cout<<"c="<<c.t()<<size(c);
+      //cout<<"getDocTopics done"<<endl;
+      //cout<<"c="<<c.t()<<size(c);
       Col<uint32_t> z(mNw);
       getWordTopics(z, phi);
-      cout<<"getWordTopics done"<<endl;
-      cout<<"z="<<z.t()<<size(z);
+      //cout<<"getWordTopics done"<<endl;
+      //cout<<"z="<<z.t()<<size(z);
       Mat<double> beta;
       getCorpTopics(beta,lambda);
-      cout<<"getCorpTopics done"<<endl;
-      cout<<"beta:\t"<<size(beta);
+      //cout<<"getCorpTopics done"<<endl;
+      //cout<<"beta:\t"<<size(beta);
 
       for (uint32_t i=0; i<x.n_cols; ++i){
-        cout<<"z_"<<i<<"="<<z[i]<<endl;
+        //cout<<"z_"<<i<<"="<<z[i]<<endl;
         p[x[i]] += logCat(x[i], beta.row( c[ z[i] ]));
-        cout<<"p_"<<x[i]<<"="<<p[x[i]]<<endl;
+        //cout<<"p_"<<x[i]<<"="<<p[x[i]]<<endl;
       }
       for (uint32_t w=0; w<mNw; ++w)
         p[w] = p[w]==0.0?-1e20:p[w];
 
-      cout<<"p="<<p<<endl;
+      //cout<<"p="<<p<<endl;
       return p;
     };
 

@@ -30,7 +30,7 @@ if __name__ == '__main__':
   #parser.add_argument('-D', type=int, default=500, help='number of documents to synthesize')
   #parser.add_argument('-H', type=int, default=10, help='number of held out documents for perplexity computation')
   parser.add_argument('-N', type=int, default=100, help='number of words per document')
-  parser.add_argument('-Nw', type=int, default=40, help='alphabet size (how many different words)')
+  parser.add_argument('-Nw', type=int, default=10, help='alphabet size (how many different words)')
   parser.add_argument('-a','--alpha', type=float, default=1.0, help='concentration parameter for document level')
   parser.add_argument('-o','--omega', type=float, default=10.0, help='concentration parameter for corpus level')
   parser.add_argument('-k','--kappa', type=float, default=0.9, help='forgetting rate for stochastic updates')
@@ -70,11 +70,28 @@ if __name__ == '__main__':
       x=[]
 
   hdp.loadHDPSample(x_tr,x_te, hdp.hdp_var)
-  print('{}'.format(hdp.state['logP_w']))
+  #print('{}'.format(hdp.state['logP_w']))
   hdp.save('incTest.mat')
 
-
-
+# -- make sure the saved model is saved and loaded correctly
   hdp2 = HDP_var_inc(K,T,Nw,omega,alpha,dirAlphas)
   hdp2.load('incTest.mat')
-  print('{}'.format(hdp2.state['logP_w']))
+  #print('{}'.format(hdp2.state['logP_w']))
+  hdp.stateEquals(hdp2)
+
+# -- plot some things
+  fig0=plt.figure(0)
+  imgplot=plt.imshow(hdp.docTopicsImg(),interpolation='nearest',cmap=cm.hot);
+  fig0.show()
+
+  symKLimg = hdp.symKLImg();
+  print('logP_w:\n{}'.format(hdp.state['logP_w']))
+  print('symKLimg:\n{}'.format(symKLimg))
+  fig1=plt.figure(1)
+  imgplot=plt.imshow(symKLimg,interpolation='nearest',cmap=cm.hot);
+  fig1.show()
+
+
+  time.sleep(1000)
+  raw_input()
+
