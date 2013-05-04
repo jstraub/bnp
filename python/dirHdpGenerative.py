@@ -166,6 +166,8 @@ class HDP_base:
           if s.state[listMatrix][d].shape[1] == 1: # savemat/loadmat puts vectors always as column vectors
             s.state[listMatrix][d] = s.state[listMatrix][d].ravel()
           print('loaded {}_{}\t {}'.format(listMatrix,d,s.state[listMatrix][d].shape))
+    
+    return True
 
 
   def stateEquals(s,hdp):
