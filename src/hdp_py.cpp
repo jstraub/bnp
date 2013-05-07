@@ -313,9 +313,12 @@ class HDP_var_base_py : public virtual HDP_var_base
     Mat<double> pi_wrap=np2mat<double>(pi); 
     Mat<uint32_t> c_wrap=np2mat<uint32_t>(c); 
     if((sigPi_mat.n_rows != sigPi_wrap.n_rows) || (c_mat.n_rows != c_wrap.n_rows) || (pi_mat.n_rows != pi_wrap.n_rows) || 
-        (sigPi_mat.n_cols != sigPi_wrap.n_cols) || (c_mat.n_cols != c_wrap.n_cols) || (pi_mat.n_cols != pi_wrap.n_cols))
+        (sigPi_mat.n_cols != sigPi_wrap.n_cols) || (c_mat.n_cols != c_wrap.n_cols) || (pi_mat.n_cols != pi_wrap.n_cols)) {
+      cout<<"sigPi_mat: "<<size(sigPi_mat)<<" vs sigPi_wrap: "<<size(sigPi_wrap)<<endl;
+      cout<<"pi_mat: "<<size(pi_mat)<<" vs pi_wrap: "<<size(pi_wrap)<<endl;
+      cout<<"c_mat: "<<size(c_mat)<<" vs c_wrap: "<<size(c_wrap)<<endl;
       return false;
-    else{
+    }else{
       pi_wrap=pi_mat;
       sigPi_wrap=sigPi_mat;
       c_wrap=c_mat;

@@ -227,11 +227,13 @@ class HDP_base:
       s.state['sigPi']=np.zeros((D_tr,s.state['T']+1),dtype=np.double)
       s.state['pi']=np.zeros((D_tr,s.state['T']),dtype=np.double)
       s.state['c']=np.zeros((D_tr,s.state['T']),dtype=np.uint32)
-      hdp.getDocTopics(s.state['pi'],s.state['sigPi'],s.state['c'])
-      print('pi: {}'.format(s.state['pi'].shape))
-      print('pi: {}'.format(s.state['pi']))
-      print('sigPi: {}'.format(s.state['sigPi'].shape))
-      print('sigPi: {}'.format(s.state['sigPi']))
+      if hdp.getDocTopics(s.state['pi'],s.state['sigPi'],s.state['c']):
+        print('pi: {}'.format(s.state['pi'].shape))
+        print('pi: {}'.format(s.state['pi']))
+        print('sigPi: {}'.format(s.state['sigPi'].shape))
+        print('sigPi: {}'.format(s.state['sigPi']))
+      else:
+        print('error while loading pi, sigPi and c from C++ model')
 
       s.state['z']=[] # word indices to doc topics
       for d in range(0,D_tr):
@@ -269,9 +271,13 @@ class HDP_base:
         kl += (logP - logQ)* np.exp(logP)
     return kl, logP_joint, logQ_joint
   
-  # Jensen-Shannon Divergence - symmeterised divergence
+ #  symmeterised divergence
   def symKL(s,logP,logQ):
     return np.sum((logP-logQ)*(np.exp(logP)-np.exp(logQ)))
+
+# Jensen-Shannon Divergence - 
+  def jsD(s,logP,logQ):
+    return 0.0
 
   # x is the heldout data i.e. a document from the same dataset as was trained on
   #def Perplexity(s,x):
@@ -308,7 +314,7 @@ class HDP_base:
     symKLd = np.zeros((D_tr,D_tr))
     for di in range(0,D_tr):
       for dj in range(0,D_tr):
-        symKLd[di,dj] = s.symKL(s.state['logP_w'][di],s.state['logP_w'][di])
+        symKLd[di,dj] = s.symKL(s.state['logP_w'][di],s.state['logP_w'][dj])
     return symKLd
 
   def plotTopics(s,minSupport=None):

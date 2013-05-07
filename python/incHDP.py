@@ -26,7 +26,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(description = 'hdp topic modeling of synthetic data')
   parser.add_argument('-T', type=int, default=10, help='document level truncation')
   parser.add_argument('-K', type=int, default=100, help='corpus level truncation')
-  parser.add_argument('-S', type=int, default=10, help='mini batch size')
+  parser.add_argument('-S', type=int, default=3, help='mini batch size')
   #parser.add_argument('-D', type=int, default=500, help='number of documents to synthesize')
   #parser.add_argument('-H', type=int, default=10, help='number of held out documents for perplexity computation')
   parser.add_argument('-N', type=int, default=100, help='number of words per document')
@@ -62,12 +62,17 @@ if __name__ == '__main__':
   for line in fileinput.input():
     x.append(np.fromstring(line, dtype='uint32', sep=" "))
     print('{}'.format(x[-1]))
-    if len(x) >= S+2:
+    if len(x) >= S:
       print('----------')
-      hdp.updateEst(x[0:-3],kappa,S,x_te=x[-2:-1])
-      x_tr.extend(x[0:-3])
-      x_te.extend(x[-2:-1])
+      hdp.updateEst(x,kappa,S)
+      x_tr.extend(x)
       x=[]
+#    if len(x) >= S+2:
+#      print('----------')
+#      hdp.updateEst(x[0:-3],kappa,S,x_te=x[-2:-1])
+#      x_tr.extend(x[0:-3])
+#      x_te.extend(x[-2:-1])
+#      x=[]
 
   hdp.loadHDPSample(x_tr,x_te, hdp.hdp_var)
   #print('{}'.format(hdp.state['logP_w']))

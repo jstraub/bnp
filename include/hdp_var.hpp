@@ -102,6 +102,12 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 //      cout<<"mPhi -> D="<<mPhi.size()<<endl;
 //      cout<<"mPhi -> D="<<HDP_var_base::mPhi.size()<<endl;
 //      cout<<"mPerp="<<mPerp.t()<<endl;
+//
+      Mat<double> pi(D,T);
+      Mat<double> sigPi(D,T+1);
+      Mat<uint32_t> c(D,T);
+      getDocTopics(pi,sigPi,c);
+      cout<<"c:"<<c<<endl;
 
       mInd2Proc.set_size(0); // all processed
 

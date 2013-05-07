@@ -137,6 +137,10 @@ class HDP_var_base
     bool getDocTopics(Mat<double>& pi, Mat<double>& sigPi, Mat<uint32_t>& c) const
     {
       uint32_t D=mZeta.size();
+
+      pi.set_size(D,mT);
+      sigPi.set_size(D,mT+1);
+      c.set_size(D,mT);
       for (uint32_t d=0; d<D; ++d){
         Col<double> cpi;
         Col<double> csigPi;
@@ -147,6 +151,7 @@ class HDP_var_base
         c.row(d) = cc.t();
       }
         return true;
+
     };
 
   /*
