@@ -554,8 +554,10 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
       d_lambda.zeros();
       d_a.zeros();
-      for (uint32_t k=0; k<K; ++k) { // for all K corpus level topics
-        for (uint32_t i=0; i<T; ++i) {
+      for (uint32_t k=0; k<K; ++k) 
+      { // for all K corpus level topics
+        for (uint32_t i=0; i<T; ++i) 
+        {
           Row<double> _lambda(Nw); _lambda.zeros();
           for (uint32_t n=0; n<N; ++n){
             _lambda(x_d(n)) += phi(n,i);

@@ -81,10 +81,38 @@ void betaMode(Col<double>& v, const Col<double>& alpha, const Col<double>& beta)
     }
   }
 };
+void betaMode(Row<double>& v, const Row<double>& alpha, const Row<double>& beta)
+{
+  assert(alpha.n_elem == beta.n_elem);
+  // breaking proportions
+  v.set_size(alpha.n_elem);
+  for (uint32_t i=0; i<v.n_elem; ++i){
+    if (alpha[i]+beta[i] != 2.0) {
+      v[i] = (alpha[i]-1.0)/(alpha[i]+beta[i]-2.0);
+    }else{
+      v[i] = 1.0;
+    }
+  }
+};
 
 // stick breaking proportions 
 // truncated stickbreaking -> stick breaks will be dim longer than proportions v 
 void stickBreaking(Col<double>& prop, const Col<double>& v)
+{
+  prop.set_size(v.n_elem+1);
+  // stick breaking proportions
+  for (uint32_t i=0; i<prop.n_elem; ++i){
+    if (i == prop.n_elem-1){
+      prop[i] = 1.0;
+    }else{
+      prop[i] = v[i];
+    }
+    for (uint32_t j=0; j<i; ++j){
+      prop[i] *= (1.0 - v[j]);
+    }
+  }
+};
+void stickBreaking(Row<double>& prop, const Row<double>& v)
 {
   prop.set_size(v.n_elem+1);
   // stick breaking proportions
@@ -126,5 +154,16 @@ void dirMode(Row<double>& mode, const Row<double>& alpha)
 void dirMode(Col<double>& mode, const Col<double>& alpha)
 {
 
-  mode = (alpha-1.0)/sum(alpha-1.0);
+  // see derivation in my notes
+  Col<double> alpha_mod(alpha);
+  double alpha_0 = sum(alpha);
+  double K = alpha.n_elem;
+  if (alpha_0 < K) {
+    for (uint32_t i=0; i<K; ++i)
+      if (alpha_mod[i] > 1.0) {alpha_mod[i] = 1.0;}
+  }else if(alpha_0 > K) {
+    for (uint32_t i=0; i<K; ++i)
+      if (alpha_mod[i] < 1.0) {alpha_mod[i] = 1.0;}
+  }
+  mode = (alpha_mod-1.0)/sum(alpha_mod-1.0);
 };

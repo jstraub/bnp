@@ -142,13 +142,23 @@ class HDP_var_base
       sigPi.set_size(D,mT+1);
       c.set_size(D,mT);
       for (uint32_t d=0; d<D; ++d){
-        Col<double> cpi;
-        Col<double> csigPi;
-        Col<uint32_t> cc;
-        getDocTopics(cpi,csigPi,cc,mGamma[d],mZeta[d]);
-        pi.row(d) = cpi.t();
-        sigPi.row(d) = csigPi.t();
-        c.row(d) = cc.t();
+        Row<double> cpi;
+        Row<double> csigPi;
+        Row<uint32_t> cc;
+
+        betaMode(cpi,mGamma[d].col(0),mGamma[d].col(1));
+        stickBreaking(csigPi,cpi);
+        for (uint32_t i=0; i<T; ++i){
+          cc[i] = multinomialMode(mZeta[d].row(i));
+        }
+
+        //getDocTopics(cpi,csigPi,cc,mGamma[d],mZeta[d]);
+        pi.row(d) = cpi;
+        sigPi.row(d) = csigPi;
+        c.row(d) = cc;
+
+        cout<<csigPi.t()<<" = "<<sum(csigPi)<<endl;
+        cout<<sigPi.row(d)<<" = "<<sum(sigPi.row(d))<<endl;
       }
       return true;
     };
