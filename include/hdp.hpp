@@ -142,13 +142,13 @@ class HDP_var_base
       sigPi.set_size(D,mT+1);
       c.set_size(D,mT);
       for (uint32_t d=0; d<D; ++d){
-        Row<double> cpi;
-        Row<double> csigPi;
-        Row<uint32_t> cc;
+        Row<double> cpi(mT);
+        Row<double> csigPi(mT+1);
+        Row<uint32_t> cc(mT);
 
         betaMode(cpi,mGamma[d].col(0),mGamma[d].col(1));
         stickBreaking(csigPi,cpi);
-        for (uint32_t i=0; i<T; ++i){
+        for (uint32_t i=0; i<mT; ++i){
           cc[i] = multinomialMode(mZeta[d].row(i));
         }
 

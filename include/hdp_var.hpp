@@ -306,6 +306,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
             converged = (accu(gamma_prev != gamma[dout]))==0 || o>60 ;
             gamma_prev = gamma[dout];
             ++o;
+            cout<<"o="<<o<<endl;
           }
 
           Mat<double> d_lambda(mK,mNw);
@@ -431,7 +432,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         //cout<<"p_"<<x[i]<<"="<<p[x[i]]<<endl;
       }
       for (uint32_t w=0; w<mNw; ++w)
-        p[w] = p[w]==0.0?-1e20:p[w];
+        p[w] = p[w]==0.0?-1e10:p[w];
 
       //cout<<"p="<<p<<endl;
       return p;
