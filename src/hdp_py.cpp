@@ -134,8 +134,13 @@ Row<U> np2row(const numeric::array& np)
 	// Get pointer to np array
 	PyArrayObject* a = (PyArrayObject*)PyArray_FROM_O(np.ptr());
 	if(!checkPyArr(a,1,NpTyp<U>::Num)) exit(0);
-	// do not copy the data!
-	return Row<U>((U*)a->data,a->dimensions[0],false,true);
+  if (a->nd == 1) {
+	  // do not copy the data!
+	  return Row<U>((U*)a->data,a->dimensions[0],false,true);
+  }else{
+	  // do not copy the data!
+	  return Row<U>((U*)a->data,a->dimensions[1],false,true);
+  }
 }
 
 template<class U>
@@ -425,118 +430,6 @@ public:
     return HDP_var::updateEst_batch(kappa,S);
   }
 
-//  bool getWordDistr(const numeric::array& p)
-//  {
-//    Mat<double> p_mat=np2mat<double>(p); // can do this since x_mat gets copied inside    
-//    return HDP_var::getWordDistr(p_mat);
-//  }
-//
-//
-//  // works on the data in lambda -> size has to be correct in order for this to work!
-//  // makes a copy of the internal labels vector
-//  bool getLambda(numeric::array& lambda, uint32_t k)
-//  {
-//    Col<double> lambda_col;
-//    if(!HDP_var::getLambda(lambda_col, k)){return false;} // works on the data in _mat
-//    Col<double> lambda_wrap=np2col<double>(lambda); 
-//    if(lambda_col.n_rows != lambda_wrap.n_rows)
-//      return false;
-//    else{
-//      for (uint32_t i=0; i<lambda_wrap.n_rows; ++i)
-//        lambda_wrap.at(i)=lambda_col.at(i);
-//      return true;
-//    }
-//  };
-//
-//  void getA(numeric::array& a)
-//  {
-//    Col<double> a_wrap=np2col<double>(a); 
-//     for (uint32_t i=0; i<a_wrap.n_rows; ++i)
-//        a_wrap.at(i)=HDP_var::mA.at(0,i);
-//  };
-//
-//  void getB(numeric::array& b)
-//  {
-//    Col<double> b_wrap=np2col<double>(b); 
-//     for (uint32_t i=0; i<b_wrap.n_rows; ++i)
-//        b_wrap.at(i)=HDP_var::mA.at(1,i);
-//  };
-//
-//  void getPerplexity(numeric::array& perp)
-//  {
-//    Col<double> perp_wrap=np2col<double>(perp); 
-//     for (uint32_t i=0; i<perp_wrap.n_rows; ++i)
-//        perp_wrap.at(i)=HDP_var::mPerp.at(i);
-//  };
-//
-//  bool getDocTopics(numeric::array& pi, numeric::array& prop, numeric::array& topicInd, uint32_t d)
-//  {
-//    Col<double> prop_col;
-//    Col<double> pi_col;
-//    Col<uint32_t> topicInd_col;
-//    if(!HDP_var::getDocTopics(pi_col, prop_col, topicInd_col, d)){return false;} // works on the data in _mat
-//    Col<double> prop_wrap=np2col<double>(prop); 
-//    Col<double> pi_wrap=np2col<double>(pi); 
-//    Col<uint32_t> topicInd_wrap=np2col<uint32_t>(topicInd); 
-//    if((prop_col.n_rows != prop_wrap.n_rows) || (topicInd_col.n_rows != topicInd_wrap.n_rows) || (pi_col.n_rows != pi_wrap.n_rows))
-//      return false;
-//    else{
-//     for (uint32_t i=0; i<pi_col.n_rows; ++i)
-//        pi_wrap.at(i)=pi_col.at(i);
-//     for (uint32_t i=0; i<topicInd_wrap.n_rows; ++i)
-//        topicInd_wrap.at(i)=topicInd_col.at(i);
-//      for (uint32_t i=0; i<prop_wrap.n_rows; ++i)
-//        prop_wrap.at(i)=prop_col.at(i);
-//      return true;
-//    }
-//  };
-
-//  bool getCorpTopicProportions(numeric::array& v, numeric::array& sigV)
-//  {
-//    Col<double> sigV_col;
-//    Col<double> v_col;
-//    if(!HDP_var::getCorpTopicProportions(v_col,sigV_col)){return false;} // works on the data in _mat
-//    Col<double> sigV_wrap=np2col<double>(sigV); 
-//    Col<double> v_wrap=np2col<double>(v); 
-//    if((sigV_col.n_rows != sigV_wrap.n_rows) || (v_col.n_rows != v_wrap.n_rows))
-//      return false;
-//    else{
-//      for (uint32_t i=0; i<v_wrap.n_rows; ++i)
-//        v_wrap.at(i)=v_col.at(i);
-//      for (uint32_t i=0; i<sigV_wrap.n_rows; ++i)
-//        sigV_wrap.at(i)=sigV_col.at(i);
-//      return true;
-//    }
-//  }; 
-//
-//  bool getCorpTopic(numeric::array& beta, uint32_t k)
-//  {
-//    Col<double> beta_col;
-//    if(!HDP_var::getCorpTopic(beta_col, k)){return false;} // works on the data in _mat
-//    Col<double> beta_wrap=np2col<double>(beta); 
-//    if(beta_col.n_rows != beta_wrap.n_rows)
-//      return false;
-//    else{
-//      for (uint32_t i=0; i<beta_wrap.n_rows; ++i)
-//        beta_wrap.at(i)=beta_col.at(i);
-//      return true;
-//    }
-//  };
-//
-//  bool getWordTopics(numeric::array& z, uint32_t d)
-//  {
-//    Col<uint32_t> z_col;
-//    if(!HDP_var::getWordTopics(z_col, d)){return false;} // works on the data in _mat
-//    Col<uint32_t> z_wrap=np2col<uint32_t>(z); 
-//    if(z_col.n_rows != z_wrap.n_rows)
-//      return false;
-//    else{
-//      for (uint32_t i=0; i<z_wrap.n_rows; ++i)
-//        z_wrap.at(i)=z_col.at(i);
-//      return true;
-//    }
-//  };
-//
 };
 
 
@@ -573,9 +466,51 @@ public:
     return HDP_var_ss::updateEst(x_mat,kappa);
   }
 
-
 };
 
+
+class TestNp2Arma_py
+{
+  public:
+    TestNp2Arma_py()
+    {
+      Amat = Mat<double>(3,3);
+      Amat<<1<<2<<3<<endr
+          <<4<<5<<6<<endr
+          <<7<<8<<9<<endr;
+      Acol = Col<double>(3);
+      Acol<<1<<2<<3;
+      Arow = Row<double>(3);
+      Arow<<1<<2<<3;
+    };
+
+  void getAmat(const numeric::array& a)
+  {
+      cout<<Amat<<endl;
+    Mat<double> a_wrap=np2mat<double>(a);
+    a_wrap = Amat.t();
+  }
+
+  void getAcol(const numeric::array& a)
+  {
+      cout<<Acol<<endl;
+    Col<double> a_wrap=np2col<double>(a);
+    a_wrap = Acol;
+  }
+
+  void getArow(const numeric::array& a)
+  {
+      cout<<Arow<<endl;
+    Row<double> a_wrap=np2row<double>(a);
+    a_wrap = Arow;
+  }
+
+  private:
+  Mat<double> Amat;
+  Col<double> Acol;
+  Row<double> Arow;
+
+};
 
 BOOST_PYTHON_MODULE(libbnp)
 {
@@ -635,6 +570,11 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("getCorpTopics",&HDP_var_ss_py::getCorpTopics_py)
         .def("getWordDistr",&HDP_var_ss_py::getWordDistr_py);
 //        .def("perplexity",&HDP_var_ss_py::perplexity)
+
+  class_<TestNp2Arma_py>("TestNp2Arma",init<>())
+    .def("getAmat",&TestNp2Arma_py::getAmat)
+    .def("getAcol",&TestNp2Arma_py::getAcol)
+    .def("getArow",&TestNp2Arma_py::getArow);
 
 }
 
