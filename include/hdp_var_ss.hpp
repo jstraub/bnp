@@ -94,7 +94,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>, public virtual HDP_var_base
     //  uint32_t T=10; // truncation on document level
     //  uint32_t K=100; // truncation on corpus level
     // S = batch size
-    void densityEst(Mat<uint32_t>& x, Mat<uint32_t>& x_test, double kappa, uint32_t K, uint32_t T, uint32_t S)
+    void densityEst(const Mat<uint32_t>& x, const Mat<uint32_t>& x_test, double kappa, uint32_t K, uint32_t T, uint32_t S)
     {
 
       // From: Online Variational Inference for the HDP

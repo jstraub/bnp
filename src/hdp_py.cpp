@@ -117,15 +117,41 @@ bool checkPyArr(PyArrayObject* a, const int ndims, const NpTypes npType)
 	return true;
 }
 
+/*
+ * converter from numpy to arma for read only const copies of the np matrix
+ * the compllicating factor is that arma is col major and np is row major
+ */
 template<class U>
-Mat<U> np2mat(const numeric::array& np)
+const Mat<U> np2mat(const numeric::array& np)
 {
   // Get pointer to np array
   PyArrayObject* a = (PyArrayObject*)PyArray_FROM_O(np.ptr());
   if(!checkPyArr(a,2,NpTyp<U>::Num)) exit(0);
   // do not copy the data!
   //cout<<a->nd<<": "<<a->dimensions[0]<<"x"<<a->dimensions[1]<<endl;
-  return arma::Mat<U>((U*)a->data,a->dimensions[0],a->dimensions[1],false,true);
+  arma::Mat<U> A=arma::Mat<U>((U*)a->data,a->dimensions[1],a->dimensions[0],false,true);
+  return A.t();
+}
+
+/*
+ * for assigning data from an arma matrix to a numpy matrix
+ * the compllicating factor is that arma is col major and np is row major
+ */
+template<class U>
+void assignMat2np(const Mat<U>& A_mat, const numeric::array& np)
+{
+  // Get pointer to np array
+  PyArrayObject* a = (PyArrayObject*)PyArray_FROM_O(np.ptr());
+  if(!checkPyArr(a,2,NpTyp<U>::Num)) exit(0);
+  // do not copy the data!
+  //cout<<a->nd<<": "<<a->dimensions[0]<<"x"<<a->dimensions[1]<<endl;
+
+  arma::Mat<U> a_wrap=arma::Mat<U>((U*)a->data,a->dimensions[1],a->dimensions[0],false,true); // verse the dimensions to getthe expected behavior
+  if ((a_wrap.n_rows != A_mat.n_cols) || (a_wrap.n_cols != A_mat.n_rows)){
+    cout<<"assignMat2np:: Problem  with size of arma and np matrices!"<<endl;
+    assert(0);
+  }
+  a_wrap = A_mat.t(); // IMPORTANT: Arma is col major and np is row major -> let Arma do the conversion by assigning .t() all over the place!!!
 }
 
 template<class U>
@@ -134,10 +160,10 @@ Row<U> np2row(const numeric::array& np)
 	// Get pointer to np array
 	PyArrayObject* a = (PyArrayObject*)PyArray_FROM_O(np.ptr());
 	if(!checkPyArr(a,1,NpTyp<U>::Num)) exit(0);
-  if (a->nd == 1) {
+  if (a->nd == 1) { // I get a numpy 1 dim vector that I want to convert into an arma row
 	  // do not copy the data!
 	  return Row<U>((U*)a->data,a->dimensions[0],false,true);
-  }else{
+  }else{ // I get a numpy 2 dim matrix (with hopefully only 1 row) that I want to convert into an arma row
 	  // do not copy the data!
 	  return Row<U>((U*)a->data,a->dimensions[1],false,true);
   }
@@ -209,16 +235,12 @@ public:
   // makes no copy of the external data x_i
   uint32_t addDoc(const numeric::array& x_i)
   {
-    Mat<U> x_i_mat=np2mat<U>(x_i); // can do this since x_i_mat gets copied inside
-
-    //cout<<"adding  x: "<<x_i_mat.n_cols<<": "<<x_i_mat<<endl;
-    return HDP_gibbs<U>::addDoc(x_i_mat);
+    return HDP_gibbs<U>::addDoc(np2mat<U>(x_i));
   };
 
   uint32_t addHeldOut(const numeric::array& x_i)
   {
-    Mat<uint32_t> x_i_mat=np2mat<U>(x_i); // can do this since x_i_mat gets copied inside
-    return HDP_gibbs<U>::addHeldOut(x_i_mat);
+    return HDP_gibbs<U>::addHeldOut(np2mat<U>(x_i));
   };
 
 
@@ -265,8 +287,14 @@ class HDP_var_base_py : public virtual HDP_var_base
 
   bool getWordDistr_py(const numeric::array& p)
   {
-    Mat<double> p_mat=np2mat<double>(p); // can do this since x_mat gets copied inside    
-    return HDP_var_base::getWordDistr(p_mat);
+    Mat<double> p_mat; // can do this since x_mat gets copied inside    
+    if (HDP_var_base::getWordDistr(p_mat))
+    {
+      assignMat2np(p_mat,p);
+      return true;
+    }else{
+      return false;
+    }
   }
 
   /* 
@@ -289,8 +317,7 @@ class HDP_var_base_py : public virtual HDP_var_base
 
   void getA_py(numeric::array& a)
   {
-    Mat<double> a_wrap=np2mat<double>(a); 
-    a_wrap = HDP_var_base::mA;
+    assignMat2np(HDP_var_base::mA,a);
   };
 
   void getPerplexity_py(numeric::array& perp)
@@ -314,21 +341,22 @@ class HDP_var_base_py : public virtual HDP_var_base
     Mat<double> pi_mat;
     Mat<uint32_t> c_mat;
     if(!HDP_var_base::getDocTopics(pi_mat, sigPi_mat, c_mat)){return false;} // works on the data in _mat
-    Mat<double> sigPi_wrap=np2mat<double>(sigPi); 
-    Mat<double> pi_wrap=np2mat<double>(pi); 
-    Mat<uint32_t> c_wrap=np2mat<uint32_t>(c); 
-    if((sigPi_mat.n_rows != sigPi_wrap.n_rows) || (c_mat.n_rows != c_wrap.n_rows) || (pi_mat.n_rows != pi_wrap.n_rows) || 
-        (sigPi_mat.n_cols != sigPi_wrap.n_cols) || (c_mat.n_cols != c_wrap.n_cols) || (pi_mat.n_cols != pi_wrap.n_cols)) {
-      cout<<"sigPi_mat: "<<size(sigPi_mat)<<" vs sigPi_wrap: "<<size(sigPi_wrap)<<endl;
-      cout<<"pi_mat: "<<size(pi_mat)<<" vs pi_wrap: "<<size(pi_wrap)<<endl;
-      cout<<"c_mat: "<<size(c_mat)<<" vs c_wrap: "<<size(c_wrap)<<endl;
-      return false;
-    }else{
-      pi_wrap=pi_mat;
-      sigPi_wrap=sigPi_mat;
-      c_wrap=c_mat;
+//    Mat<double> sigPi_wrap=np2mat<double>(sigPi); 
+//    Mat<double> pi_wrap=np2mat<double>(pi); 
+//    Mat<uint32_t> c_wrap=np2mat<uint32_t>(c); 
+//    if((sigPi_mat.n_rows != sigPi_wrap.n_rows) || (c_mat.n_rows != c_wrap.n_rows) || (pi_mat.n_rows != pi_wrap.n_rows) || 
+//        (sigPi_mat.n_cols != sigPi_wrap.n_cols) || (c_mat.n_cols != c_wrap.n_cols) || (pi_mat.n_cols != pi_wrap.n_cols)) {
+//      cout<<"sigPi_mat: "<<size(sigPi_mat)<<" vs sigPi_wrap: "<<size(sigPi_wrap)<<endl;
+//      cout<<"pi_mat: "<<size(pi_mat)<<" vs pi_wrap: "<<size(pi_wrap)<<endl;
+//      cout<<"c_mat: "<<size(c_mat)<<" vs c_wrap: "<<size(c_wrap)<<endl;
+//      return false;
+//    }else{
+
+      assignMat2np(pi_mat,pi);
+      assignMat2np(sigPi_mat,sigPi);
+      assignMat2np(c_mat,c);
       return true;
-    }
+//    }
   };
 
   bool getCorpTopicProportions_py(numeric::array& v, numeric::array& sigV)
@@ -341,10 +369,12 @@ class HDP_var_base_py : public virtual HDP_var_base
     if((sigV_col.n_rows != sigV_wrap.n_rows) || (v_col.n_rows != v_wrap.n_rows))
       return false;
     else{
-      for (uint32_t i=0; i<v_wrap.n_rows; ++i)
-        v_wrap.at(i)=v_col.at(i);
-      for (uint32_t i=0; i<sigV_wrap.n_rows; ++i)
-        sigV_wrap.at(i)=sigV_col.at(i);
+      v_wrap = v_col;
+      sigV_wrap = sigV_col;
+//      for (uint32_t i=0; i<v_wrap.n_rows; ++i)
+//        v_wrap.at(i)=v_col.at(i);
+//      for (uint32_t i=0; i<sigV_wrap.n_rows; ++i)
+//        sigV_wrap.at(i)=sigV_col.at(i);
       return true;
     }
   }; 
@@ -353,13 +383,14 @@ class HDP_var_base_py : public virtual HDP_var_base
   {
     Mat<double> beta_mat;
     if(!HDP_var_base::getCorpTopics(beta_mat)){return false;} // works on the data in _mat
-    Mat<double> beta_wrap=np2mat<double>(beta); 
-    if((beta_mat.n_rows != beta_wrap.n_rows)||(beta_mat.n_cols != beta_wrap.n_cols))
-      return false;
-    else{
-      beta_wrap = beta_mat;
+//    Mat<double> beta_wrap=np2mat<double>(beta); 
+//    if((beta_mat.n_rows != beta_wrap.n_rows)||(beta_mat.n_cols != beta_wrap.n_cols))
+//      return false;
+//    else{
+
+      assignMat2np(beta_mat,beta);
       return true;
-    }
+//    }
   };
 
   /*
@@ -373,13 +404,14 @@ class HDP_var_base_py : public virtual HDP_var_base
   {
     Col<uint32_t> z_col;
     if(!HDP_var_base::getWordTopics(z_col, d)){return false;} // works on the data in _mat
-    cout<<"x_col="<<z_col.t()<<endl;
+    //cout<<"x_col="<<z_col.t()<<endl;
     Col<uint32_t> z_wrap=np2col<uint32_t>(z); 
     if(z_col.n_rows != z_wrap.n_rows)
       return false;
     else{
-      for (uint32_t i=0; i<z_wrap.n_rows; ++i)
-        z_wrap.at(i)=z_col.at(i);
+      z_wrap = z_col;
+//      for (uint32_t i=0; i<z_wrap.n_rows; ++i)
+//        z_wrap.at(i)=z_col.at(i);
       return true;
     }
   };
@@ -407,14 +439,12 @@ public:
   // makes no copy of the external data x_i
   uint32_t addDoc(const numeric::array& x_i)
   {
-    Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied insidez
-    return HDP_var::addDoc(x_i_mat);
+    return HDP_var::addDoc(np2mat<uint32_t>(x_i));
   };
 
   uint32_t addHeldOut(const numeric::array& x_i)
   {
-    Mat<uint32_t> x_i_mat=np2mat<uint32_t>(x_i); // can do this since x_i_mat gets copied inside
-    return HDP_var::addHeldOut(x_i_mat);
+    return HDP_var::addHeldOut(np2mat<uint32_t>(x_i));
   };
 
 
@@ -422,8 +452,7 @@ public:
   // can use this to update the estimate with information from additional x 
   bool updateEst(const numeric::array& x, double ro=0.75)
   {
-    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
-    return HDP_var::updateEst(x_mat,ro);
+    return HDP_var::updateEst(np2mat<uint32_t>(x),ro);
   }
 
   bool updateEst_batch(double kappa, uint32_t S){
@@ -431,8 +460,6 @@ public:
   }
 
 };
-
-
 
 class HDP_var_ss_py : public HDP_var_base_py, public HDP_var_ss
 {
@@ -445,14 +472,9 @@ public:
 
   bool densityEst(const numeric::array& x, const numeric::array& x_ho, double kappa, uint32_t K, uint32_t T, uint32_t S)
   {
-    Mat<uint32_t> x_mat=np2mat<uint32_t>(x); // can do this since x_mat gets copied inside    
-    Mat<uint32_t> x_ho_mat=np2mat<uint32_t>(x_ho); // can do this since x_mat gets copied inside    
-    cout<<"mX.n_rows="<<x_mat.n_rows<<endl;
-    cout<<"mX_ho.n_rows="<<x_ho_mat.n_rows<<endl;
-//    for (uint32_t i=0; i<HDP_var::mX.size(); ++i)
-//      cout<<"  x_"<<i<<": "<<HDP_var::mX[i].n_rows<<"x"<<HDP_var::mX[i].n_cols<<endl;
-//
-    HDP_var_ss::densityEst(x_mat,x_ho_mat,kappa,K,T,S);
+//    cout<<"mX.n_rows="<<x_mat.n_rows<<endl;
+//    cout<<"mX_ho.n_rows="<<x_ho_mat.n_rows<<endl;
+    HDP_var_ss::densityEst(np2mat<uint32_t>(x),np2mat<uint32_t>(x_ho),kappa,K,T,S);
     return true;
   }
 
@@ -462,8 +484,7 @@ public:
    */
   bool updateEst(const numeric::array& x, double kappa)
   {
-    Row<uint32_t> x_mat=np2row<uint32_t>(x); // can do this since x_mat gets copied inside    
-    return HDP_var_ss::updateEst(x_mat,kappa);
+    return HDP_var_ss::updateEst(np2row<uint32_t>(x),kappa);
   }
 
 };
@@ -478,6 +499,11 @@ class TestNp2Arma_py
       Amat<<1<<2<<3<<endr
           <<4<<5<<6<<endr
           <<7<<8<<9<<endr;
+      Arect = Mat<double>(4,3);
+      Arect<<1<<2<<3<<endr
+          <<4<<5<<6<<endr
+          <<7<<8<<9<<endr
+          <<10<<11<<12<<endr;
       Acol = Col<double>(3);
       Acol<<1<<2<<3;
       Arow = Row<double>(3);
@@ -486,27 +512,39 @@ class TestNp2Arma_py
 
   void getAmat(const numeric::array& a)
   {
-      cout<<Amat<<endl;
-    Mat<double> a_wrap=np2mat<double>(a);
-    a_wrap = Amat.t();
+    cout<<Amat<<endl;
+    assignMat2np(Amat,a);
+  }
+
+  void getArect(const numeric::array& a)
+  {
+    cout<<Arect<<endl;
+    assignMat2np(Arect,a);
+  }
+
+  void putArect(const numeric::array& a)
+  {
+    const Mat<double> a_wrap=np2mat<double>(a);
+    cout<<"a_wrap:"<<a_wrap<<endl;
   }
 
   void getAcol(const numeric::array& a)
   {
-      cout<<Acol<<endl;
+    cout<<Acol<<endl;
     Col<double> a_wrap=np2col<double>(a);
     a_wrap = Acol;
   }
 
   void getArow(const numeric::array& a)
   {
-      cout<<Arow<<endl;
+    cout<<Arow<<endl;
     Row<double> a_wrap=np2row<double>(a);
     a_wrap = Arow;
   }
 
   private:
   Mat<double> Amat;
+  Mat<double> Arect;
   Col<double> Acol;
   Row<double> Arow;
 
@@ -573,6 +611,8 @@ BOOST_PYTHON_MODULE(libbnp)
 
   class_<TestNp2Arma_py>("TestNp2Arma",init<>())
     .def("getAmat",&TestNp2Arma_py::getAmat)
+    .def("getArect",&TestNp2Arma_py::getArect)
+    .def("putArect",&TestNp2Arma_py::putArect)
     .def("getAcol",&TestNp2Arma_py::getAcol)
     .def("getArow",&TestNp2Arma_py::getArow);
 
