@@ -77,19 +77,19 @@ def logDir(x, alpha):
 
 class HDP_base:
 
-  # parameters
-  c = []
-  z = []
-  beta = np.zeros(1)
-  v = np.zeros(1)
-  sigV = np.zeros(1)
-  pi = []
-  sigPi = []
-  # data
-  x_tr = []
-  x_ho = []
-  # results
-  perp = np.zeros(1)
+#  # parameters
+#  c = []
+#  z = []
+#  beta = np.zeros(1)
+#  v = np.zeros(1)
+#  sigV = np.zeros(1)
+#  pi = []
+#  sigPi = []
+#  # data
+#  x_tr = []
+#  x_ho = []
+#  # results
+#  perp = np.zeros(1)
 
   loaded = dict()
   
@@ -132,11 +132,18 @@ class HDP_base:
     print('--- loading state from mat file at {}'.format(path))
     if HDP_base.__parseLoad(s,s.loaded):
       print('--- loaded state successfully!')
+      print('c={}'.format(s.state['c']))
+      print('sigPi={}'.format(s.state['sigPi']))
     else:
       print('--- error while loading state!')
+    raw_input()
     return True
 
   def __parseLoad(s,mat):
+
+    print('mat.keys: {}'.format(mat.keys()))
+    print('c: {}'.format(mat['c']))
+
     for scalar in s.scalars:
       s.state[scalar]=mat[scalar][0][0]
       print('loaded {}\t {}'.format(scalar,s.state[scalar]))
@@ -163,8 +170,9 @@ class HDP_base:
       else:
         for d in range(0,D):
           s.state[listMatrix].append(mat[listMatrix][d][0])
-          if s.state[listMatrix][d].shape[1] == 1: # savemat/loadmat puts vectors always as column vectors
-            s.state[listMatrix][d] = s.state[listMatrix][d].ravel()
+          if len(s.state[listMatrix][d].shape) >1:
+            if s.state[listMatrix][d].shape[1] == 1: # savemat/loadmat puts vectors always as column vectors
+              s.state[listMatrix][d] = s.state[listMatrix][d].ravel()
           print('loaded {}_{}\t {}'.format(listMatrix,d,s.state[listMatrix][d].shape))
     
     return True
@@ -256,39 +264,48 @@ class HDP_base:
       np.sum(s.state['sigPi'][d])
       print('sigPi = {0}; {1}'.format(s.state['sigPi'][d],np.sum(self.sigPi[d])))
 
-  def KLdivergence(s,q):
-    kl = 0.0
-    logP_joint = 0.0
-    logQ_joint = 0.0
-    D=len(s.x_tr)
-    for d in range(0,D):
-      N=s.x_tr[d].size
-      for n in range(0,N):
-        logP = s.logP_wordJoint(d,n)
-        logQ = q.logP_wordJoint(d,n)
-        logP_joint += logP
-        logQ_joint += logQ
-        kl += (logP - logQ)* np.exp(logP)
-    return kl, logP_joint, logQ_joint
-  
- #  symmeterised divergence
+# KL divergence
+
+  def klD(s,logP,logQ):
+    p = np.exp(logP)
+    if len(logP.shape) > 1:
+      kl = np.zeros(p.shape[0])
+      for i in range(0,logP.shape[0]):
+        kl[i] = np.sum(p[i,:]*(logP[i,:]-logQ[i,:]))
+      return kl
+    else:
+      return np.sum(p*(logP-logQ))
+
+#  symmeterised divergence
   def symKL(s,logP,logQ):
     return np.sum((logP-logQ)*(np.exp(logP)-np.exp(logQ)))
+  def symKLImg(s):
+    D_tr = s.state['D_tr']
+    K = s.state['K']
+    T = s.state['T']
+    # create image for topic
+    symKLd = np.zeros((D_tr,D_tr))
+    for di in range(0,D_tr):
+      for dj in range(0,D_tr):
+        symKLd[di,dj] = s.symKL(s.state['logP_w'][di],s.state['logP_w'][dj])
+    return symKLd
 
 # Jensen-Shannon Divergence - 
   def jsD(s,logP,logQ):
-    return 0.0
-
-  # x is the heldout data i.e. a document from the same dataset as was trained on
-  #def Perplexity(s,x):
-
-  def CrossEntropy(s,x):
-    H=0
-    N = x.size
-    for w in range(0,s.Nw):
-      n_w = np.sum(x==w)
-      q = 0.5 # TODO: computation of q given x 
-      H -= (n_w/N) * np.log(q)
+    p=np.exp(logP)
+    q=np.exp(logQ)
+    logM=-np.log(2)+np.log(p + q)
+    return 0.5*np.sum(p*(logP-logM))+0.5*np.sum(q*(logQ-logM))
+  def jsDImg(s):
+    D_tr = s.state['D_tr']
+    K = s.state['K']
+    T = s.state['T']
+    # create image for topic
+    jsd = np.zeros((D_tr,D_tr))
+    for di in range(0,D_tr):
+      for dj in range(0,D_tr):
+        jsd[di,dj] = s.jsD(s.state['logP_w'][di],s.state['logP_w'][dj])
+    return jsd
 
   def docTopicsImg(s):
     D_tr = s.state['D_tr']
@@ -306,33 +323,22 @@ class HDP_base:
 #    print('sigPi_d={0}'.format(s.sigPi[d]))
     return vT
 
-  def symKLImg(s):
-    D_tr = s.state['D_tr']
-    K = s.state['K']
-    T = s.state['T']
-    # create image for topic
-    symKLd = np.zeros((D_tr,D_tr))
-    for di in range(0,D_tr):
-      for dj in range(0,D_tr):
-        symKLd[di,dj] = s.symKL(s.state['logP_w'][di],s.state['logP_w'][dj])
-    return symKLd
-
   def plotTopics(s,minSupport=None):
-    D = len(s.x_tr)
+    D = s.state['D_tr']
     ks=np.zeros(D)
     for d in range(0,D):
 
-      # necessaary since topics may be selected several times!
-      c_u=np.unique(s.c[d])
+      # necessary since topics may be selected several times!
+      c_u=np.unique(s.state['c'][d,:])
       sigPi_u = np.zeros(c_u.size)
       for i in range(0,c_u.size):
         #print('{}'.format(c_u[i] == s.c[d]))
         #print('{}'.format(s.sigPi[d]))
-        sigPi_u[i] = np.sum(s.sigPi[d][c_u[i] == s.c[d]])
+        sigPi_u[i] = np.sum(s.state['sigPi'][d,c_u[i] == s.state['c'][d,:]])
       k_max = c_u[sigPi_u == np.max(sigPi_u)]
 #      print('c={};'.format(s.c[d]))
 #      print('sigPi={};'.format(s.sigPi[d]))
-#      print('sigPi_u = {};\tc_u={};\tk_max={}'.format(sigPi_u,c_u,k_max))
+      print('sigPi_u = {};\tc_u={};\tk_max={}'.format(sigPi_u,c_u,k_max))
 
 #      t_max=np.nonzero(s.sigPi[d]==np.max(s.sigPi[d]))[0][0]
 #      print('d={}; D={}'.format(d,D))
@@ -348,11 +354,11 @@ class HDP_base:
     ks_unique=ks_unique[~np.isnan(ks_unique)]
     if minSupport is not None:
       Np = ks_unique.size # numer of subplots
-      print('D{0} Np{1}'.format(D,Np))
+      #print('D{0} Np{1}'.format(D,Np))
       sup = np.zeros(ks_unique.size)
       for d in range(0,D):
         sup[np.nonzero(ks_unique==ks[d])[0]] += 1
-      print('sup={0} sum(sup)={1}'.format(sup,np.sum(sup)))
+      #print('sup={0} sum(sup)={1}'.format(sup,np.sum(sup)))
       delete = np.zeros(ks_unique.size,dtype=np.bool)
       for i in range(0,Np):
         if sup[i] < minSupport:
@@ -365,81 +371,62 @@ class HDP_base:
     fig=plt.figure()
     for i in range(0,Np):
       plt.subplot(Ncol,Nrow,i+1)
-      x = np.linspace(0,s.beta[int(ks_unique[i])].size-1,s.beta[int(ks_unique[i])].size)
-      plt.stem(x,s.beta[int(ks_unique[i])])
+      x = np.linspace(0,s.state['beta'][int(ks_unique[i])].size-1,s.state['beta'][int(ks_unique[i])].size)
+      plt.stem(x,s.state['beta'][int(ks_unique[i])])
       plt.ylim([0.0,1.0])
       plt.xlabel('topic '+str(ks_unique[i]))
     return fig
 
-  def logP_fullJoint(s):
-    logP = 0.0
-    D = len(s.x_tr)
-    for d in range(0,D):
-      N = s.x_tr[d].size
-      for n in range(0,N):
-        logP_w = s.logP_wordJoint(d,n)
-#        print('logP({},{})={}'.format(d,n,logP_w))
-        logP += logP_w
-    return logP
-
-  def logP_wordJoint(s, d, n):
-    #print('d={}, n={}'.format(d,n))
-    #print('x={}; x.len={}; x[d].size={}; c.len={}; z.len={}; v.size={}; sigV.size={}; pi.len={}; sigPi.len={}'.format(s.x[d][n],len(s.x),s.x[d].size,len(s.c),len(s.z),s.v.size,s.sigV.size,len(s.pi),len(s.sigPi)))
-    #print('z={}; c={}; beta.size {}\n'.format(s.z[d][n], s.c[d][ s.z[d][n]],s.beta.shape))
-
-#    print('\tx|beta =    {}'.format(logCat(s.x[d][n], s.beta[ s.c[d][ s.z[d][n]]])))
-#    print('\tc|sigV =    {}'.format(logCat(s.c[d][ s.z[d][n]], s.sigV)))
-#    print('\tv|omega =   {}'.format(logBeta(s.v, 1.0, s.omega)))
-#    print('\tz|sigPi =   {}'.format(logCat(s.z[d][n], s.sigPi[d])))
-#    print('\tpi|alpha =  {}'.format(logBeta(s.pi[d], 1.0, s.alpha)))
-#    print('\tbeta|lambda={}'.format(logDir(s.beta[ s.c[d][ s.z[d][n]]], s.Lambda)))
-    return logCat(s.x_tr[d][n], s.beta[ s.c[d][ s.z[d][n]]]) \
-    + logCat(s.c[d][ s.z[d][n]], s.sigV) \
-    + logBeta(s.v, 1.0, s.omega) \
-    + logCat(s.z[d][n], s.sigPi[d]) \
-    + logBeta(s.pi[d], 1.0, s.alpha) \
-    + logDir(s.beta[ s.c[d][ s.z[d][n]]], s.Lambda)
 
 class HDP_sample(HDP_base):
 
   def generateDirHDPSample(s,D,N):
     # doc level
-    s.x_tr=[]
+    s.state['D_tr'] = D
+    s.state['x_tr']=[]
     # draw K topics from Dirichlet
-    s.beta = np.random.dirichlet(s.Lambda,s.K)
+    s.state['beta'] = np.random.dirichlet(s.state['Lambda'],s.state['K'])
     # draw breaking proportions using Beta
-    s.v = np.random.beta(1,s.omega,s.K-1)
-    s.sigV = stickBreaking(s.v)
+    s.state['v'] = np.random.beta(1,s.state['omega'],s.state['K'])
+    s.state['sigV'] = stickBreaking(s.v)
   
-    s.c=[]  # pointers to corp level topics
-    s.pi=[] # breaking proportions for selected doc level topics
-    s.sigPi=[]
-    s.z=[]
+    s.state['c']=[]  # pointers to corp level topics
+    s.state['pi']=[] # breaking proportions for selected doc level topics
+    s.state['sigPi']=[]
+    s.state['z']=[]
+
+
+    s.state['c'] = np.zeros((D,s.state['T']))
+    s.state['pi'] = np.zeros((D,s.state['T']))
+    s.state['sigPi'] = np.zeros((D,s.state['T']+1))
   
+    s.state['logP_w']=np.ones((D,s.state['Nw']))*0.1
     for d in range(0,D): # for each document
       # draw T doc level pointers to topics (multinomial)
-      s.c.append(np.zeros(s.T))
-      _, s.c[d] = np.nonzero(np.random.multinomial(1,s.sigV,s.T))
+      _, s.state['c'][d,:] = np.nonzero(np.random.multinomial(1,s.state['sigV'],s.state['T']))
       # draw T doc level breaking proportions using Beta
-      s.pi.append(np.zeros(s.T-1))
-      s.sigPi.append(np.zeros(s.T))
-      s.pi[d] = np.random.beta(1,s.alpha,s.T-1)
-      s.sigPi[d] = stickBreaking(s.pi[d])
+      s.state['pi'][d,:] = np.random.beta(1,s.state['alpha'],s.state['T'])
+      s.state['sigPi'][d,:] = stickBreaking(s.state['pi'][d,:])
   
-      s.x_tr.append(np.zeros(N))
+      s.state['x_tr'].append(np.zeros(N))
       # draw topic assignment of word (multinomial)
-      s.z.append(np.zeros(N))
-      _, s.z[d] = np.nonzero(np.random.multinomial(1,s.sigPi[d],N))
+      s.state['z'].append(np.zeros(N))
+      _, s.state['z'][d] = np.nonzero(np.random.multinomial(1,s.state['sigPi'][d,:],N))
       for i in range(0,N): # for each word
         # draw words
-        _, s.x_tr[d][i] = np.nonzero(np.random.multinomial(1,s.beta[ s.c[d][ s.z[d][i]], :],1))
+        _, s.state['x_tr'][d][i] = np.nonzero(np.random.multinomial(1,s.state['beta'][ s.state['c'][d, s.state['z'][d][i]], :],1))
+        s.state['logP_w'][d, s.state['x_tr'][d][i]] +=1
   
-      s.x_tr[d] = s.x_tr[d].astype(np.uint32)
+      s.state['x_tr'][d] = s.state['x_tr'][d].astype(np.uint32)
+      s.state['logP_w'][d,:] /= np.sum(s.state['logP_w'][d,:])
+    s.state['logP_w'] = np.log(s.state['logP_w'])
   
 #    for d in range(0,D):
-#      print('d={0}: {1}'.format(d,s.x_tr[d]))
+#      print('d={0}: {1}'.format(d,s.state['x_tr'][d]))
+    s.state['D_te'] = 0
+    s.state['perp'] = []
   
-    return s.x_tr, s.sigV, s.beta, s.pi, s.c
+    return s.state['x_tr'], s.state['sigV'], s.state['beta'], s.state['pi'], s.state['c']
 
   
     

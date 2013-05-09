@@ -84,3 +84,7 @@ ADD_LIBRARY(bnp SHARED src/hdp_py.cpp ${SRC})
 TARGET_LINK_LIBRARIES(bnp ${LIBS} boost_python ${PYTHON_LIB})
 INSTALL(TARGETS bnp LIBRARY DESTINATION $ENV{WORKSPACE_HOME}/research/bnp/python)
 
+# unit tests 
+add_executable(unitTestProbHelpers ./src/unitTestProbHelpers.cpp ./src/probabilityHelpers.cpp)
+target_link_libraries(unitTestProbHelpers ${LIBS} boost_unit_test_framework stdc++)
+

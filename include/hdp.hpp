@@ -150,8 +150,7 @@ class HDP_var_base
         sigPi.row(d) = csigPi.t();
         c.row(d) = cc.t();
       }
-        return true;
-
+      return true;
     };
 
   /*

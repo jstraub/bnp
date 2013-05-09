@@ -42,11 +42,12 @@ class HDPvar(bnp.HDP_var):
   def initialEstimate(self,x,x_ho,Nw,kappa,K,T,S):
     D = len(x)
     for x_i in x:
-      self.addDoc(x_i.reshape((1,x_i.shape[0])))
+      self.addDoc(np.resize(x_i,(1,x_i.size)))
       #self.addDoc(np.vstack(x_i[0:N_d]))
     for x_ho_i in x_ho:
       print("adding held out")
-      self.addHeldOut(x_i.reshape((1,x_i.shape[0])))
+      self.addHeldOut(np.resize(x_ho_i,(1,x_ho_i.size)))
+      
       #self.addHeldOut(np.vstack(x_ho_i[0:N_d]))
     return self.densityEst(Nw,kappa,K,T,S)
 
@@ -73,7 +74,7 @@ if __name__ == '__main__':
   parser.add_argument('-K', type=int, default=100, help='corpus level truncation')
   parser.add_argument('-S', type=int, default=10, help='mini batch size')
   parser.add_argument('-D', type=int, default=500, help='number of documents to synthesize')
-  parser.add_argument('-Ho', type=int, default=10, help='number of held out documents for perplexity computation')
+  parser.add_argument('-H', type=int, default=10, help='number of held out documents for perplexity computation')
   parser.add_argument('-N', type=int, default=100, help='number of words per document')
   parser.add_argument('-Nw', type=int, default=40, help='alphabet size (how many different words)')
   parser.add_argument('-a','--alpha', type=float, default=1.0, help='concentration parameter for document level')
@@ -86,7 +87,7 @@ if __name__ == '__main__':
 
 
   D = args.D #number of documents to process
-  D_ho = args.Ho # (ho= held out) number of docs used for testing (perplexity)
+  D_ho = args.H # (ho= held out) number of docs used for testing (perplexity)
   N_d = args.N # max number of words per doc
   Nw = args.Nw # how many different symbols are in the alphabet
   kappa = args.kappa # forgetting rate
@@ -97,13 +98,13 @@ if __name__ == '__main__':
   omega = args.omega # concentration on G_0
   dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
 
-  hdp_sample = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
-  x, gtCorpProp, gtTopic, pi, c = hdp_sample.generateDirHDPSample(D+D_ho,N_d)
+  hdp_true = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
+  x, gtCorpProp, gtTopic, pi, c = hdp_true.generateDirHDPSample(D+D_ho,N_d)
   x_tr = x[0:D-D_ho]
   x_ho = x[D-D_ho:D]
 
-  hdp_sample.save('sample.mat')
-  hdp_sample.load('sample.mat')
+  hdp_true.save('sample.mat')
+  hdp_true.load('sample.mat')
 
   print("---------------- Starting! use " + str(D) +" docs and " + str(D_ho) + " held out --------------")
 
@@ -150,7 +151,7 @@ if __name__ == '__main__':
     fig00=plt.figure()
     plt.plot(perp)
     fig00.show()
-    raw_input('Press enter to continue')
+#    raw_input('Press enter to continue')
 
     perp_d=np.zeros(D_ho)
     for d in range(0,D_ho):
@@ -161,35 +162,40 @@ if __name__ == '__main__':
     fig01=plt.figure()
     plt.plot(perp_d)
     fig01.show()
-    raw_input('Press enter to continue')
+#    raw_input('Press enter to continue')
 
     hdp_var = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
     #hdp_var.loadHDPSample(x,topic,docTopicInd,z,v,sigV,pi,sigPi,omega,alpha,dirAlphas)
-    hdp_var.loadHDPSample(x_tr=x_tr,x_ho=x_ho,hdp=hdp)
+    hdp_var.loadHDPSample(x_tr=x_tr,x_te=x_ho,hdp=hdp)
     hdp_var.save('model.mat')
     hdp_var.load('model.mat')
 
-    print('Computing KLdivergence of variational model')
-    #logP_gt = hdp_sample.logP_fullJoint()
-    #logP_var = hdp_var.logP_fullJoint()
-    kl_pq, logP_gt, logP_var = hdp_sample.KLdivergence(hdp_var)
-    #kl_qp = hdp_var.KLdivergence(hdp_sample)
-
-    #hdp_sample.checkSticks()
-    #hdp_var.checkSticks()
-
-    print('\n-----------------------------\n')
-    print('logP of full joint of groundtruth = {0}'.format(logP_gt))
-    print('logP of full joint of variational = {0}'.format(logP_var))
-    print('KL(p||q) = {0}'.format(kl_pq))
-    #print('KL(q||p) = {0}'.format(kl_qp))
-
     fig1=plt.figure()
-    plt.imshow(hdp_sample.docTopicsImg(),interpolation='nearest', cmap = cm.hot)
+    plt.imshow(hdp_true.docTopicsImg(),interpolation='nearest', cmap = cm.hot)
     fig1.show()
     fig2=plt.figure()
     plt.imshow(hdp_var.docTopicsImg(),interpolation='nearest', cmap = cm.hot)
     fig2.show()
+    
+    print('{}'.format(hdp_true.state['logP_w']))
+    klDvar2true = hdp_var.klD(hdp_var.state['logP_w'],hdp_true.state['logP_w'])
+    klDtrue2var = hdp_var.klD(hdp_true.state['logP_w'],hdp_var.state['logP_w'])
+
+    fig3=plt.figure()
+    plt.subplot(1,2,0) 
+    plt.stem(np.arange(0,D),klDvar2true)
+    plt.ylabel('divergence D(var||true)')
+    plt.xlabel('documents')
+    plt.subplot(1,2,1) 
+    plt.stem(np.arange(0,D),klDtrue2var)
+    plt.ylabel('divergence D(true||var)')
+    plt.xlabel('documents')
+    fig3.show()
+
+    print('D(var||true): {}'.format(klDvar2true))
+    print('D(true||var): {}'.format(klDtrue2var))
+    
+
     raw_input()
 
 

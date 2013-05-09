@@ -94,8 +94,15 @@ if __name__ == '__main__':
   print('symKLimg:\n{}'.format(symKLimg))
   fig1=plt.figure(1)
   imgplot=plt.imshow(symKLimg,interpolation='nearest',cmap=cm.hot);
+  plt.colorbar()
   fig1.show()
 
+  jsDimg = hdp.jsDImg();
+  print('jsDimg:\n{}'.format(jsDimg))
+  fig2=plt.figure(2)
+  imgplot=plt.imshow(jsDimg,interpolation='nearest',cmap=cm.hot);
+  plt.colorbar()
+  fig2.show()
 
   time.sleep(1000)
   raw_input()
