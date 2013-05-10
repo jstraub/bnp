@@ -74,9 +74,13 @@ void betaMode(Col<double>& v, const Col<double>& alpha, const Col<double>& beta)
   // breaking proportions
   v.set_size(alpha.n_elem);
   for (uint32_t i=0; i<v.n_elem; ++i){
-    if (alpha[i]+beta[i] != 2.0) {
+    if (alpha[i]+beta[i] == 2.0) {
+      v[i] = 0.5;
+    }else if (alpha[i]>1.0 && beta[i]>1.0) {
       v[i] = (alpha[i]-1.0)/(alpha[i]+beta[i]-2.0);
-    }else{
+    }else if (alpha[i]<1.0 && beta[i]>1.0) {
+      v[i] = 0.0;
+    }else if (alpha[i]>1.0 && beta[i]<1.0) {
       v[i] = 1.0;
     }
   }
@@ -87,9 +91,13 @@ void betaMode(Row<double>& v, const Col<double>& alpha, const Col<double>& beta)
   // breaking proportions
   v.set_size(alpha.n_elem);
   for (uint32_t i=0; i<v.n_elem; ++i){
-    if (alpha[i]+beta[i] != 2.0) {
+    if (alpha[i]+beta[i] == 2.0) {
+      v[i] = 0.5;
+    }else if (alpha[i]>1.0 && beta[i]>1.0) {
       v[i] = (alpha[i]-1.0)/(alpha[i]+beta[i]-2.0);
-    }else{
+    }else if (alpha[i]<1.0 && beta[i]>1.0) {
+      v[i] = 0.0;
+    }else if (alpha[i]>1.0 && beta[i]<1.0) {
       v[i] = 1.0;
     }
   }

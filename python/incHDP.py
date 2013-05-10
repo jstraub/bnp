@@ -102,8 +102,7 @@ if __name__ == '__main__':
   fig2=plt.figure(2)
   imgplot=plt.imshow(jsDimg,interpolation='nearest',cmap=cm.hot);
   plt.colorbar()
-  fig2.show()
+  plt.show()
 
-  time.sleep(1000)
-  raw_input()
+  time.sleep(10000)
 

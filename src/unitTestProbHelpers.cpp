@@ -37,4 +37,6 @@ BOOST_AUTO_TEST_CASE( probabilityHelpersTest )
   prop_true << 1.0 << 0.0 << 0.0 << 0.0 <<0.0 << 0.0;
   BOOST_CHECK_EQUAL( int32_t(sum(prop != prop_true)), int32_t(0) ); 
 
+
+
 }

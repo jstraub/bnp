@@ -132,17 +132,12 @@ class HDP_base:
     print('--- loading state from mat file at {}'.format(path))
     if HDP_base.__parseLoad(s,s.loaded):
       print('--- loaded state successfully!')
-      print('c={}'.format(s.state['c']))
-      print('sigPi={}'.format(s.state['sigPi']))
     else:
       print('--- error while loading state!')
-    raw_input()
     return True
 
   def __parseLoad(s,mat):
-
     print('mat.keys: {}'.format(mat.keys()))
-    print('c: {}'.format(mat['c']))
 
     for scalar in s.scalars:
       s.state[scalar]=mat[scalar][0][0]
@@ -166,15 +161,15 @@ class HDP_base:
       print('{} D={}'.format(listMatrix,D))
       if D==1:
         s.state[listMatrix].append(mat[listMatrix].ravel())
-        print('loaded {}_{}\t {}'.format(listMatrix,d,s.state[listMatrix][0].shape))
+        #print('loaded {}_{}\t {}'.format(listMatrix,d,s.state[listMatrix][0].shape))
       else:
         for d in range(0,D):
           s.state[listMatrix].append(mat[listMatrix][d][0])
           if len(s.state[listMatrix][d].shape) >1:
             if s.state[listMatrix][d].shape[1] == 1: # savemat/loadmat puts vectors always as column vectors
               s.state[listMatrix][d] = s.state[listMatrix][d].ravel()
-          print('loaded {}_{}\t {}'.format(listMatrix,d,s.state[listMatrix][d].shape))
-    
+          #print('loaded {}_{}\t {}'.format(listMatrix,d,s.state[listMatrix][d].shape))
+      print('loaded {}\t {}'.format(listMatrix,D))
     return True
 
 
@@ -246,7 +241,7 @@ class HDP_base:
       s.state['z']=[] # word indices to doc topics
       for d in range(0,D_tr):
         N_d = s.state['x_tr'][d].size
-        print('N_d={}'.format(N_d))
+        #print('N_d={}'.format(N_d))
 
 #        print('getting {}'.format(d))
 #        hdp.getDocTopics(s.state['pi'][d,:],s.state['sigPi'][d,:],s.state['c'][d,:],d)
@@ -349,7 +344,7 @@ class HDP_base:
 #        k_max = s.c[d][t_max]
 #      else:
 #        k_max = np.nan # this means that we arre not selecting one of the estimated models!! (the last element in sigPi is 1-sum(sigPi(0:end-1)) and represents the "other" models
-      ks[d]=k_max
+      ks[d]=k_max[0]
     ks_unique=np.unique(ks)
     ks_unique=ks_unique[~np.isnan(ks_unique)]
     if minSupport is not None:

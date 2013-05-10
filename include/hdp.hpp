@@ -136,15 +136,20 @@ class HDP_var_base
         Row<double> csigPi(mT+1);
         Row<uint32_t> cc(mT);
 
-//        cout<<"d="<<d<<endl;
         betaMode(cpi,mGamma[d].col(0),mGamma[d].col(1));
-//        cout<<"cpi="<<cpi<<endl;
         stickBreaking(csigPi,cpi);
-//        cout<<"csigPi="<<csigPi<<endl;
+        if ( sum(csigPi>1.0)>0)
+        {
+          cout<<"d="<<d<<endl;
+          cout<<"gamma: "<<mGamma[d]<<endl;
+          cout<<"cpi="<<cpi<<endl;
+          cout<<"csigPi="<<csigPi<<endl;
+          cout<<"|csigPi|="<<sum(csigPi)<<endl;
+          assert(0);
+        }
         for (uint32_t i=0; i<mT; ++i){
           cc[i] = multinomialMode(mZeta[d].row(i));
         }
-
 
         //getDocTopics(cpi,csigPi,cc,mGamma[d],mZeta[d]);
         pi.row(d) = cpi;
