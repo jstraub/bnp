@@ -102,12 +102,12 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 //      cout<<"mPhi -> D="<<mPhi.size()<<endl;
 //      cout<<"mPhi -> D="<<HDP_var_base::mPhi.size()<<endl;
 //      cout<<"mPerp="<<mPerp.t()<<endl;
-//
+
       Mat<double> pi(D,T);
       Mat<double> sigPi(D,T+1);
       Mat<uint32_t> c(D,T);
       getDocTopics(pi,sigPi,c);
-      cout<<"c:"<<c<<endl;
+//      cout<<"c:"<<c<<endl;
 
       mInd2Proc.set_size(0); // all processed
 
@@ -276,6 +276,9 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         Mat<double> db_a(mK,2); 
         db_lambda.zeros();
         db_a.zeros();
+
+
+
 #pragma omp parallel for schedule(dynamic) 
         for (uint32_t db=dd; db<min(dd+S,ind.n_elem); db++)
         {
@@ -306,7 +309,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
             converged = (accu(gamma_prev != gamma[dout]))==0 || o>60 ;
             gamma_prev = gamma[dout];
             ++o;
-            cout<<"o="<<o<<endl;
+//            cout<<"o="<<o<<endl;
           }
 
           Mat<double> d_lambda(mK,mNw);
@@ -443,6 +446,25 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
     Row<uint32_t> mInd2Proc; // indices of docs that have not been processed
 
   private:
+
+    /*
+     * precompute necessary digamma function values, because these are slowing the whole algorithm down
+     * all the update methods for zeta and phi need these values very often! I can precumpute these once after updating the global parameters (and hence lambda)
+     */
+    void buildDigamma(const Mat<double>& digam_lamb_k, const Col<double>& digam_lamb_sum, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+    {
+      digam_lamb_k.zeros(mK,mNw);
+      digam_lamb_sum.zeros(mK);
+      Col<uint32_t> x_u = unique(x_d);
+      for (uint32_t i = 0; i < x_u.n_elem ; i++) {
+        for (uint32_t k = 0; k < mK; k++) {
+           digam_lamb_k(k,x_u(i)) = digamma(lambda(k,x_u(i)));
+        }
+      }
+      for (uint32_t k = 0; k < mK; k++) {
+        digam_lamb_sum(k) = digamma(sum(lambda.row(k)));
+      }
+    }
 
     void initZeta(Mat<double>& zeta, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
     {

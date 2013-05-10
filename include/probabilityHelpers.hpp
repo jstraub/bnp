@@ -23,7 +23,7 @@ double logBeta(const Row<double>& x, double alpha, double beta);
 double logDir(const Row<double>& x, const Row<double>& alpha);
 
 void betaMode(Col<double>& v, const Col<double>& alpha, const Col<double>& beta);
-void betaMode(Row<double>& v, const Row<double>& alpha, const Row<double>& beta);
+void betaMode(Row<double>& v, const Col<double>& alpha, const Col<double>& beta);
 // stick breaking proportions;  truncated stickbreaking -> stick breaks will be dim longer than proportions v 
 void stickBreaking(Col<double>& prop, const Col<double>& v);
 void stickBreaking(Row<double>& prop, const Row<double>& v);

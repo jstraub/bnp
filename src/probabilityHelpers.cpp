@@ -81,7 +81,7 @@ void betaMode(Col<double>& v, const Col<double>& alpha, const Col<double>& beta)
     }
   }
 };
-void betaMode(Row<double>& v, const Row<double>& alpha, const Row<double>& beta)
+void betaMode(Row<double>& v, const Col<double>& alpha, const Col<double>& beta)
 {
   assert(alpha.n_elem == beta.n_elem);
   // breaking proportions

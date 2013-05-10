@@ -43,17 +43,14 @@ int main(int argc, char** argv)
 //  x[3].rows(0,59) += 4;
 //  x[4].randn();
 //  x[4].rows(0,29) += 4;
-  Row<double> alphas(3);
+  Row<double> alphas(Nw);
   alphas.ones();
-  alphas(0)=30;
-  alphas(1)=30;
-  alphas(2)=30;
   //alphas *= 1.1; // smaller alpha means more uncertainty in the where the good distributions are
-  double alpha =1.0, gamma=1000.0;
+  double alpha =1.0, gamma=100.0;
   Dir dir(alphas);
   HDP_var hdp_onl(dir, alpha, gamma);
 
-  hdp_onl.densityEst(x,4,0.6,10,2,1);
+  hdp_onl.densityEst(x,Nw,0.9,10,2,1);
 
   cout<<"x:"<<endl;
   for(uint32_t j=0; j<x.size(); ++j)

@@ -124,16 +124,6 @@ class HDP_var_base
       }
     };
 
-//    bool getDocTopics(Col<double>& pi, Col<double>& sigPi, Col<uint32_t>& c, uint32_t d) const
-//    {
-//      if (d < mGamma.size())
-//        return getDocTopics(pi,sigPi,c,mGamma[d],mZeta[d]);
-//      else{
-//        cout<<"asking for out of range doc "<<d<<" have only "<<mGamma.size()<<endl;
-//        return false;
-//      }
-//    };
-
     bool getDocTopics(Mat<double>& pi, Mat<double>& sigPi, Mat<uint32_t>& c) const
     {
       uint32_t D=mZeta.size();
@@ -146,19 +136,22 @@ class HDP_var_base
         Row<double> csigPi(mT+1);
         Row<uint32_t> cc(mT);
 
+//        cout<<"d="<<d<<endl;
         betaMode(cpi,mGamma[d].col(0),mGamma[d].col(1));
+//        cout<<"cpi="<<cpi<<endl;
         stickBreaking(csigPi,cpi);
+//        cout<<"csigPi="<<csigPi<<endl;
         for (uint32_t i=0; i<mT; ++i){
           cc[i] = multinomialMode(mZeta[d].row(i));
         }
+
 
         //getDocTopics(cpi,csigPi,cc,mGamma[d],mZeta[d]);
         pi.row(d) = cpi;
         sigPi.row(d) = csigPi;
         c.row(d) = cc;
-
-        cout<<csigPi.t()<<" = "<<sum(csigPi)<<endl;
-        cout<<sigPi.row(d)<<" = "<<sum(sigPi.row(d))<<endl;
+//        cout<<csigPi.t()<<" = "<<sum(csigPi)<<endl;
+//        cout<<sigPi.row(d)<<" = "<<sum(sigPi.row(d))<<endl;
       }
       return true;
     };
@@ -174,7 +167,7 @@ class HDP_var_base
 //      cout<<"mPhi -> D="<<mPhi.size()<<endl;
       if (z.n_rows != mPhi[d].n_rows)
       {
-        cout<<"z.rows="<<z.n_rows<<" vs phi_d.rows="<<mPhi[d].n_rows<<endl;
+//        cout<<"z.rows="<<z.n_rows<<" vs phi_d.rows="<<mPhi[d].n_rows<<endl;
         return false;
       }else{
       return getWordTopics(z,mPhi[d]);
