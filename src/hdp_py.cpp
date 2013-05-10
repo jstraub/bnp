@@ -225,9 +225,9 @@ public:
 
   bool densityEst(uint32_t Nw, uint32_t K0, uint32_t T0, uint32_t It)
   {
-    cout<<"mX.size()="<<HDP<U>::mX.size()<<endl;
-    for (uint32_t i=0; i<HDP<U>::mX.size(); ++i)
-      cout<<"  x_"<<i<<": "<<HDP<U>::mX[i].n_cols<<": "<<HDP<U>::mX[i]<<endl;
+//    cout<<"mX.size()="<<HDP<U>::mX.size()<<endl;
+//    for (uint32_t i=0; i<HDP<U>::mX.size(); ++i)
+//      cout<<"  x_"<<i<<": "<<HDP<U>::mX[i].n_cols<<": "<<HDP<U>::mX[i]<<endl;
 
     return HDP_gibbs<U>::densityEst(Nw, K0, T0, It);
   }
@@ -428,8 +428,8 @@ public:
 
   bool densityEst(uint32_t Nw, double kappa, uint32_t K, uint32_t T, uint32_t S)
   {
-    cout<<"mX.size()="<<HDP_var::mX.size()<<endl;
-    cout<<"mX_ho.size()="<<HDP_var::mX_ho.size()<<endl;
+//    cout<<"mX.size()="<<HDP_var::mX.size()<<endl;
+//    cout<<"mX_ho.size()="<<HDP_var::mX_ho.size()<<endl;
 //    for (uint32_t i=0; i<HDP_var::mX.size(); ++i)
 //      cout<<"  x_"<<i<<": "<<HDP_var::mX[i].n_rows<<"x"<<HDP_var::mX[i].n_cols<<endl;
 //
