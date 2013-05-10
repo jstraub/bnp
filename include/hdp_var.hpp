@@ -214,9 +214,13 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
 
+      Mat<double> digam_lamb_k(mK,mNw);
+      Col<double> digam_lamb_sum(mK);
+      buildDigamma(digam_lamb_k, digam_lamb_sum, lambda, x);
+
       //    cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
-      initZeta(zeta,lambda,x);
-      initPhi(phi,zeta,lambda,x);
+      initZeta(zeta,digam_lamb_k, digam_lamb_sum,x);
+      initPhi(phi,zeta,digam_lamb_k, digam_lamb_sum,x);
 
       // ------------------------ doc level updates --------------------
       bool converged = false;
@@ -227,8 +231,8 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       while(!converged){
         //      cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
         updateGamma(gamma,phi);
-        updateZeta(zeta,phi,a,lambda,x);
-        updatePhi(phi,zeta,gamma,lambda,x);
+        updateZeta(zeta,phi,a,digam_lamb_k, digam_lamb_sum,x);
+        updatePhi(phi,zeta,gamma,digam_lamb_k, digam_lamb_sum,x);
 
         converged = (accu(gamma_prev != gamma))==0 || o>60 ;
         gamma_prev = gamma;
@@ -278,7 +282,6 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         db_a.zeros();
 
 
-
 #pragma omp parallel for schedule(dynamic) 
         for (uint32_t db=dd; db<min(dd+S,ind.n_elem); db++)
         {
@@ -288,10 +291,16 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
           //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
 
           cout<<"-- db="<<db<<" d="<<d<<" N="<<N<<endl;
+
+
+          Mat<double> digam_lamb_k(mK,mNw);
+          Col<double> digam_lamb_sum(mK);
+          buildDigamma(digam_lamb_k, digam_lamb_sum, lambda, mX[d]);
+
           //Mat<double> zeta(T,K);
           phi[dout].resize(N,mT);
-          initZeta(zeta[dout],lambda,mX[d]);
-          initPhi(phi[dout],zeta[dout],lambda,mX[d]);
+          initZeta(zeta[dout],digam_lamb_k, digam_lamb_sum,mX[d]);
+          initPhi(phi[dout],zeta[dout],digam_lamb_k, digam_lamb_sum,mX[d]);
 
           //cout<<" ------------------------ doc level updates --------------------"<<endl;
           //Mat<double> gamma(T,2);
@@ -303,8 +312,8 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
           while(!converged){
             //           cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
             updateGamma(gamma[dout],phi[dout]);
-            updateZeta(zeta[dout],phi[dout],a,lambda,mX[d]);
-            updatePhi(phi[dout],zeta[dout],gamma[dout],lambda,mX[d]);
+            updateZeta(zeta[dout],phi[dout],a,digam_lamb_k, digam_lamb_sum,mX[d]);
+            updatePhi(phi[dout],zeta[dout],gamma[dout],digam_lamb_k, digam_lamb_sum,mX[d]);
 
             converged = (accu(gamma_prev != gamma[dout]))==0 || o>60 ;
             gamma_prev = gamma[dout];
@@ -451,11 +460,13 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      * precompute necessary digamma function values, because these are slowing the whole algorithm down
      * all the update methods for zeta and phi need these values very often! I can precumpute these once after updating the global parameters (and hence lambda)
      */
-    void buildDigamma(const Mat<double>& digam_lamb_k, const Col<double>& digam_lamb_sum, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+    void buildDigamma(Mat<double>& digam_lamb_k, Col<double>& digam_lamb_sum, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
     {
       digam_lamb_k.zeros(mK,mNw);
       digam_lamb_sum.zeros(mK);
-      Col<uint32_t> x_u = unique(x_d);
+      Mat<uint32_t> x_u = unique(x_d);
+      cout<<"x_d="<<x_d<<endl;
+      cout<<"x_u="<<x_u<<endl;
       for (uint32_t i = 0; i < x_u.n_elem ; i++) {
         for (uint32_t k = 0; k < mK; k++) {
            digam_lamb_k(k,x_u(i)) = digamma(lambda(k,x_u(i)));
@@ -466,7 +477,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       }
     }
 
-    void initZeta(Mat<double>& zeta, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+    void initZeta(Mat<double>& zeta, const Mat<double>& digam_lamb_k, const Col<double>& digam_lamb_sum, const Mat<uint32_t>& x_d)
     {
       uint32_t N = x_d.n_cols;
       uint32_t T = zeta.n_rows;
@@ -477,7 +488,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
           zeta(i,k)=0.0;
           for (uint32_t n=0; n<N; ++n) {
             //if(i==0 && k==0) cout<<zeta(i,k)<<" -> ";
-            zeta(i,k) += ElogBeta(lambda, k, x_d(n));
+            zeta(i,k) += digam_lamb_k(k,x_d(n)) - digam_lamb_sum(k); //ElogBeta(lambda, k, x_d(n));
           }
         }
         normalizeLogDistribution(zeta.row(i));
@@ -487,7 +498,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       //cerr<<"normalization check:"<<endl<<sum(zeta,1).t()<<endl; // sum over rows
     };
 
-    void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+    void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& digam_lamb_k, const Col<double>& digam_lamb_sum, const Mat<uint32_t>& x_d)
     {
       uint32_t N = x_d.n_cols;
       uint32_t T = zeta.n_rows;
@@ -497,7 +508,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         for (uint32_t i=0; i<T; ++i) {
           phi(n,i)=0.0;
           for (uint32_t k=0; k<K; ++k) {
-            phi(n,i)+=zeta(i,k)* ElogBeta(lambda, k, x_d(n));
+            phi(n,i)+=zeta(i,k)* (digam_lamb_k(k,x_d(n)) - digam_lamb_sum(k)); // ElogBeta(lambda, k, x_d(n));
           }
         }
         normalizeLogDistribution(phi.row(n));
@@ -524,7 +535,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       //cout<<gamma.t()<<endl;
     };
 
-    void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& a, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+    void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& a, const Mat<double>& digam_lamb_k, const Col<double>& digam_lamb_sum, const Mat<uint32_t>& x_d)
     {
 
       assert(x_d.n_rows == 1);
@@ -539,7 +550,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
           zeta(i,k) = ElogSigma(a,k);
           //cout<<zeta(i,k)<<endl;
           for (uint32_t n=0; n<N; ++n){
-            zeta(i,k) += phi(n,i)*ElogBeta(lambda,k,x_d(n));
+            zeta(i,k) += phi(n,i)* (digam_lamb_k(k,x_d(n)) - digam_lamb_sum(k)); //ElogBeta(lambda,k,x_d(n));
           }
         }
         normalizeLogDistribution(zeta.row(i));
@@ -547,7 +558,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
     }
 
 
-    void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Mat<uint32_t>& x_d)
+    void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& digam_lamb_k, const Col<double>& digam_lamb_sum, const Mat<uint32_t>& x_d)
     {
 
       assert(x_d.n_rows == 1);
@@ -561,7 +572,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         for (uint32_t i=0; i<T; ++i) {
           phi(n,i) = ElogSigma(gamma,i);
           for (uint32_t k=0; k<K; ++k) {
-            phi(n,i) += zeta(i,k)*ElogBeta(lambda,k,x_d(n)) ;
+            phi(n,i) += zeta(i,k)* (digam_lamb_k(k,x_d(n)) - digam_lamb_sum(k)); //ElogBeta(lambda,k,x_d(n)) ;
           }
         }
         normalizeLogDistribution(phi.row(n));
@@ -626,7 +637,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
     {
       double e=digamma(a(k,0)) - digamma(a(k,0) + a(k,1));
       for (uint32_t l=0; l<k; ++l)
-        e+=digamma(a(k,1)) - digamma(a(k,0) + a(k,1));
+        e+=digamma(a(l,1)) - digamma(a(l,0) + a(l,1));
       return e; 
     }
 
