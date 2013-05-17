@@ -36,10 +36,14 @@ BOOST_PYTHON_MODULE(libbnp)
 	boost::python::numeric::array::set_module_and_type("numpy", "ndarray");
 
 	class_<Dir_py>("Dir", init<numeric::array>())
-			.def(init<Dir_py>());
-	class_<NIW_py>("NIW",init<const numeric::array, double,
-			const numeric::array, double>())
-			.def(init<NIW_py>());
+			.def(init<Dir_py>())
+      .def("asRow",&Dir_py::asRow)
+      .def("rowDim",&Dir_py::rowDim);
+
+	class_<NIW_py>("NIW",init<const numeric::array, double, const numeric::array, double>())
+			.def(init<NIW_py>())
+      .def("asRow",&NIW_py::asRow)
+      .def("rowDim",&NIW_py::rowDim);
 
 	//	class_<DP_Dir>("DP_Dir",init<Dir_py,double>());
 	//	class_<DP_INW>("DP_INW",init<NIW_py,double>());

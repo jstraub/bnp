@@ -93,10 +93,10 @@ class HDP_base:
 
   loaded = dict()
   
-  def __init__(s, K=None,T=None,Nw=None,omega=None,alpha=None,Lambda=None, pathToModel=None):
+  def __init__(s, K=None,T=None,Nw=None,omega=None,alpha=None,base=None, pathToModel=None):
 
     s.scalars = ['K','T','Nw','omega','alpha','D_tr','D_te']
-    s.matrices = ['c','pi','sigPi','Lambda','beta','sigV','v','perp','logP_w']
+    s.matrices = ['c','pi','sigPi','base','beta','sigV','v','perp','logP_w']
     s.listMatrices=['z','x_tr','x_te']
     
     s.shape=dict()
@@ -114,7 +114,8 @@ class HDP_base:
       # hyper parameters
       s.state['omega'] = omega
       s.state['alpha'] = alpha
-      s.state['Lambda'] = Lambda
+      s.state['base'] = np.zeros(base.rowDim())
+      base.asRow(s.state['base'])
       print('in HDP_base setting K={}; T={}; Nw={}; omega={}; alpha={};'.format(s.state['K'],s.state['T'],s.state['Nw'],s.state['omega'],s.state['alpha']))
     else:
       s.load(pathToModel)
@@ -198,7 +199,7 @@ class HDP_base:
 
 
   def loadHDPSample(s, x_tr, x_te, hdp):
-    if isinstance(hdp,bnp.HDP_var) or isinstance(hdp,bnp.HDP_var_ss):
+    if isinstance(hdp,bnp.HDP_var_Dir) or isinstance(hdp,bnp.HDP_var_NIW) or isinstance(hdp,bnp.HDP_var_ss):
       print("---------------------- obtaining results -------------------------");
       s.state['x_tr'] = x_tr
       s.state['x_te'] = x_te
@@ -384,7 +385,7 @@ class HDP_sample(HDP_base):
     s.state['D_tr'] = D
     s.state['x_tr']=[]
     # draw K topics from Dirichlet
-    s.state['beta'] = np.random.dirichlet(s.state['Lambda'],s.state['K'])
+    s.state['beta'] = np.random.dirichlet(s.state['base'],s.state['K'])
     # draw breaking proportions using Beta
     s.state['v'] = np.random.beta(1,s.state['omega'],s.state['K'])
     s.state['sigV'] = stickBreaking(s.state['v'])

@@ -28,15 +28,18 @@ class BaseMeasure
 {
 public:
   BaseMeasure()
+    : mRowDim(0)
   {
     //cout<<"Creating "<<typeid(this).name()<<endl;
   };
 
   BaseMeasure(const BaseMeasure<U>& other)
+    : mRowDim(0)
   { };
 
   virtual ~BaseMeasure()
   {};
+
   virtual double predictiveProb(const Col<U>& x_q, const Mat<U>& x_given) const
   {
     cerr<<"BaseMeasure:: Something gone wrong with virtual functions"<<endl;
@@ -51,28 +54,45 @@ public:
   };
 
   virtual BaseMeasure<U>* getCopy() const
-  {
+  { 
+    cerr<<"BaseMeasure:: getCopy()"<<endl;
     exit(0);
     return new BaseMeasure<U>(*this);
   };
 
   virtual Row<double> asRow() const
   {
-    exit(0);
-    return Row<double>();
+    cerr<<"BaseMeasure:: asRow()"<<endl;
+    exit(0); return Row<double>(); 
+  };
+
+  uint32_t rowDim() const
+  {
+    return mRowDim;
   };
   
   virtual void fromRow(const Row<double>& r)
-  {exit(0);};
+  {
+    cerr<<"BaseMeasure:: fromRow()"<<endl;
+    exit(0);};
 
   virtual void mode(Row<double>& mode) const
-  {exit(0);};
+  {
+    cerr<<"BaseMeasure:: mode()"<<endl;
+    exit(0);};
 
   virtual double Elog(const Col<U>& x) const
-  {exit(0);};
+  {
+    cerr<<"BaseMeasure:: Elog()"<<endl;
+    exit(0);};
 
-  virtual void posteriorHDP_var(const Mat<double>& zeta, const Mat<double>& phi, uint32_t D, const Mat<U>& x)
-  {exit(0);};
+  virtual void posteriorHDP_var(const Col<double>& zeta, const Mat<double>& phi, uint32_t D, const Mat<U>& x)
+  {
+    cerr<<"BaseMeasure:: posteriorHDP_var()"<<endl;
+    exit(0);};
+
+protected:
+  uint32_t mRowDim;
 
 };
 
@@ -140,11 +160,15 @@ class Dir : public BaseMeasure<uint32_t>
 public:
   Dir(const Row<double>& alphas)
   : mAlphas(alphas), mAlpha0(sum(alphas))
-  {};
+  {
+    mRowDim = mAlphas.n_elem;
+  };
 
   Dir(const Dir& dir)
     : mAlphas(dir.mAlphas), mAlpha0(sum(dir.mAlphas))
-  {};
+  {
+    mRowDim = mAlphas.n_elem;
+  };
 
   /*
    * return a copy of this object - this uses the concept of covariance
@@ -241,11 +265,17 @@ public:
   : mVtheta(vtheta), mKappa(kappa), mDelta(Delta), mNu(nu)
   {
 //    cout<<"Creating "<<typeid(this).name()<<endl;
+    
+    mRowDim = mVtheta.n_elem;
+    mRowDim = mRowDim*mRowDim + mRowDim +2;
   };
 
   NIW(const NIW& niw)
   : mVtheta(niw.mVtheta), mKappa(niw.mKappa), mDelta(niw.mDelta), mNu(niw.mNu)
-  { };
+  {
+    mRowDim = mVtheta.n_elem;
+    mRowDim = mRowDim*mRowDim + mRowDim +2;
+  };
 
   virtual NIW* getCopy() const
   {
@@ -271,7 +301,6 @@ public:
       row(d*d+i) = mVtheta(i);
     row(d*d+d) = mNu;
     row(d*d+d+1) = mKappa;
-
     return row;
   };
   
@@ -290,16 +319,38 @@ public:
 
   virtual void mode(Row<double>& mode) const
   { 
-    mode.set_size(4); 
+    uint32_t d = mVtheta.n_elem; // we already have a Vtheta from the init;
+    mode.set_size(d*d+d); 
+    //TODO: not sure about covariance...
+    for (uint32_t i=0; i<d; ++i)
+      for (uint32_t j=0; j<d; ++j)
+        mode(j+i*d) = mDelta(j,i)/(mNu+d+1); // column major
+    for (uint32_t i=0; i<d; ++i)
+      mode(d*d+i) = mVtheta(i); // sure about the mean
   };
 
   virtual double Elog(const Col<double>& x) const
   {
-    return 0.0;
+    uint32_t d = mVtheta.n_elem; // we already have a Vtheta from the init;
+    double a = (gamma((mNu+1.0)/2.0)/( pow((mNu-d+1.0)*datum::pi,d/2.0)* gamma((mNu-d+1.0)/2.0)* sqrt((mKappa+1.0)/(mKappa*(mNu-d+1.0)))* sqrt(det(mDelta)) )) ;
+    double b = as_scalar((x-mVtheta).t()*solve(mDelta,x-mVtheta));
+    double c = pow(1.0+(mKappa/(mKappa+1.0))*b,(mNu+1.0)/2.0);
+    return a/c;
   };
 
-  virtual void posteriorHDP_var(const Mat<double>& zeta, const Mat<double>& phi, uint32_t D, const Mat<double>& x)
+  virtual void posteriorHDP_var(const Col<double>& zeta, const Mat<double>& phi, uint32_t D, const Mat<double>& x)
   {
+    uint32_t n = x.n_cols;
+    Col<double> x_hat=sum(x,1);
+    Mat<double> S(mDelta);
+    S.zeros();
+    for (uint32_t i=0; i<n; ++i)
+      S += (x.col(i) - x_hat) * (x.col(i) - x_hat).t();
+    
+    mDelta = mDelta + S + (mKappa*n)/(mKappa+n)*(x_hat - mVtheta)*(x_hat - mVtheta).t();
+    mVtheta = mKappa/(mKappa+n)* mVtheta + n/(mKappa+n)*x_hat;
+    mKappa += x.n_cols;
+    mNu += x.n_cols;
   };
 
   double predictiveProb(const Col<double>& x_q, const Mat<double>& x_given) const

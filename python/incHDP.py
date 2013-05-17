@@ -53,8 +53,9 @@ if __name__ == '__main__':
   dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
 
   print("---------------- Starting! --------------")
-
-  hdp = HDP_var_inc(K,T,Nw,omega,alpha,dirAlphas)
+  
+  base = bnp.Dir(dirAlphas)
+  hdp = HDP_var_Dir_inc(K,T,Nw,omega,alpha,base)
 
   x=[]
   x_tr=[]
@@ -79,7 +80,7 @@ if __name__ == '__main__':
   hdp.save('incTest.mat')
 
 # -- make sure the saved model is saved and loaded correctly
-  hdp2 = HDP_var_inc(K,T,Nw,omega,alpha,dirAlphas)
+  hdp2 = HDP_var_Dir_inc(K,T,Nw,omega,alpha,base)
   hdp2.load('incTest.mat')
   #print('{}'.format(hdp2.state['logP_w']))
   hdp.stateEquals(hdp2)
