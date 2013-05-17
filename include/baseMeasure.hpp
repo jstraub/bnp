@@ -78,18 +78,18 @@ public:
 private:
 };
 
-class InvNormWishart : public BaseMeasure<double>
+class NIW : public BaseMeasure<double>
 {
 public:
   // make a copy of vtheta and Delta (that should only be a copy of the header anyway
-  InvNormWishart(colvec vtheta, double kappa, mat Delta, double nu)
+  NIW(colvec vtheta, double kappa, mat Delta, double nu)
   : mVtheta(vtheta), mKappa(kappa), mDelta(Delta), mNu(nu)
   {
 //    cout<<"Creating "<<typeid(this).name()<<endl;
   };
 
-  InvNormWishart(const InvNormWishart& inw)
-  : mVtheta(inw.mVtheta), mKappa(inw.mKappa), mDelta(inw.mDelta), mNu(inw.mNu)
+  NIW(const NIW& niw)
+  : mVtheta(niw.mVtheta), mKappa(niw.mKappa), mDelta(niw.mDelta), mNu(niw.mNu)
   { };
 
   double predictiveProb(const Col<double>& x_q, const Mat<double>& x_given) const

@@ -274,15 +274,19 @@ class HDP_base:
 #  symmeterised divergence
   def symKL(s,logP,logQ):
     return np.sum((logP-logQ)*(np.exp(logP)-np.exp(logQ)))
+
   def symKLImg(s):
     D_tr = s.state['D_tr']
     K = s.state['K']
     T = s.state['T']
     # create image for topic
     symKLd = np.zeros((D_tr,D_tr))
+    logP = s.state['logP_w']
+    p = np.exp(logP)
     for di in range(0,D_tr):
       for dj in range(0,D_tr):
-        symKLd[di,dj] = s.symKL(s.state['logP_w'][di],s.state['logP_w'][dj])
+        symKLd[di,dj] =  np.sum((logP[di,:]-logP[dj,:])*(p[di,:]-p[dj,:]))
+#s.symKL(s.state['logP_w'][di],s.state['logP_w'][dj])
     return symKLd
 
 # Jensen-Shannon Divergence - 

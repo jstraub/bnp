@@ -44,14 +44,14 @@ class HDP // : public DP<U>
       uint32_t N = x_i.n_cols;
       
       //DONE: this shuffle might not be working
-      cout<<"x_i: "<<x_i.cols(0,10)<<endl;
+//      cout<<"x_i: "<<x_i.cols(0,10)<<endl;
       Mat<U> x_s = shuffle(x_i,1); // suffle the columns (words)
-      cout<<"x_s: "<<x_s.cols(0,10)<<endl;
+//      cout<<"x_s: "<<x_s.cols(0,10)<<endl;
       Mat<U> x_te = x_s.cols(0,(N/2)-1) ; // select first half to train on
       Mat<U> x_ho = x_s.cols(N/2,N-1) ; // select second half as held out
 
-      cout<<"x_te: "<<x_te.n_rows<<"x"<<x_te.n_cols<<endl;
-      cout<<"x_ho: "<<x_ho.n_rows<<"x"<<x_ho.n_cols<<endl;
+//      cout<<"x_te: "<<x_te.n_rows<<"x"<<x_te.n_cols<<endl;
+//      cout<<"x_ho: "<<x_ho.n_rows<<"x"<<x_ho.n_cols<<endl;
       
   
       mX_te.push_back(x_te); // on half of the data we train as usual to get a topic model for the document
@@ -70,14 +70,14 @@ class HDP // : public DP<U>
       double perp = 0.0;
       for (uint32_t i=0; i<N; ++i){
         //cout<<"c_z_n = "<<c[z[w]]<<" z_n="<<z[w]<<" w="<<w<<" N="<<N<<" x_w="<<x_ho[w]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols;
-        cout<<"x_ho_i="<<x_ho(i)<<"; logP_x_ho_i="<<logP(x_ho(i))<<endl;
+//        cout<<"x_ho_i="<<x_ho(i)<<"; logP_x_ho_i="<<logP(x_ho(i))<<endl;
           perp -= logP(x_ho(i));
         //cout<<"w="<<w<<"\tx_ho_w="<<x_ho[w]<<"\tlogP="<<logP[w]<<"\tperp+="<<-double(x_ho[w])*logP[w]<<endl;
       } cout<<endl;
       perp /= double(N);
       perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
       perp = pow(2.0,perp);
-      cout<<"perp="<<perp<<endl;
+//      cout<<"perp="<<perp<<endl;
 
       return perp;
     };
@@ -302,7 +302,7 @@ class HDP_var_base
 
 
     bool getWordTopics(Col<uint32_t>& z, const Mat<double>& phi) const {
-      cout<<phi.n_rows<<" x "<<phi.n_cols<<endl;
+//      cout<<phi.n_rows<<" x "<<phi.n_cols<<endl;
       z.set_size(phi.n_rows);
       for (uint32_t i=0; i<z.n_elem; ++i){
         z[i] = multinomialMode(phi.row(i));
