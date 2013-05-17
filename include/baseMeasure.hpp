@@ -69,7 +69,10 @@ public:
   virtual void mode(Row<double>& mode) const
   {exit(0);};
 
-  virtual double Elog(U x) const
+  virtual double Elog(const Col<U>& x) const
+  {exit(0);};
+
+  virtual void posteriorHDP_var(const Mat<double>& zeta, const Mat<double>& phi, uint32_t D, const Mat<U>& x)
   {exit(0);};
 
 };
@@ -117,7 +120,7 @@ public:
       mDistris[i] = a.getCopy();
   };
 
-  BaseMeasure<U>* operator[](const uint32_t i)
+  BaseMeasure<U>* operator[](const uint32_t i) const
   {
     assert(i<mDistris.size());
     return mDistris[i];
@@ -169,11 +172,41 @@ public:
     dirMode(mode,mAlphas);
   };
 
-  virtual double Elog(uint32_t x) const
+  virtual double Elog(const Col<uint32_t>& x) const
   {
-    return digamma(mAlphas(x)) - digamma(mAlpha0);
+    // TODO: assumes that x is 1D word
+    return digamma(mAlphas(x(0))) - digamma(mAlpha0);
   };
 
+  /*
+   * update parameters using observations x to form posterior for stochastic variational HDP
+   */
+  virtual void posteriorHDP_var(const Col<double>& zeta, const Mat<double>& phi, uint32_t D, const Mat<uint32_t>& x)
+  { 
+
+    uint32_t N = x.n_cols;
+    uint32_t T = zeta.n_rows;
+    uint32_t Nw = mAlphas.n_elem;
+
+    Row<double> lambda(Nw);
+    lambda.zeros();
+    for (uint32_t i=0; i<T; ++i) 
+    {
+      Row<double> _lambda(Nw); 
+      _lambda.zeros();
+      for (uint32_t n=0; n<N; ++n){
+        _lambda(x(n)) += phi(n,i);
+      }
+      lambda += zeta(i) * _lambda;
+    }
+    mAlphas += D*lambda;
+    //cout<<"lambda-nu="<<d_lambda[k].t()<<endl;
+    //cout<<"lambda="<<d_lambda[k].t()<<endl;
+  };
+
+  /*
+   * used for gibbs sampling - seems to assume a categorical distribution
+   */
   double predictiveProb(const Col<uint32_t>& x_q, const Mat<uint32_t>& x_given) const
   {
     // TODO: assumes x_q is 1D! (so actually just a uint32_t
@@ -243,7 +276,7 @@ public:
     return row;
   };
   
-  virtual void  fromRow(const Row<double>& row)
+  virtual void fromRow(const Row<double>& row)
   {
     uint32_t d = mVtheta.n_elem; // we already have a Vtheta from the init;
     for (uint32_t i=0; i<d; ++i)
@@ -261,9 +294,13 @@ public:
     mode.set_size(4); 
   };
 
-  virtual double Elog(double x) const
+  virtual double Elog(const Col<double>& x) const
   {
     return 0.0;
+  };
+
+  virtual void posteriorHDP_var(const Mat<double>& zeta, const Mat<double>& phi, uint32_t D, const Mat<double>& x)
+  {
   };
 
   double predictiveProb(const Col<double>& x_q, const Mat<double>& x_given) const

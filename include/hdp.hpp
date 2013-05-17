@@ -245,7 +245,7 @@ protected:
       return true;
     };
 
-    bool getCorpTopics(Mat<double>& topics, DistriContainer<uint32_t>& lambda) const
+    bool getCorpTopics(Mat<double>& topics, const DistriContainer<uint32_t>& lambda) const
     {
       uint32_t K = lambda.size();
       Row<double> beta;

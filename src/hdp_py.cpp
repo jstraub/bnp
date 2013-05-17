@@ -303,14 +303,15 @@ class HDP_var_base_py : public virtual HDP_var_base
    */
   bool getLambda_py(numeric::array& lambda, uint32_t k)
   {
-    Col<double> lambda_col;
-    if(!HDP_var_base::getLambda(lambda_col, k)){return false;} // works on the data in _mat
-    Col<double> lambda_wrap=np2col<double>(lambda); 
-    if(lambda_col.n_rows != lambda_wrap.n_rows)
+    Row<double> lambda_row;
+    if(!HDP_var_base::getLambda(lambda_row, k)){return false;} // works on the data in _mat
+    Row<double> lambda_wrap=np2row<double>(lambda); 
+    if(lambda_row.n_cols != lambda_wrap.n_cols)
       return false;
     else{
-      for (uint32_t i=0; i<lambda_wrap.n_rows; ++i)
-        lambda_wrap.at(i)=lambda_col.at(i);
+      lambda_wrap = lambda_row;
+//      for (uint32_t i=0; i<lambda_wrap.n_rows; ++i)
+//        lambda_wrap.at(i)=lambda_col.at(i);
       return true;
     }
   };

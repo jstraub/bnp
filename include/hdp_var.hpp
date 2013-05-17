@@ -219,11 +219,11 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
     bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, DistriContainer<uint32_t>& lambda, double omega, uint32_t d, double kappa)
     {
       uint32_t D = d+1; // assume that doc d is appended to the end  
-      uint32_t Nw = lambda.n_cols;
+//      uint32_t Nw = lambda.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
 
-      Mat<double> eLogBeta(mK,mNw); //TODO
+      Mat<double> eLogBeta(mK,x.n_cols); //TODO
       Col<double> digam_lamb_sum(mK);
       compElogBeta(eLogBeta,  lambda, x);
 
@@ -313,7 +313,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
           cout<<"-- db="<<db<<" d="<<d<<" N="<<N<<endl;
 
-          Mat<double> eLogBeta(mK,mNw);
+          Mat<double> eLogBeta(mK,mX[d].n_cols);
           Col<double> digam_lamb_sum(mK);
           compElogBeta(eLogBeta, lambda, mX[d]);
 
@@ -367,7 +367,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         //cout<<"d_a="<<d_a<<endl;
         //cout<<"a="<<a<<endl;
         
-        for (uint32_t k=0; k<d_lambda.size(); ++k)
+        for (uint32_t k=0; k<db_lambda.size(); ++k)
           lambda[k]->fromRow((1.0-ro)*lambda[k]->asRow() + (ro/S)*db_lambda[k]->asRow()); //TODO: doies this make sense for NIW prior???
         //lambda = (1.0-ro)*lambda + (ro/S)*db_lambda;
         a = (1.0-ro)*a + (ro/S)*db_a;
@@ -491,16 +491,16 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      */
     void compElogBeta(Mat<double>& eLogBeta, const DistriContainer<uint32_t>& lambda, const Mat<uint32_t>& x_d) const 
     { 
-      eLogBeta.zeros(mK,mNw);
+      eLogBeta.zeros(mK,x_d.n_cols);
 
       Col<double> digam_lamb_sum(mK);
-      Mat<uint32_t> x_u = unique(x_d);
+    //  Mat<uint32_t> x_u = unique(x_d); // cannot do this trick anymore since x_d are continuous for the NIW base measure
 //      cout<<"x_d="<<x_d<<endl;
 //      cout<<"x_u="<<x_u<<endl;
  
-      for (uint32_t i = 0; i < x_u.n_elem ; i++) {
+      for (uint32_t i = 0; i < x_d.n_cols ; i++) {
         for (uint32_t k = 0; k < mK; k++) {
-           eLogBeta(k,x_u(i)) = lambda[k]->Elog(x_u(i)); // E[log beta] computation in paper
+           eLogBeta(k,i) = lambda[k]->Elog(x_d.col(i)); // E[log beta] computation in paper
         }
       }
 //      for (uint32_t k = 0; k < mK; k++) {
@@ -533,7 +533,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
           zeta(i,k)=0.0;
           for (uint32_t n=0; n<N; ++n) {
             //if(i==0 && k==0) cout<<zeta(i,k)<<" -> ";
-            zeta(i,k) += eLogBeta(k,x_d(n)); //ElogBeta(lambda, k, x_d(n));
+            zeta(i,k) += eLogBeta(k,n); //ElogBeta(lambda, k, x_d(n));
           }
         }
         normalizeLogDistribution(zeta.row(i));
@@ -553,7 +553,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         for (uint32_t i=0; i<T; ++i) {
           phi(n,i)=0.0;
           for (uint32_t k=0; k<K; ++k) {
-            phi(n,i)+=zeta(i,k)* eLogBeta(k,x_d(n)); // ElogBeta(lambda, k, x_d(n));
+            phi(n,i)+=zeta(i,k)* eLogBeta(k,n); // ElogBeta(lambda, k, x_d(n));
           }
         }
         normalizeLogDistribution(phi.row(n));
@@ -595,7 +595,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
           zeta(i,k) = eLogSig_a(k); //ElogSigma(a,k);
           //cout<<zeta(i,k)<<endl;
           for (uint32_t n=0; n<N; ++n){
-            zeta(i,k) += phi(n,i)* eLogBeta(k,x_d(n)); //ElogBeta(lambda,k,x_d(n));
+            zeta(i,k) += phi(n,i)* eLogBeta(k,n); //ElogBeta(lambda,k,x_d(n));
           }
         }
         normalizeLogDistribution(zeta.row(i));
@@ -617,7 +617,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         for (uint32_t i=0; i<T; ++i) {
           phi(n,i) = eLogSig_gam(i); //ElogSigma(gamma,i);
           for (uint32_t k=0; k<K; ++k) {
-            phi(n,i) += zeta(i,k)* eLogBeta(k,x_d(n)); //ElogBeta(lambda,k,x_d(n)) ;
+            phi(n,i) += zeta(i,k)* eLogBeta(k,n); //ElogBeta(lambda,k,x_d(n)) ;
           }
         }
         normalizeLogDistribution(phi.row(n));
@@ -626,31 +626,39 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
     void computeNaturalGradients(DistriContainer<uint32_t>& d_lambda, Mat<double>& d_a, const Mat<double>& zeta, const Mat<double>&  phi, double omega, uint32_t D, const Mat<uint32_t>& x_d)
     {
-      uint32_t N = x_d.n_cols;
-      uint32_t Nw = d_lambda.n_cols;
+//      uint32_t N = x_d.n_cols;
+//      uint32_t Nw = d_lambda.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
 
-      d_lambda.zeros();
+      d_lambda.init(mH0,mK);
+
+//      d_lambda.zeros();
       d_a.zeros();
       for (uint32_t k=0; k<K; ++k) 
       { // for all K corpus level topics
+        d_lambda[k]->posteriorHDP_var(zeta.col(k),phi,D,x_d);
+
+//        for (uint32_t i=0; i<T; ++i) 
+//        {
+//          Row<double> _lambda(Nw); _lambda.zeros();
+//          for (uint32_t n=0; n<N; ++n){
+//            _lambda(x_d(n)) += phi(n,i);
+//          }
+//          d_lambda.row(k) += zeta(i,k) * _lambda;
+//        }
+//        d_lambda.row(k) = D*d_lambda.row(k);
+//        //cout<<"lambda-nu="<<d_lambda[k].t()<<endl;
+//        d_lambda.row(k) += ((Dir*)(&mH0))->mAlphas;
+//        //cout<<"lambda="<<d_lambda[k].t()<<endl;
+
         for (uint32_t i=0; i<T; ++i) 
         {
-          Row<double> _lambda(Nw); _lambda.zeros();
-          for (uint32_t n=0; n<N; ++n){
-            _lambda(x_d(n)) += phi(n,i);
-          }
-          d_lambda.row(k) += zeta(i,k) * _lambda;
           d_a(k,0) += zeta(i,k);
           for (uint32_t l=k+1; l<K; ++l) {
             d_a(k,1) += zeta(i,l);
           }
         }
-        d_lambda.row(k) = D*d_lambda.row(k);
-        //cout<<"lambda-nu="<<d_lambda[k].t()<<endl;
-        d_lambda.row(k) += ((Dir*)(&mH0))->mAlphas;
-        //cout<<"lambda="<<d_lambda[k].t()<<endl;
         d_a(k,0) = D*d_a(k,0)+1.0;
         d_a(k,1) = D*d_a(k,1)+omega;
       }

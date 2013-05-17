@@ -387,7 +387,7 @@ class HDP_sample(HDP_base):
     s.state['beta'] = np.random.dirichlet(s.state['Lambda'],s.state['K'])
     # draw breaking proportions using Beta
     s.state['v'] = np.random.beta(1,s.state['omega'],s.state['K'])
-    s.state['sigV'] = stickBreaking(s.v)
+    s.state['sigV'] = stickBreaking(s.state['v'])
   
     s.state['c']=[]  # pointers to corp level topics
     s.state['pi']=[] # breaking proportions for selected doc level topics
