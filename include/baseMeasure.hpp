@@ -123,10 +123,21 @@ public:
       mDistris[i] = a[i]->getCopy();
   };
 
+  DistriContainer(const DistriContainer<U>& a)
+    : mDistris(a.size(),NULL)
+  {
+    for (uint32_t i=0; i<a.size(); ++i)
+      mDistris[i] = a[i]->getCopy();
+  };
+
+
   ~DistriContainer()
   {
     for (uint32_t i=0; i<mDistris.size(); ++i)
+    {
+      cout<<"deleting "<<mDistris.size()<<" "<<i<<" :"<<mDistris[i]<<endl;
       delete mDistris[i];
+    }
   };
   
   void init(const BaseMeasure<U>& a, uint32_t d)

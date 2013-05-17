@@ -37,7 +37,7 @@ def dataFromBOFs(pathToData):
 
 
 
-class HDPvar(bnp.HDP_var):
+class HDPvar(bnp.HDP_var_Dir):
   # x are data for training; x_ho is held out data
   def initialEstimate(self,x,x_ho,Nw,kappa,K,T,S):
     D = len(x)
@@ -52,7 +52,7 @@ class HDPvar(bnp.HDP_var):
     return self.densityEst(Nw,kappa,K,T,S)
 
 
-class HDPgibbs(bnp.HDP_Dir):
+class HDPgibbs(bnp.HDP_gibbs_Dir):
   # x are data for training; x_ho is held out data
   def initialEstimate(self,x,x_ho,Nw,K0,T0,It):
     D = len(x)
@@ -98,7 +98,9 @@ if __name__ == '__main__':
   omega = args.omega # concentration on G_0
   dirAlphas = np.ones(Nw) # alphas for dirichlet base measure
 
-  hdp_true = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
+  dirichlet=bnp.Dir(dirAlphas)
+
+  hdp_true = HDP_sample(K,T,Nw,omega,alpha,dirichlet)
   x, gtCorpProp, gtTopic, pi, c = hdp_true.generateDirHDPSample(D+D_ho,N_d)
   x_tr = x[0:D-D_ho]
   x_ho = x[D-D_ho:D]
@@ -108,7 +110,6 @@ if __name__ == '__main__':
 
   print("---------------- Starting! use " + str(D) +" docs and " + str(D_ho) + " held out --------------")
 
-  dirichlet=bnp.Dir(dirAlphas)
   print("Dir created")
 
   if args.gibbs:

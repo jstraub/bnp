@@ -36,6 +36,11 @@ int main(int argc, char** argv)
     //x[d+2].rows(0,29) += 1;
     //x[d+2].rows(60,89) += 1;
   }
+  vector<Mat<uint32_t> > x_te(1,zeros<Mat<uint32_t> >(1,90));
+  x[0].zeros();
+  x[0].cols(0,29) += 1;
+  x[0].cols(30,59) += 2;
+
   uint32_t Nw = 3;
 //  x[2].randn();
 //  x[2].rows(0,29) -= 8;
@@ -50,6 +55,7 @@ int main(int argc, char** argv)
   Dir dir(alphas);
   HDP_var<uint32_t> hdp_onl(dir, alpha, gamma);
 
+  hdp_onl.addHeldOut(x_te[0]);
   hdp_onl.densityEst(x,Nw,0.9,10,2,1);
 
   cout<<"x:"<<endl;
