@@ -22,40 +22,6 @@
 using namespace std;
 using namespace arma;
 
-template <class U>
-class DistriContainer:
-{
-public:
-  DistriContainer(const BaseMeasure<U>& a, uint32_t d)
-    : mDistris(d,NULL)
-  {
-    for (uint32_t i=0; i<d; ++i)
-      mDistris[i] = a.getClopy();
-  };
-
-
-  DistriContainer(const vector<BaseMeasure<U>* >& a)
-    : mDistris(d,NULL)
-  {
-    for (uint32_t i=0; i<d; ++i)
-      mDistris[i] = a[i]->getCopy();
-  };
-
-  ~DistriContainer()
-  {
-    for (uint32_t i=0; i<d; ++i)
-      delete mDistris[i];
-  };
-
-  BaseMeasure<U>* operator[](uint32_t i)
-  {
-    assert(i<mDistris.size());
-    return mDistris[i];
-  };
-
-private:
-  vector<BaseMeasure<U>* > mDistris;
-}
 
 
 /*
@@ -104,10 +70,8 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       mA.col(1) *= mOmega; 
 
       // initialize lambda
-      mLambda.resize(K,NULL);
-      for (uint32_t k=0; k<K; ++k){
-        mLambda[k] = mH0.getCopy(); // initialize the priors of the topics from the base measure.
-      }
+      mLambda.init(mH0,K); // initialize the priors of the topics from the base measure.
+    
 //      mLambda.zeros(K,Nw);
 //      GammaRnd gammaRnd(1.0, 1.0);
 //      for (uint32_t k=0; k<K; ++k){
@@ -252,14 +216,14 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
     /*
      *
      */
-    bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa)
+    bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, DistriContainer<uint32_t>& lambda, double omega, uint32_t d, double kappa)
     {
       uint32_t D = d+1; // assume that doc d is appended to the end  
       uint32_t Nw = lambda.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
 
-      Mat<double> eLogBeta(mK,mNw);
+      Mat<double> eLogBeta(mK,mNw); //TODO
       Col<double> digam_lamb_sum(mK);
       compElogBeta(eLogBeta,  lambda, x);
 
@@ -293,14 +257,17 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
       //    cout<<" --------------------- natural gradients --------------------------- "<<endl;
       //    cout<<"\tD="<<D<<" omega="<<omega<<endl;
-      Mat<double> d_lambda(K,Nw);
+      DistriContainer<uint32_t> d_lambda(mH0,K);
       Mat<double> d_a(K,2); 
       computeNaturalGradients(d_lambda, d_a, zeta, phi, omega, D, x);
 
       //    cout<<" ------------------- global parameter updates: ---------------"<<endl;
       double ro = exp(-kappa*log(1+double(d+1)));
       //    cout<<"\tro="<<ro<<endl;
-      lambda = (1.0-ro)*lambda + ro*d_lambda;
+      for (uint32_t k=0; k<mK; ++k)
+        lambda[k]->fromRow( (1.0-ro)*lambda[k]->asRow() + ro* d_lambda[k]->asRow());
+      
+      //lambda = (1.0-ro)*lambda + ro*d_lambda;
       a = (1.0-ro)*a+ ro*d_a;
       return true;
     };
@@ -312,7 +279,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      * @param sameIndAsX == true -> zeta,phi,gamma have same indices as x (ind_x). This typically happens for the initial batch update. Setting this to true eliminates the need of reordering the results afterwords to match the indices of the docs x.
      * @return the randomly shuffled indices to show how the data was processed -> this allows association of zetas, phis and gammas with docs in mX
      */
-    Row<uint32_t> updateEst_batch(const Row<uint32_t>& ind_x, vector<Mat<double> >& zeta, vector<Mat<double> >& phi, vector<Mat<double> >& gamma, Mat<double>& a, vector<BaseMeasure<uint32_t> >& lambda, Col<double>& perp, double omega, double kappa, uint32_t S, bool sameIndAsX=false)
+    Row<uint32_t> updateEst_batch(const Row<uint32_t>& ind_x, vector<Mat<double> >& zeta, vector<Mat<double> >& phi, vector<Mat<double> >& gamma, Mat<double>& a, DistriContainer<uint32_t>& lambda, Col<double>& perp, double omega, double kappa, uint32_t S, bool sameIndAsX=false)
     {
       uint32_t d_0 = min(ind_x); // thats the doc number that we start with -> needed for ro computation; assumes that all indices in mX prior to d_0 have already been processed.
       uint32_t D= max(ind_x)+1; // D is the maximal index of docs that we are processing +1
@@ -444,9 +411,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
         Mat<double> a(mA);// DONE: make deep copy here!
 
-        vector<BaseMeasure<uint32_t>* > lambda(mLambda.size(),NULL);
-        for (uint32_t i=0; i<lambda.size(); ++i)
-          lambda[i] = mLambda[i]->getCopy();
+        DistriContainer<uint32_t> lambda(mLambda);
         double omega = mOmega;
 
         cout<<"updating copied model with x"<<endl;
@@ -476,8 +441,8 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
     /* 
      * log probability using the samples x (not using sufficient statistics -> x is just a list of words)
      */
-    Row<double> logP_w(const Mat<uint32_t>& x, const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const vector<BaseMeasure<uint32_t>* >& lambda) const
-    {
+    Row<double> logP_w(const Mat<uint32_t>& x, const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const DistriContainer<uint32_t>& lambda) const
+    { 
       Row<double> p(mNw);
       p.zeros();
 
@@ -524,7 +489,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      * precompute necessary digamma function values, because these are slowing the whole algorithm down
      * all the update methods for zeta and phi need these values very often! I can precumpute these once after updating the global parameters (and hence lambda)
      */
-    void compElogBeta(Mat<double>& eLogBeta, const vector<BaseMeasure<uint32_t>* >& lambda, const Mat<uint32_t>& x_d) const 
+    void compElogBeta(Mat<double>& eLogBeta, const DistriContainer<uint32_t>& lambda, const Mat<uint32_t>& x_d) const 
     { 
       eLogBeta.zeros(mK,mNw);
 
@@ -659,7 +624,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       }
     }
 
-    void computeNaturalGradients(Mat<double>& d_lambda, Mat<double>& d_a, const Mat<double>& zeta, const Mat<double>&  phi, double omega, uint32_t D, const Mat<uint32_t>& x_d)
+    void computeNaturalGradients(DistriContainer<uint32_t>& d_lambda, Mat<double>& d_a, const Mat<double>& zeta, const Mat<double>&  phi, double omega, uint32_t D, const Mat<uint32_t>& x_d)
     {
       uint32_t N = x_d.n_cols;
       uint32_t Nw = d_lambda.n_cols;
@@ -693,17 +658,6 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
     }
 
 
-    double digamma(double x) const
-    {
-      //http://en.wikipedia.org/wiki/Digamma_function#Computation_and_approximation
-      if(x<1e-50){
-        //cerr<<"\tdigamma param x near zero: "<<x<<" cutting of"<<endl;
-        x=1e-50;
-      }
-      //double x_sq = x*x;
-      //return log(x)-1.0/(2.0*x)-1.0/(12.0*x_sq)+1.0/(12*x_sq*x_sq)-1.0/(252.0*x_sq*x_sq*x_sq);
-      return boost::math::digamma(x);
-    }
 
 //    double ElogBeta(const Mat<double>& lambda, uint32_t k, uint32_t w_dn)
 //    {

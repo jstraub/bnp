@@ -8,6 +8,8 @@
 #ifndef BASEMEASURE_HPP_
 #define BASEMEASURE_HPP_
 
+#include "probabilityHelpers.hpp"
+
 #include <armadillo>
 
 #include <stddef.h>
@@ -17,7 +19,11 @@
 using namespace std;
 using namespace arma;
 
-// templated on the unit
+
+
+/*
+ * templated on the unit
+ */
 template<class U>
 class BaseMeasure
 {
@@ -51,22 +57,81 @@ public:
     return new BaseMeasure<U>(*this);
   };
 
-  virtual Row<U> asRow() const
+  virtual Row<double> asRow() const
   {
     exit(0);
-    return Row<U>();
+    return Row<double>();
   };
   
-  virtual fromRow(const Row<U>& r)
+  virtual void fromRow(const Row<double>& r)
   {exit(0);};
 
-  virtual mode(Row<double>& mode) const
+  virtual void mode(Row<double>& mode) const
   {exit(0);};
 
   virtual double Elog(U x) const
   {exit(0);};
 
 };
+
+/*
+ * Container for base measure pointers
+ */
+template <class U>
+class DistriContainer
+{
+public:
+
+  DistriContainer()
+    : mDistris(0,NULL)
+  {
+  };
+
+  DistriContainer(const BaseMeasure<U>& a, uint32_t d)
+    : mDistris(d,NULL)
+  {
+    for (uint32_t i=0; i<d; ++i)
+      mDistris[i] = a.getCopy();
+  };
+
+  DistriContainer(const vector<BaseMeasure<U>* >& a)
+    : mDistris(a.size(),NULL)
+  {
+    for (uint32_t i=0; i<a.size(); ++i)
+      mDistris[i] = a[i]->getCopy();
+  };
+
+  ~DistriContainer()
+  {
+    for (uint32_t i=0; i<mDistris.size(); ++i)
+      delete mDistris[i];
+  };
+  
+  void init(const BaseMeasure<U>& a, uint32_t d)
+  { 
+    for (uint32_t i=0; i<mDistris.size(); ++i)
+      delete mDistris[i];
+
+    mDistris.resize(d,NULL);
+    for (uint32_t i=0; i<d; ++i)
+      mDistris[i] = a.getCopy();
+  };
+
+  BaseMeasure<U>* operator[](const uint32_t i)
+  {
+    assert(i<mDistris.size());
+    return mDistris[i];
+  };
+
+  uint32_t size() const
+  {
+    return mDistris.size();
+  };
+
+private:
+  vector<BaseMeasure<U>* > mDistris;
+};
+
 
 class Dir : public BaseMeasure<uint32_t>
 {
@@ -87,25 +152,26 @@ public:
     return new Dir(*this);
   };
 
-  virtual Row<U> asRow() const
+  virtual Row<double> asRow() const
   {
     return mAlphas;
   };
   
-  virtual fromRow(const Row<U>& r)
+  virtual void fromRow(const Row<double>& r)
   {
     mAlphas = r;
     mAlpha0 = sum(r);
   };
 
-  virtual mode(Row<double>& mode) const
+  virtual void mode(Row<double>& mode) const
   {
+    mode.set_size(mAlphas.size()); 
     dirMode(mode,mAlphas);
   };
 
   virtual double Elog(uint32_t x) const
   {
-    return digamma(mAlpha(x_u(i))) - digamma(mAlpha0);
+    return digamma(mAlphas(x)) - digamma(mAlpha0);
   };
 
   double predictiveProb(const Col<uint32_t>& x_q, const Mat<uint32_t>& x_given) const
@@ -161,10 +227,10 @@ public:
    * (d^2+d) nu
    * (d^2+d+1) kappa 
    */
-  virtual Row<U> asRow() const
+  virtual Row<double> asRow() const
   {
     uint32_t d = mVtheta.n_elem;
-    Row<U> row(d*d+d+2);
+    Row<double> row(d*d+d+2);
 
     for (uint32_t i=0; i<d; ++i)
       for (uint32_t j=0; j<d; ++j)
@@ -177,7 +243,7 @@ public:
     return row;
   };
   
-  virtual fromRow(const Row<U>& r)
+  virtual void  fromRow(const Row<double>& row)
   {
     uint32_t d = mVtheta.n_elem; // we already have a Vtheta from the init;
     for (uint32_t i=0; i<d; ++i)
@@ -190,9 +256,9 @@ public:
   };
 
 
-  virtual mode(Row<double>& mode) const
+  virtual void mode(Row<double>& mode) const
   { 
-     
+    mode.set_size(4); 
   };
 
   virtual double Elog(double x) const

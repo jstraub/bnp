@@ -191,7 +191,8 @@ class HDP_var_base
     {
       if(mLambda.size() > 0 && k < mLambda.size())
       {
-        return mLambda[k]->mode(topic);
+        mLambda[k]->mode(topic);
+        return true; 
       }else{
         return false;
       }
@@ -223,7 +224,7 @@ class HDP_var_base
 
 
 protected:
-    vector<BaseMeasure<uint32_t>* > mLambda;
+    DistriContainer<uint32_t> mLambda;
     //Mat<double> mLambda; // corpus level topics (Dirichlet)
     Mat<double> mA; // corpus level Beta process alpha parameter for stickbreaking
     vector<Mat<double> > mZeta; // document level topic indices/pointers to corpus level topics (Multinomial) 
@@ -237,17 +238,19 @@ protected:
     uint32_t mNw; // size of dictionary
 
 
-    bool getCorpTopic(Col<double>& topic, const BaseMeasure<uint32_t>& lambda) const
+    bool getCorpTopic(Row<double>& topic, const BaseMeasure<uint32_t>* lambda) const
     {
       // mode of dirichlet (MAP estimate)
       lambda->mode(topic);
       return true;
     };
 
-    bool getCorpTopics(Mat<double>& topics, const vector<BaseMeasure<uint32_t>* >& lambda) const
+    bool getCorpTopics(Mat<double>& topics, DistriContainer<uint32_t>& lambda) const
     {
       uint32_t K = lambda.size();
-      uint32_t Nw = lambda.n_cols;
+      Row<double> beta;
+      lambda[0]->mode(beta);
+      uint32_t Nw = beta.n_elem;
       topics.set_size(K,Nw);
       for (uint32_t k=0; k<K; k++){
         // mode of dirichlet (MAP estimate)

@@ -1,5 +1,18 @@
 #include "probabilityHelpers.hpp"
 
+
+double digamma(double x)
+{
+  //http://en.wikipedia.org/wiki/Digamma_function#Computation_and_approximation
+  if(x<1e-50){
+    //cerr<<"\tdigamma param x near zero: "<<x<<" cutting of"<<endl;
+    x=1e-50;
+  }
+  //double x_sq = x*x;
+  //return log(x)-1.0/(2.0*x)-1.0/(12.0*x_sq)+1.0/(12*x_sq*x_sq)-1.0/(252.0*x_sq*x_sq*x_sq);
+  return boost::math::digamma(x);
+}
+
 // cateorical distribution (Multionomial for one word)
 double Cat(uint32_t x, Row<double> pi)
 {
