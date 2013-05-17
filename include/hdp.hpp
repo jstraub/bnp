@@ -21,7 +21,7 @@ class HDP // : public DP<U>
 {
   public:
     HDP(const BaseMeasure<U>& base, double alpha, double omega)
-      : mH(base), mAlpha(alpha), mOmega(omega)
+      : mH0(base), mAlpha(alpha), mOmega(omega)
     { };
 
     ~HDP()
@@ -52,8 +52,6 @@ class HDP // : public DP<U>
 
 //      cout<<"x_te: "<<x_te.n_rows<<"x"<<x_te.n_cols<<endl;
 //      cout<<"x_ho: "<<x_ho.n_rows<<"x"<<x_ho.n_cols<<endl;
-      
-  
       mX_te.push_back(x_te); // on half of the data we train as usual to get a topic model for the document
       mX_ho.push_back(x_ho); // held out data to evaluate the perplexity
       return mX_ho.size();
@@ -84,7 +82,7 @@ class HDP // : public DP<U>
 
 protected:
 
-    const BaseMeasure<U>& mH; // base measure
+    const BaseMeasure<U>& mH0; // base measure
     double mAlpha; 
     double mOmega;
     vector<Mat<U> > mX; // training data
@@ -113,11 +111,11 @@ class HDP_var_base
       perp=mPerp;
     };
 
-    bool getLambda(Col<double>& lambda, uint32_t k)
+    bool getLambda(Row<double>& lambda, uint32_t k)
     {
-      if(mLambda.n_rows > 0 && k < mLambda.n_rows)
+      if(mLambda.size()> 0 && k < mLambda.size())
       {
-        lambda=mLambda.row(k).t();
+        lambda=mLambda[k]->asRow();
         return true;
       }else{
         return false;
@@ -189,11 +187,11 @@ class HDP_var_base
      * as an estimate for the Multinomial distribution of the respective topics
      *
      */
-    bool getCorpTopic(Col<double>& topic, uint32_t k) const
+    bool getCorpTopic(Row<double>& topic, uint32_t k) const
     {
-      if(mLambda.n_rows > 0 && k < mLambda.n_rows)
+      if(mLambda.size() > 0 && k < mLambda.size())
       {
-        return getCorpTopic(topic,mLambda.row(k));
+        return mLambda[k]->mode(topic);
       }else{
         return false;
       }
@@ -224,8 +222,9 @@ class HDP_var_base
     };
 
 
-  protected:
-    Mat<double> mLambda; // corpus level topics (Dirichlet)
+protected:
+    vector<BaseMeasure<uint32_t>* > mLambda;
+    //Mat<double> mLambda; // corpus level topics (Dirichlet)
     Mat<double> mA; // corpus level Beta process alpha parameter for stickbreaking
     vector<Mat<double> > mZeta; // document level topic indices/pointers to corpus level topics (Multinomial) 
     vector<Mat<double> > mPhi; // document level word to doc level topic assignment (Multinomial)
@@ -238,24 +237,22 @@ class HDP_var_base
     uint32_t mNw; // size of dictionary
 
 
-
-    bool getCorpTopic(Col<double>& topic, const Row<double>& lambda) const
+    bool getCorpTopic(Col<double>& topic, const BaseMeasure<uint32_t>& lambda) const
     {
       // mode of dirichlet (MAP estimate)
-      dirMode(topic, lambda.t());
+      lambda->mode(topic);
       return true;
     };
 
-    bool getCorpTopics(Mat<double>& topics, const Mat<double>& lambda) const
+    bool getCorpTopics(Mat<double>& topics, const vector<BaseMeasure<uint32_t>* >& lambda) const
     {
-      uint32_t K = lambda.n_rows;
+      uint32_t K = lambda.size();
       uint32_t Nw = lambda.n_cols;
       topics.set_size(K,Nw);
       for (uint32_t k=0; k<K; k++){
         // mode of dirichlet (MAP estimate)
-        Row<double> lamb = lambda.row(k);
-        Row<double> beta(Nw);
-        dirMode(beta, lamb);
+        Row<double> beta;
+        lambda[k]->mode(beta);
         topics.row(k) = beta;
 //        cout<<"lambda_"<<k<<"="<<lambda.row(k)<<endl;
 //        cout<<"topic_"<<k<<"="<<topics.row(k)<<endl;

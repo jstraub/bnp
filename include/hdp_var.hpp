@@ -59,17 +59,26 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      */
     void initCorpusParams(uint32_t Nw, uint32_t K, uint32_t T, uint32_t D)
     {
+
+      mT = T;
+      mK = K;
+      mNw = Nw;
+
       mA.ones(K,2);
       mA.col(1) *= mOmega; 
 
       // initialize lambda
-      mLambda.zeros(K,Nw);
-      GammaRnd gammaRnd(1.0, 1.0);
+      mLambda.resize(K,NULL);
       for (uint32_t k=0; k<K; ++k){
-        for (uint32_t w=0; w<Nw; ++w) mLambda(k,w) = gammaRnd.draw();
-        mLambda.row(k) *= double(D)*100.0/double(K*Nw);
-        mLambda.row(k) += ((Dir*)(&mH))->mAlphas;
+        mLambda[k] = mH0.getCopy(); // initialize the priors of the topics from the base measure.
       }
+//      mLambda.zeros(K,Nw);
+//      GammaRnd gammaRnd(1.0, 1.0);
+//      for (uint32_t k=0; k<K; ++k){
+//        for (uint32_t w=0; w<Nw; ++w) mLambda(k,w) = gammaRnd.draw();
+//        mLambda.row(k) *= double(D)*100.0/double(K*Nw);
+//        mLambda.row(k) += ((Dir*)(&mH0))->mAlphas;
+//      }
     };
 
     /* From: Online Variational Inference for the HDP
@@ -267,7 +276,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      * @param sameIndAsX == true -> zeta,phi,gamma have same indices as x (ind_x). This typically happens for the initial batch update. Setting this to true eliminates the need of reordering the results afterwords to match the indices of the docs x.
      * @return the randomly shuffled indices to show how the data was processed -> this allows association of zetas, phis and gammas with docs in mX
      */
-    Row<uint32_t> updateEst_batch(const Row<uint32_t>& ind_x, vector<Mat<double> >& zeta, vector<Mat<double> >& phi, vector<Mat<double> >& gamma, Mat<double>& a, Mat<double>& lambda, Col<double>& perp, double omega, double kappa, uint32_t S, bool sameIndAsX=false)
+    Row<uint32_t> updateEst_batch(const Row<uint32_t>& ind_x, vector<Mat<double> >& zeta, vector<Mat<double> >& phi, vector<Mat<double> >& gamma, Mat<double>& a, vector<BaseMeasure<uint32_t> >& lambda, Col<double>& perp, double omega, double kappa, uint32_t S, bool sameIndAsX=false)
     {
       uint32_t d_0 = min(ind_x); // thats the doc number that we start with -> needed for ro computation; assumes that all indices in mX prior to d_0 have already been processed.
       uint32_t D= max(ind_x)+1; // D is the maximal index of docs that we are processing +1
@@ -283,9 +292,11 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
       for (uint32_t dd=0; dd<ind.n_elem; dd += S)
       {
-        Mat<double> db_lambda(mK,mNw); // batch updates
+        vector<BaseMeasure<uint32_t> > db_lambda(mK,NULL); // batch updates
+        for (uint32_t k=0; k<db_lambda.size(); ++k)
+          db_lambda[k] = mH0.getCopy();
+
         Mat<double> db_a(mK,2); 
-        db_lambda.zeros();
         db_a.zeros();
 
         Col<double> eLogSig_a(mK);
@@ -333,13 +344,16 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 //            cout<<"o="<<o<<endl;
           }
 
-          Mat<double> d_lambda(mK,mNw);
+          vector<BaseMeasure<uint32_t> > d_lambda(mK,NULL); // batch updates
+          for (uint32_t k=0; k<d_lambda.size(); ++k)
+            d_lambda[k] = mH0.getCopy();
           Mat<double> d_a(mK,2); 
           //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
           computeNaturalGradients(d_lambda, d_a, zeta[dout], phi[dout], mOmega, D, mX[d]);
 #pragma omp critical
           {
-            db_lambda += d_lambda;
+            for (uint32_t k=0; k<d_lambda.size(); ++k)
+              db_lambda[k].fromRow(db_lambda[k].asRow()+d_lambda[k].asRow());
             db_a += d_a;
           }
         }
@@ -353,7 +367,10 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         cout<<" -- global parameter updates t="<<t<<" bS="<<bS<<" ro="<<ro<<endl;
         //cout<<"d_a="<<d_a<<endl;
         //cout<<"a="<<a<<endl;
-        lambda = (1.0-ro)*lambda + (ro/S)*db_lambda;
+        
+        for (uint32_t k=0; k<d_lambda.size(); ++k)
+          lambda[k].fromRow((1.0-ro)*lambda[k].asRow() + (ro/S)*db_lambda[k].asRow()); //TODO: doies this make sense for NIW prior???
+        //lambda = (1.0-ro)*lambda + (ro/S)*db_lambda;
         a = (1.0-ro)*a + (ro/S)*db_a;
 
         perp[dd+bS/2] = 0.0;
@@ -394,12 +411,16 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         //uint32_t d = mX.size()-1;
 
         Mat<double> a(mA);// DONE: make deep copy here!
-        Mat<double> lambda(mLambda);
+
+        vector<BaseMeasure<uint32_t> > lambda(mLambda.size(),NULL);
+        for (uint32_t i=0; i<lambda.size(); ++i){
+          lambda[i] = mLambda[i]->getCopy();
+        }
         double omega = mOmega;
 
         cout<<"updating copied model with x"<<endl;
         updateEst(x_te,zeta,phi,gamma,a,lambda,omega,d,kappa);
-        cout<<" lambda.shape="<<lambda.n_rows<<" "<<lambda.n_cols<<endl;
+        cout<<" lambda.shape="<<lambda.size()<<endl;
         cout<<"computing perplexity under updated model"<<endl;
         //TODO: compute probabilities then use that to compute perplexity
 
@@ -424,7 +445,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
     /* 
      * log probability using the samples x (not using sufficient statistics -> x is just a list of words)
      */
-    Row<double> logP_w(const Mat<uint32_t>& x, const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda) const
+    Row<double> logP_w(const Mat<uint32_t>& x, const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const vector<BaseMeasure<uint32_t>* >& lambda) const
     {
       Row<double> p(mNw);
       p.zeros();
@@ -472,7 +493,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      * precompute necessary digamma function values, because these are slowing the whole algorithm down
      * all the update methods for zeta and phi need these values very often! I can precumpute these once after updating the global parameters (and hence lambda)
      */
-    void compElogBeta(Mat<double>& eLogBeta, const Mat<double>& lambda, const Mat<uint32_t>& x_d) const 
+    void compElogBeta(Mat<double>& eLogBeta, const vector<BaseMeasure<uint32_t>* >& lambda, const Mat<uint32_t>& x_d) const 
     { 
       eLogBeta.zeros(mK,mNw);
 
@@ -480,14 +501,20 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       Mat<uint32_t> x_u = unique(x_d);
 //      cout<<"x_d="<<x_d<<endl;
 //      cout<<"x_u="<<x_u<<endl;
-      for (uint32_t k = 0; k < mK; k++) {
-        digam_lamb_sum(k) = digamma(sum(lambda.row(k)));
-      }
+ 
       for (uint32_t i = 0; i < x_u.n_elem ; i++) {
         for (uint32_t k = 0; k < mK; k++) {
-           eLogBeta(k,x_u(i)) = digamma(lambda(k,x_u(i))) - digam_lamb_sum(k);
+           eLogBeta(k,x_u(i)) = lambda[k]->Elog(x_u(i)); // E[log beta] computation in paper
         }
       }
+//      for (uint32_t k = 0; k < mK; k++) {
+//        digam_lamb_sum(k) = digamma(sum(lambda.row(k)));
+//      }
+//      for (uint32_t i = 0; i < x_u.n_elem ; i++) {
+//        for (uint32_t k = 0; k < mK; k++) {
+//           eLogBeta(k,x_u(i)) = digamma(lambda(k,x_u(i))) - digam_lamb_sum(k);
+//        }
+//      }
     }
 
     void compElogSig(Col<double>& eLogSig, const Mat<double>& a) const
@@ -626,7 +653,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         }
         d_lambda.row(k) = D*d_lambda.row(k);
         //cout<<"lambda-nu="<<d_lambda[k].t()<<endl;
-        d_lambda.row(k) += ((Dir*)(&mH))->mAlphas;
+        d_lambda.row(k) += ((Dir*)(&mH0))->mAlphas;
         //cout<<"lambda="<<d_lambda[k].t()<<endl;
         d_a(k,0) = D*d_a(k,0)+1.0;
         d_a(k,1) = D*d_a(k,1)+omega;
@@ -647,22 +674,21 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       return boost::math::digamma(x);
     }
 
-    double ElogBeta(const Mat<double>& lambda, uint32_t k, uint32_t w_dn)
-    {
-      //if(lambda[k](w_dn)<1e-6){
-      //  cout<<"\tlambda[k]("<<w_dn<<") near zero: "<<lambda[k](w_dn)<<endl;
-      //}
-      return digamma(lambda(k,w_dn)) - digamma(sum(lambda.row(k)));
-    }
-
-    double ElogSigma(const Mat<double>& a, uint32_t k)
-    {
-      double e=digamma(a(k,0)) - digamma(a(k,0) + a(k,1));
-      for (uint32_t l=0; l<k; ++l)
-        e+=digamma(a(l,1)) - digamma(a(l,0) + a(l,1));
-      return e; 
-    }
-
+//    double ElogBeta(const Mat<double>& lambda, uint32_t k, uint32_t w_dn)
+//    {
+//      //if(lambda[k](w_dn)<1e-6){
+//      //  cout<<"\tlambda[k]("<<w_dn<<") near zero: "<<lambda[k](w_dn)<<endl;
+//      //}
+//      return digamma(lambda(k,w_dn)) - digamma(sum(lambda.row(k)));
+//    }
+//
+//    double ElogSigma(const Mat<double>& a, uint32_t k)
+//    {
+//      double e=digamma(a(k,0)) - digamma(a(k,0) + a(k,1));
+//      for (uint32_t l=0; l<k; ++l)
+//        e+=digamma(a(l,1)) - digamma(a(l,0) + a(l,1));
+//      return e; 
+//    }
 
     //bool normalizeLogDistribution(Row<double>& r)
     bool normalizeLogDistribution(arma::subview_row<double> r)

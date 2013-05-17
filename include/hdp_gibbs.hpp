@@ -87,7 +87,7 @@ class HDP_gibbs : public HDP<U>
               //HDP hdp_x_ji = posterior(x_k_ji); // compute posterior hdp given the data 
               //cout<<"x_j="<<x[j].col(i)<<endl;
               //cout<<"x_k_ji="<<x_k_ji<<endl;
-              double f_k_jt = this->mH.predictiveProb(x[j].col(i),x_k_ji);
+              double f_k_jt = this->mH0.predictiveProb(x[j].col(i),x_k_ji);
               //cout<<"f_k_jt="<<f_k_jt<<endl;
               //logGaus(x[j].col(i), hdp_x_ji.mVtheta, hdp_x_ji.mmCov()); // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
               f(t) = f_k_jt;
@@ -108,7 +108,7 @@ class HDP_gibbs : public HDP<U>
               }
               Mat<U> x_k_ji = getXinK(x,j,i,k,k_jt,t_ji,tt==It-1);
               //HDP hdp_x_ji = posterior(x_k_ji); // compute posterior hdp given the data in 
-              double f_k =  this->mH.predictiveProb(x[j].col(i),x_k_ji);
+              double f_k =  this->mH0.predictiveProb(x[j].col(i),x_k_ji);
               //logGaus(x[j].col(i), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());  // marginal probability of x_ji in cluster k/dish k given all other data in that cluster
               f(T[j]+k) = f_k;
               l(T[j]+k) = log(this->mAlpha*m_k/((n_j+this->mAlpha)*(m_ + HDP<U>::mOmega))) + f_k; // TODO: shouldnt this be mAlpha of the posterior hdp?
@@ -119,7 +119,7 @@ class HDP_gibbs : public HDP<U>
             //        cout<<"mVtheta=:"<<mVtheta<<endl;
             //        cout<<"Cov=:"<<mmCov()<<endl;
             //
-            double f_knew = this->mH.predictiveProb(x[j].col(i));
+            double f_knew = this->mH0.predictiveProb(x[j].col(i));
             //logGaus(x[j].col(i), mVtheta, mmCov());
             f[T[j]+K] = f_knew;
             l[T[j]+K] = log(this->mAlpha*HDP<U>::mOmega/((n_j+this->mAlpha)*(m_+HDP<U>::mOmega))) + f_knew;
@@ -210,7 +210,7 @@ class HDP_gibbs : public HDP<U>
               { // product over independent x_ji_t
                 Mat<U> x_k_ji = getXinK(x,j,i_jt(i),k,k_jt,t_ji); // for posterior computation
                 //HDP hdp_x_ji = posterior(x_k_ji); // compute posterior hdp given the data in 
-                f_k += this->mH.predictiveProb(x_jt.col(i),x_k_ji);
+                f_k += this->mH0.predictiveProb(x_jt.col(i),x_k_ji);
                 //logGaus(x_jt.col(i), hdp_x_ji.mVtheta, hdp_x_ji.mmCov());
               }
               f(k)=f_k;
@@ -218,7 +218,7 @@ class HDP_gibbs : public HDP<U>
             }
             double f_knew=0.0;
             for (uint32_t i=0; i<x_jt.n_cols; ++i) // product over independent x_ji_t
-              f_knew += this->mH.predictiveProb(x_jt.col(i));
+              f_knew += this->mH0.predictiveProb(x_jt.col(i));
             //logGaus(x_jt.col(i), mVtheta, mmCov());
             f(K)=f_knew;
             l(K)=log(HDP<U>::mOmega/(m_ + HDP<U>::mOmega)) + f_knew; // update dish at table t in restaurant j

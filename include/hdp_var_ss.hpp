@@ -337,7 +337,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>, public virtual HDP_var_base
     };
 
     // compute the perplexity given a heldout data from document x_ho and the model paremeters of it (after incorporating x)
-    double perplexity(const Row<uint32_t>& x_ho, const Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& gamma, const Mat<double>& lambda)
+    double perplexity(const Row<uint32_t>& x_ho, const Mat<double>& zeta, const Mat<double>& phi, const Mat<double>& gamma, const vector<BaseMeasure<uint32_t>* >& lambda)
     {
       Row<double> logP=logP_w(phi, zeta, gamma, lambda);
 
@@ -360,7 +360,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>, public virtual HDP_var_base
     }
 
 
-    bool updateEst(const Row<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, Mat<double>& lambda, double omega, uint32_t d, double kappa)
+    bool updateEst(const Row<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, vector<BaseMeasure<uint32_t>* >& lambda, double omega, uint32_t d, double kappa)
     {
       uint32_t D = d+1; // assume that doc d is appended to the end  
       //uint32_t N = x.n_rows;
@@ -431,7 +431,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>, public virtual HDP_var_base
      * probability of assuming the use of suffient statistics
      */
     // TODO: this was the old version - presumably working for sufficient statistics
-    Row<double> logP_w(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda) const
+    Row<double> logP_w(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const vector<BaseMeasure<uint32_t>* >& lambda) const
     {
       Row<double> p(mNw);
       p.zeros();
@@ -439,7 +439,7 @@ class HDP_var_ss: public HDP_ss<uint32_t>, public virtual HDP_var_base
       cout<<"phi:\t"<<size(phi);
       cout<<"zeta:\t"<<size(zeta);
       cout<<"gamma:\t"<<size(gamma);
-      cout<<"lambda:\t"<<size(lambda);
+      cout<<"lambda:\t"<<lambda.size();
 
       Col<double> pi;
       Col<double> sigPi;
@@ -471,36 +471,36 @@ class HDP_var_ss: public HDP_ss<uint32_t>, public virtual HDP_var_base
     /* TODO: its not realy the joint... or is it?!
      * joint probability distribution
      */
-    Row<double> logP_joint(uint32_t d) const {
-      return logP_joint(mPhi[d],mZeta[d],mGamma[d],mLambda,mA);
-    };
-    Row<double> logP_joint(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Mat<double>& a) const
-    {
-      Row<double> p(mNw);
-      p.zeros();
-
-      Col<double> v;
-      Col<double> sigV;
-      getCorpTopicProportions(v,sigV,a);
-      Col<double> pi;
-      Col<double> sigPi;
-      Col<uint32_t> c;
-      getDocTopics(pi,sigPi,c,gamma,zeta);
-      Col<uint32_t> z(mNw);
-      getWordTopics(z, phi);
-      Mat<double> beta;
-      getCorpTopics(beta,lambda);
-
-      for (uint32_t w=0; w<mNw; ++w){
-        p[w] = logCat(w, beta.row( c[ z[w] ]).t()) + 
-          logCat(c[ z[w] ], sigV.t()) + 
-          logBeta(v, 1.0, mOmega) + 
-          logCat(z[w], sigPi.t()) +
-          logBeta(pi, 1.0, mAlpha) +
-          logDir(beta.row( c[ z[w] ]).t(), mLambda.t());
-      }
-      return p;
-    };
+//    Row<double> logP_joint(uint32_t d) const {
+//      return logP_joint(mPhi[d],mZeta[d],mGamma[d],mLambda,mA);
+//    };
+//    Row<double> logP_joint(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const Mat<double>& lambda, const Mat<double>& a) const
+//    {
+//      Row<double> p(mNw);
+//      p.zeros();
+//
+//      Col<double> v;
+//      Col<double> sigV;
+//      getCorpTopicProportions(v,sigV,a);
+//      Col<double> pi;
+//      Col<double> sigPi;
+//      Col<uint32_t> c;
+//      getDocTopics(pi,sigPi,c,gamma,zeta);
+//      Col<uint32_t> z(mNw);
+//      getWordTopics(z, phi);
+//      Mat<double> beta;
+//      getCorpTopics(beta,lambda);
+//
+//      for (uint32_t w=0; w<mNw; ++w){
+//        p[w] = logCat(w, beta.row( c[ z[w] ]).t()) + 
+//          logCat(c[ z[w] ], sigV.t()) + 
+//          logBeta(v, 1.0, mOmega) + 
+//          logCat(z[w], sigPi.t()) +
+//          logBeta(pi, 1.0, mAlpha) +
+//          logDir(beta.row( c[ z[w] ]).t(), mLambda.t());
+//      }
+//      return p;
+//    };
 
   private:
 

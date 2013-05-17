@@ -26,6 +26,10 @@ public:
   {
     //cout<<"Creating "<<typeid(this).name()<<endl;
   };
+
+  BaseMeasure(const BaseMeasure<U>& other)
+  { };
+
   virtual ~BaseMeasure()
   {};
   virtual double predictiveProb(const Col<U>& x_q, const Mat<U>& x_given) const
@@ -40,6 +44,28 @@ public:
     exit(0);
     return 0.0;
   };
+
+  virtual BaseMeasure<U>* getCopy() const
+  {
+    exit(0);
+    return new BaseMeasure<U>(*this);
+  };
+
+  virtual Row<U> asRow() const
+  {
+    exit(0);
+    return Row<U>();
+  };
+  
+  virtual fromRow(const Row<U>& r)
+  {exit(0);};
+
+  virtual mode(Row<double>& mode) const
+  {exit(0);};
+
+  virtual double Elog(U x) const
+  {exit(0);};
+
 };
 
 class Dir : public BaseMeasure<uint32_t>
@@ -48,9 +74,39 @@ public:
   Dir(const Row<double>& alphas)
   : mAlphas(alphas), mAlpha0(sum(alphas))
   {};
+
   Dir(const Dir& dir)
-  : mAlphas(dir.mAlphas), mAlpha0(sum(dir.mAlphas))
+    : mAlphas(dir.mAlphas), mAlpha0(sum(dir.mAlphas))
   {};
+
+  /*
+   * return a copy of this object - this uses the concept of covariance
+   */
+  virtual Dir* getCopy() const
+  {
+    return new Dir(*this);
+  };
+
+  virtual Row<U> asRow() const
+  {
+    return mAlphas;
+  };
+  
+  virtual fromRow(const Row<U>& r)
+  {
+    mAlphas = r;
+    mAlpha0 = sum(r);
+  };
+
+  virtual mode(Row<double>& mode) const
+  {
+    dirMode(mode,mAlphas);
+  };
+
+  virtual double Elog(uint32_t x) const
+  {
+    return digamma(mAlpha(x_u(i))) - digamma(mAlpha0);
+  };
 
   double predictiveProb(const Col<uint32_t>& x_q, const Mat<uint32_t>& x_given) const
   {
@@ -73,6 +129,7 @@ public:
     return log(mAlphas(k)/mAlpha0);
   };
 
+
   Row<double> mAlphas;
   double mAlpha0;
 private:
@@ -91,6 +148,57 @@ public:
   NIW(const NIW& niw)
   : mVtheta(niw.mVtheta), mKappa(niw.mKappa), mDelta(niw.mDelta), mNu(niw.mNu)
   { };
+
+  virtual NIW* getCopy() const
+  {
+    return new NIW(*this);
+  };
+
+  /*
+   * puts all parameters, Vtheta, kappa, delta, and nu into one vector
+   * (0 to d^2-1) Delta
+   * (d^2 to d^2+d-1) Vtheta
+   * (d^2+d) nu
+   * (d^2+d+1) kappa 
+   */
+  virtual Row<U> asRow() const
+  {
+    uint32_t d = mVtheta.n_elem;
+    Row<U> row(d*d+d+2);
+
+    for (uint32_t i=0; i<d; ++i)
+      for (uint32_t j=0; j<d; ++j)
+        row(j+i*d) = mDelta(j,i); // column major
+    for (uint32_t i=0; i<d; ++i)
+      row(d*d+i) = mVtheta(i);
+    row(d*d+d) = mNu;
+    row(d*d+d+1) = mKappa;
+
+    return row;
+  };
+  
+  virtual fromRow(const Row<U>& r)
+  {
+    uint32_t d = mVtheta.n_elem; // we already have a Vtheta from the init;
+    for (uint32_t i=0; i<d; ++i)
+      for (uint32_t j=0; j<d; ++j)
+        mDelta(j,i) = row(j+i*d); // column major
+    for (uint32_t i=0; i<d; ++i)
+      mVtheta(i) = row(d*d+i);
+    mNu = row(d*d+d);
+    mKappa = row(d*d+d+1);
+  };
+
+
+  virtual mode(Row<double>& mode) const
+  { 
+     
+  };
+
+  virtual double Elog(double x) const
+  {
+    return 0.0;
+  };
 
   double predictiveProb(const Col<double>& x_q, const Mat<double>& x_given) const
   {

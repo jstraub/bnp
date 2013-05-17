@@ -6,7 +6,7 @@
 #include <hdp_gibbs.hpp>
 #include <hdp_var.hpp>
 // using the hdp which utilizes sufficient statistics 
-#include <hdp_var_ss.hpp>
+//#include <hdp_var_ss.hpp>
 
 #include <assert.h>
 #include <stddef.h>
@@ -194,19 +194,19 @@ public:
   };
 };
 
-class InvNormWishart_py : public InvNormWishart
+class NIW_py : public NIW
 {
 public:
-	InvNormWishart_py(const numeric::array& vtheta, double kappa,
+	NIW_py(const numeric::array& vtheta, double kappa,
 			const numeric::array& Delta, double nu) :
-        InvNormWishart(np2col<double>(vtheta),kappa,np2mat<double>(Delta),nu)
+        NIW(np2col<double>(vtheta),kappa,np2mat<double>(Delta),nu)
     //        cpVtheta(np2col<double>(vtheta)), cpDelta(np2mat<double>(Delta)),
-//  InvNormWishart(cpVtheta,kappa,cpDelta,nu)
+//  NIW(cpVtheta,kappa,cpDelta,nu)
 	{
 	  //cout<<"Creating "<<typeid(this).name()<<endl;
 	};
-	InvNormWishart_py(const InvNormWishart_py& inw) :
-		InvNormWishart(inw)
+	NIW_py(const NIW_py& inw) :
+		NIW(inw)
 	{};
 private:
 	colvec cpVtheta;
@@ -461,33 +461,33 @@ public:
 
 };
 
-class HDP_var_ss_py : public HDP_var_base_py, public HDP_var_ss
-{
-public:
-  HDP_var_ss_py(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
-  : HDP_var_base_py(0,0,0), HDP_var_ss(base,alpha,gamma)
-  {
-    //cout<<"Creating "<<typeid(this).name()<<endl;
-  };
-
-  bool densityEst(const numeric::array& x, const numeric::array& x_ho, double kappa, uint32_t K, uint32_t T, uint32_t S)
-  {
-//    cout<<"mX.n_rows="<<x_mat.n_rows<<endl;
-//    cout<<"mX_ho.n_rows="<<x_ho_mat.n_rows<<endl;
-    HDP_var_ss::densityEst(np2mat<uint32_t>(x),np2mat<uint32_t>(x_ho),kappa,K,T,S);
-    return true;
-  }
-
-  /* 
-   * after an initial densitiy estimate has been made using addDoc() and densityEst()
-   * can use this to update the estimate with information from additional x 
-   */
-  bool updateEst(const numeric::array& x, double kappa)
-  {
-    return HDP_var_ss::updateEst(np2row<uint32_t>(x),kappa);
-  }
-
-};
+//class HDP_var_ss_py : public HDP_var_base_py, public HDP_var_ss
+//{
+//public:
+//  HDP_var_ss_py(const BaseMeasure<uint32_t>& base, double alpha, double gamma)
+//  : HDP_var_base_py(0,0,0), HDP_var_ss(base,alpha,gamma)
+//  {
+//    //cout<<"Creating "<<typeid(this).name()<<endl;
+//  };
+//
+//  bool densityEst(const numeric::array& x, const numeric::array& x_ho, double kappa, uint32_t K, uint32_t T, uint32_t S)
+//  {
+////    cout<<"mX.n_rows="<<x_mat.n_rows<<endl;
+////    cout<<"mX_ho.n_rows="<<x_ho_mat.n_rows<<endl;
+//    HDP_var_ss::densityEst(np2mat<uint32_t>(x),np2mat<uint32_t>(x_ho),kappa,K,T,S);
+//    return true;
+//  }
+//
+//  /* 
+//   * after an initial densitiy estimate has been made using addDoc() and densityEst()
+//   * can use this to update the estimate with information from additional x 
+//   */
+//  bool updateEst(const numeric::array& x, double kappa)
+//  {
+//    return HDP_var_ss::updateEst(np2row<uint32_t>(x),kappa);
+//  }
+//
+//};
 
 
 class TestNp2Arma_py
@@ -557,12 +557,12 @@ BOOST_PYTHON_MODULE(libbnp)
 
 	class_<Dir_py>("Dir", init<numeric::array>())
 			.def(init<Dir_py>());
-	class_<InvNormWishart_py>("INW",init<const numeric::array, double,
+	class_<NIW_py>("NIW",init<const numeric::array, double,
 			const numeric::array, double>())
-			.def(init<InvNormWishart_py>());
+			.def(init<NIW_py>());
 
 	//	class_<DP_Dir>("DP_Dir",init<Dir_py,double>());
-	//	class_<DP_INW>("DP_INW",init<InvNormWishart_py,double>());
+	//	class_<DP_INW>("DP_INW",init<NIW_py,double>());
 
 	class_<HDP_Dir>("HDP_Dir",init<Dir_py&,double,double>())
         .def("densityEst",&HDP_Dir::densityEst)
@@ -572,7 +572,7 @@ BOOST_PYTHON_MODULE(libbnp)
         .def("getPerplexity",&HDP_Dir::getPerplexity);
   //      .def_readonly("mGamma", &HDP_Dir::mGamma);
 
-	class_<HDP_INW>("HDP_INW",init<InvNormWishart_py&,double,double>())
+	class_<HDP_INW>("HDP_INW",init<NIW_py&,double,double>())
         .def("densityEst",&HDP_INW::densityEst)
         .def("getClassLabels",&HDP_INW::getClassLabels)
         .def("addDoc",&HDP_INW::addDoc);
@@ -596,17 +596,17 @@ BOOST_PYTHON_MODULE(libbnp)
 //        .def("perplexity",&HDP_var_py::perplexity)
 
 
-	class_<HDP_var_ss_py>("HDP_var_ss",init<Dir_py&,double,double>())
-        .def("densityEst",&HDP_var_ss_py::densityEst)
-        //TODO: not sure that one works .def("updateEst",&HDP_var_ss_py::updateEst)
-        .def("getPerplexity",&HDP_var_ss_py::getPerplexity_py)
-        .def("getA",&HDP_var_ss_py::getA_py)
-        .def("getLambda",&HDP_var_ss_py::getLambda_py)
-        .def("getDocTopics",&HDP_var_ss_py::getDocTopics_py)
-        .def("getWordTopics",&HDP_var_ss_py::getWordTopics_py)
-        .def("getCorpTopicProportions",&HDP_var_ss_py::getCorpTopicProportions_py)
-        .def("getCorpTopics",&HDP_var_ss_py::getCorpTopics_py)
-        .def("getWordDistr",&HDP_var_ss_py::getWordDistr_py);
+//	class_<HDP_var_ss_py>("HDP_var_ss",init<Dir_py&,double,double>())
+//        .def("densityEst",&HDP_var_ss_py::densityEst)
+//        //TODO: not sure that one works .def("updateEst",&HDP_var_ss_py::updateEst)
+//        .def("getPerplexity",&HDP_var_ss_py::getPerplexity_py)
+//        .def("getA",&HDP_var_ss_py::getA_py)
+//        .def("getLambda",&HDP_var_ss_py::getLambda_py)
+//        .def("getDocTopics",&HDP_var_ss_py::getDocTopics_py)
+//        .def("getWordTopics",&HDP_var_ss_py::getWordTopics_py)
+//        .def("getCorpTopicProportions",&HDP_var_ss_py::getCorpTopicProportions_py)
+//        .def("getCorpTopics",&HDP_var_ss_py::getCorpTopics_py)
+//        .def("getWordDistr",&HDP_var_ss_py::getWordDistr_py);
 //        .def("perplexity",&HDP_var_ss_py::perplexity)
 
   class_<TestNp2Arma_py>("TestNp2Arma",init<>())
