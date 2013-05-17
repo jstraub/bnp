@@ -74,7 +74,8 @@ public:
   virtual void fromRow(const Row<double>& r)
   {
     cerr<<"BaseMeasure:: fromRow()"<<endl;
-    exit(0);};
+    exit(0);
+  };
 
   virtual void mode(Row<double>& mode) const
   {
@@ -130,12 +131,11 @@ public:
       mDistris[i] = a[i]->getCopy();
   };
 
-
   ~DistriContainer()
   {
     for (uint32_t i=0; i<mDistris.size(); ++i)
     {
-      cout<<"deleting "<<mDistris.size()<<" "<<i<<" :"<<mDistris[i]<<endl;
+      //cout<<"deleting "<<mDistris.size()<<" "<<i<<" :"<<mDistris[i]<<endl;
       delete mDistris[i];
     }
   };
@@ -268,6 +268,9 @@ public:
 private:
 };
 
+
+
+
 class NIW : public BaseMeasure<double>
 {
 public:
@@ -326,7 +329,6 @@ public:
     mNu = row(d*d+d);
     mKappa = row(d*d+d+1);
   };
-
 
   virtual void mode(Row<double>& mode) const
   { 
@@ -425,5 +427,108 @@ public:
   double mNu;
 };
 
+
+class Mult : public BaseMeasure<uint32_t>
+{
+  public:
+
+    Mult(const Mult& mult)
+      : Mult(mult.mP)
+    {};
+
+    Mult(const Row<double>& p)
+      : mP(p)
+    {
+      mRowDim = p.n_cols;
+    };
+
+  virtual BaseMeasure<U>* getCopy() const
+  { 
+    return new Mult(*this);
+  };
+
+  virtual Row<double> asRow() const
+  {
+    return mP;
+  };
+
+  virtual void fromRow(const Row<double>& r)
+  {
+    mP = r;
+    mRowDim = p.n_cols;
+  };
+
+
+  Row<double> mP;
+private:
+};
+
+class Gauss : public BaseMeasure<double>
+{
+  public:
+    Gauss(const Gauss& gauss)
+      : Gauss(gauss.mMu, gauss.mSig)
+    { };
+
+    Mult(const Col<double>& mu, const Mat<double>& sig)
+      : mMu(mu), mSig(sig)
+    {
+      uint32_t d=mMu.n_rows;
+      mRowDim = d*d+d;
+    };
+
+  virtual BaseMeasure<U>* getCopy() const
+  { 
+    return new Gauss(*this);
+  };
+
+  /*
+   * puts all parameters, mu and Sig into one vector
+   * (0 to d^2-1) Sig
+   * (d^2 to d^2+d-1) mu
+   */
+  virtual Row<double> asRow() const
+  {
+    uint32_t d = mVtheta.n_elem;
+    Row<double> row(d*d+d+2);
+
+    for (uint32_t i=0; i<d; ++i)
+      for (uint32_t j=0; j<d; ++j)
+        row(j+i*d) = mDelta(j,i); // column major
+    for (uint32_t i=0; i<d; ++i)
+      row(d*d+i) = mVtheta(i);
+    row(d*d+d) = mNu;
+    row(d*d+d+1) = mKappa;
+    return row;
+  };
+  
+  virtual void fromRow(const Row<double>& row)
+  {
+    uint32_t d = mVtheta.n_elem; // we already have a Vtheta from the init;
+    for (uint32_t i=0; i<d; ++i)
+      for (uint32_t j=0; j<d; ++j)
+        mDelta(j,i) = row(j+i*d); // column major
+    for (uint32_t i=0; i<d; ++i)
+      mVtheta(i) = row(d*d+i);
+    mNu = row(d*d+d);
+    mKappa = row(d*d+d+1);
+  };
+  virtual Row<double> asRow() const
+  {
+
+    return mP;
+  };
+
+  virtual void fromRow(const Row<double>& r)
+  {
+    mP = r;
+    mRowDim = p.n_cols;
+  };
+
+
+  Col<double> mMu;
+  Mat<double> mSig;
+private:
+};
 
 #endif /* BASEMEASURE_HPP_ */

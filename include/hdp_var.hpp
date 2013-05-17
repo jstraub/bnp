@@ -418,7 +418,7 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
 
         cout<<"updating copied model with x"<<endl;
         updateEst(x_te,zeta,phi,gamma,a,lambda,omega,d,kappa);
-        cout<<" lambda.shape="<<lambda.size()<<endl;
+//        cout<<" lambda.shape="<<lambda.size()<<endl;
         cout<<"computing perplexity under updated model"<<endl;
         //TODO: compute probabilities then use that to compute perplexity
 

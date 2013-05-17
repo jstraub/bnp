@@ -42,13 +42,14 @@ class HDP // : public DP<U>
     {
       //cout<<"added heldout doc with "<<x_i.size()<<" words"<<endl;
       uint32_t N = x_i.n_cols;
+      uint32_t N_te = N/10;
       
       //DONE: this shuffle might not be working
 //      cout<<"x_i: "<<x_i.cols(0,10)<<endl;
       Mat<U> x_s = shuffle(x_i,1); // suffle the columns (words)
 //      cout<<"x_s: "<<x_s.cols(0,10)<<endl;
-      Mat<U> x_te = x_s.cols(0,(N/2)-1) ; // select first half to train on
-      Mat<U> x_ho = x_s.cols(N/2,N-1) ; // select second half as held out
+      Mat<U> x_te = x_s.cols(0,N_te-1) ; // select first half to train on
+      Mat<U> x_ho = x_s.cols(N_te,N-1) ; // select second half as held out
 
 //      cout<<"x_te: "<<x_te.n_rows<<"x"<<x_te.n_cols<<endl;
 //      cout<<"x_ho: "<<x_ho.n_rows<<"x"<<x_ho.n_cols<<endl;

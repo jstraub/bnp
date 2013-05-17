@@ -154,15 +154,15 @@ if __name__ == '__main__':
     fig00.show()
 #    raw_input('Press enter to continue')
 
-    perp_d=np.zeros(D_ho)
-    for d in range(0,D_ho):
-      print('{0}: {1}'.format(d,x_ho[d]))
-      perp_d[d]=hdp.perplexity(x_ho[d],D-D_ho+1,kappa)
-      print('Perplexity of heldout ({0}):\t{1}'.format(d,perp_d))
-
-    fig01=plt.figure()
-    plt.plot(perp_d)
-    fig01.show()
+#    perp_d=np.zeros(D_ho)
+#    for d in range(0,D_ho):
+#      print('{0}: {1}'.format(d,x_ho[d]))
+#      perp_d[d]=hdp.perplexity(x_ho[d],D-D_ho+1,kappa)
+#      print('Perplexity of heldout ({0}):\t{1}'.format(d,perp_d))
+#
+#    fig01=plt.figure()
+#    plt.plot(perp_d)
+#    fig01.show()
 #    raw_input('Press enter to continue')
 
     hdp_var = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
