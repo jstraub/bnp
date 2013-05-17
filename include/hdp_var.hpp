@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "hdp.hpp"
+#include "hdp_base.hpp"
+#include "hdp_var_base.hpp"
 
 #include "random.hpp"
 #include "baseMeasure.hpp"
@@ -22,29 +23,28 @@
 using namespace std;
 using namespace arma;
 
-
-
 /*
  * this one assumes that the number of words per document is 
  * smaller than the dictionary size
  *
  * http://en.wikipedia.org/wiki/Virtual_inheritance
  */
-class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
+template <class U>
+class HDP_var: public HDP<U>, public virtual HDP_var_base
 {
   public:
 
-    HDP_var(const BaseMeasure<uint32_t>& base, double alpha, double omega)
-      : HDP_var_base(0,0,0), HDP<uint32_t>(base, alpha, omega)
+    HDP_var(const BaseMeasure<U>& base, double alpha, double omega)
+      : HDP_var_base(0,0,0), HDP<U>(base, alpha, omega)
     {};
 
     ~HDP_var()
     {};
 
     // interface mainly for python
-    uint32_t addDoc(const Mat<uint32_t>& x_i)
+    uint32_t addDoc(const Mat<U>& x_i)
     {
-      uint32_t x_ind = HDP<uint32_t>::addDoc(x_i);
+      uint32_t x_ind = HDP<U>::addDoc(x_i);
       // TODO: potentially slow
       // add the index of the added x_i
       mInd2Proc.resize(mInd2Proc.n_elem+1);
@@ -67,17 +67,17 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       mNw = Nw;
 
       mA.ones(K,2);
-      mA.col(1) *= mOmega; 
+      mA.col(1) *= HDP<U>::mOmega; 
 
       // initialize lambda
-      mLambda.init(mH0,K); // initialize the priors of the topics from the base measure.
+      HDP<U>::mLambda.init(HDP<U>::mH0,K); // initialize the priors of the topics from the base measure.
     
-//      mLambda.zeros(K,Nw);
+//      HDP<U>::mLambda.zeros(K,Nw);
 //      GammaRnd gammaRnd(1.0, 1.0);
 //      for (uint32_t k=0; k<K; ++k){
-//        for (uint32_t w=0; w<Nw; ++w) mLambda(k,w) = gammaRnd.draw();
-//        mLambda.row(k) *= double(D)*100.0/double(K*Nw);
-//        mLambda.row(k) += ((Dir*)(&mH0))->mAlphas;
+//        for (uint32_t w=0; w<Nw; ++w) HDP<U>::mLambda(k,w) = gammaRnd.draw();
+//        HDP<U>::mLambda.row(k) *= double(D)*100.0/double(K*Nw);
+//        HDP<U>::mLambda.row(k) += ((Dir*)(&mH0))->mAlphas;
 //      }
     };
 
@@ -89,15 +89,15 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      *  uint32_t K=100; // truncation on corpus level
      *  S = batch size
      */
-    void densityEst(const vector<Mat<uint32_t> >& x, uint32_t Nw, 
+    void densityEst(const vector<Mat<U> >& x, uint32_t Nw, 
         double kappa, uint32_t K, uint32_t T, uint32_t S)
     {
       cout<<"densityEstimate with: K="<<K<<"; T="<<T<<"; kappa="<<kappa<<"; Nw="<<Nw<<"; S="<<S<<endl;
 
-      mX = x;
-      uint32_t D=mX.size();
+      HDP<U>::mX = x;
+      uint32_t D=HDP<U>::mX.size();
       cout<<"D="<<D<<endl;
-      cout<<"mX[0].shape= "<<mX[0].n_rows<<"x"<<mX[0].n_cols<<endl;
+      cout<<"mX[0].shape= "<<HDP<U>::mX[0].n_rows<<"x"<<HDP<U>::mX[0].n_cols<<endl;
 
       mInd2Proc = linspace<Row<uint32_t> >(0,D-1,D);
 
@@ -107,7 +107,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
       initCorpusParams(mNw,mK,mT,D);
       cout<<"Init of corpus params done"<<endl;
-      Row<uint32_t> ind = updateEst_batch(mInd2Proc,mZeta,mPhi,mGamma,mA,mLambda,mPerp,mOmega,kappa,S,true);
+      Row<uint32_t> ind = updateEst_batch(mInd2Proc,mZeta,mPhi,mGamma,mA,HDP<U>::mLambda,mPerp,HDP<U>::mOmega,kappa,S,true);
 //      cout<<"mPhi -> D="<<mPhi.size()<<endl;
 //      cout<<"mPhi -> D="<<HDP_var_base::mPhi.size()<<endl;
 //      cout<<"mPerp="<<mPerp.t()<<endl;
@@ -127,9 +127,9 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      */
     bool densityEst(uint32_t Nw, double kappa, uint32_t K, uint32_t T, uint32_t S)
     {
-      if(mX.size() > 0)
+      if(HDP<U>::mX.size() > 0)
       {
-        densityEst(mX,Nw,kappa,K,T,S);
+        densityEst(HDP<U>::mX,Nw,kappa,K,T,S);
         //TODO: return p_d(x)
         return true;
       }else{
@@ -152,7 +152,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         vector<Mat<double> > gamma;
         Col<double> perp;
 
-        Row<uint32_t> ind = updateEst_batch(mInd2Proc,zeta,phi,gamma,mA,mLambda,perp,mOmega,kappa,S);
+        Row<uint32_t> ind = updateEst_batch(mInd2Proc,zeta,phi,gamma,mA,HDP<U>::mLambda,perp,HDP<U>::mOmega,kappa,S);
 
         mZeta.resize(mZeta.size()+Db);
         mPhi.resize(mPhi.size()+Db);
@@ -178,31 +178,31 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      * after an initial densitiy estimate has been made using densityEst()
      * can use this to update the estimate with information from additional x 
      */
-    bool  updateEst(const Mat<uint32_t>& x, double kappa)
+    bool  updateEst(const Mat<U>& x, double kappa)
     {
-      if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists an estimate already
+      if (HDP<U>::mX.size() > 0 && HDP<U>::mX.size() == mPhi.size()) { // this should indicate that there exists an estimate already
         uint32_t N = x.n_cols;
         uint32_t T = mT; 
         uint32_t K = mK;
-        mX.push_back(x);
+        HDP<U>::mX.push_back(x);
         mZeta.push_back(Mat<double>(T,K));
         mPhi.push_back(Mat<double>(N,T));
         //    mZeta.set_size(T,K);
         //    mPhi.set_size(N,T);
         mGamma.push_back(Mat<double>(T,2));
-        uint32_t d = mX.size()-1;
+        uint32_t d = HDP<U>::mX.size()-1;
         mPerp.resize(d+1);
 
-        if(updateEst(mX[d],mZeta[d],mPhi[d],mGamma[d],mA,mLambda,mOmega,d,kappa))
+        if(updateEst(HDP<U>::mX[d],mZeta[d],mPhi[d],mGamma[d],mA,HDP<U>::mLambda,HDP<U>::mOmega,d,kappa))
         {
           mPerp[d] = 0.0;
-          for (uint32_t i=0; i<mX_ho.size(); ++i)
+          for (uint32_t i=0; i < HDP<U>::mX_ho.size(); ++i)
           {    
-            Row<double> logP=logP_w(mX[d],mPhi[d], mZeta[d], mGamma[d], mLambda);
-            mPerp[d] += HDP<uint32_t>::perplexity(mX_ho[i], logP);
-            //mPerp[d] += perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], mLambda);
+            Row<double> logP=logP_w(HDP<U>::mX[d],mPhi[d], mZeta[d], mGamma[d], HDP<U>::mLambda);
+            mPerp[d] += HDP<U>::perplexity(HDP<U>::mX_ho[i], logP);
+            //mPerp[d] += perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], HDP<U>::mLambda);
           }
-          mPerp[d] /= double(mX_ho.size());
+          mPerp[d] /= double(HDP<U>::mX_ho.size());
           cout<<"Perplexity="<<mPerp[d]<<endl;
           return true; 
         }else{
@@ -216,7 +216,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
     /*
      *
      */
-    bool updateEst(const Mat<uint32_t>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, DistriContainer<uint32_t>& lambda, double omega, uint32_t d, double kappa)
+    bool updateEst(const Mat<U>& x, Mat<double>& zeta, Mat<double>& phi, Mat<double>& gamma, Mat<double>& a, DistriContainer<U>& lambda, double omega, uint32_t d, double kappa)
     {
       uint32_t D = d+1; // assume that doc d is appended to the end  
 //      uint32_t Nw = lambda.n_cols;
@@ -257,7 +257,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
       //    cout<<" --------------------- natural gradients --------------------------- "<<endl;
       //    cout<<"\tD="<<D<<" omega="<<omega<<endl;
-      DistriContainer<uint32_t> d_lambda(mH0,K);
+      DistriContainer<U> d_lambda(HDP<U>::mH0,K);
       Mat<double> d_a(K,2); 
       computeNaturalGradients(d_lambda, d_a, zeta, phi, omega, D, x);
 
@@ -279,7 +279,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      * @param sameIndAsX == true -> zeta,phi,gamma have same indices as x (ind_x). This typically happens for the initial batch update. Setting this to true eliminates the need of reordering the results afterwords to match the indices of the docs x.
      * @return the randomly shuffled indices to show how the data was processed -> this allows association of zetas, phis and gammas with docs in mX
      */
-    Row<uint32_t> updateEst_batch(const Row<uint32_t>& ind_x, vector<Mat<double> >& zeta, vector<Mat<double> >& phi, vector<Mat<double> >& gamma, Mat<double>& a, DistriContainer<uint32_t>& lambda, Col<double>& perp, double omega, double kappa, uint32_t S, bool sameIndAsX=false)
+    Row<uint32_t> updateEst_batch(const Row<uint32_t>& ind_x, vector<Mat<double> >& zeta, vector<Mat<double> >& phi, vector<Mat<double> >& gamma, Mat<double>& a, DistriContainer<U>& lambda, Col<double>& perp, double omega, double kappa, uint32_t S, bool sameIndAsX=false)
     {
       uint32_t d_0 = min(ind_x); // thats the doc number that we start with -> needed for ro computation; assumes that all indices in mX prior to d_0 have already been processed.
       uint32_t D= max(ind_x)+1; // D is the maximal index of docs that we are processing +1
@@ -295,7 +295,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
       for (uint32_t dd=0; dd<ind.n_elem; dd += S)
       {
-        DistriContainer<uint32_t> db_lambda(mH0,mK);
+        DistriContainer<U> db_lambda(HDP<U>::mH0,mK);
 
         Mat<double> db_a(mK,2); 
         db_a.zeros();
@@ -307,27 +307,28 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         for (uint32_t db=dd; db<min(dd+S,ind.n_elem); db++)
         {
           uint32_t d=ind[db];  
+          const Mat<U>& x_d = HDP<U>::mX[d];
           uint32_t dout=sameIndAsX?d:db;
-          uint32_t N=mX[d].n_cols;
+          uint32_t N=x_d.n_cols;
           //      cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
 
           cout<<"-- db="<<db<<" d="<<d<<" N="<<N<<endl;
 
-          Mat<double> eLogBeta(mK,mX[d].n_cols);
+          Mat<double> eLogBeta(mK,x_d.n_cols);
           Col<double> digam_lamb_sum(mK);
-          compElogBeta(eLogBeta, lambda, mX[d]);
+          compElogBeta(eLogBeta, lambda, x_d);
 
           //Mat<double> zeta(T,K);
           phi[dout].resize(N,mT);
-          initZeta(zeta[dout],eLogBeta, mX[d]);
-          initPhi(phi[dout],zeta[dout],eLogBeta, mX[d]);
+          initZeta(zeta[dout],eLogBeta, x_d);
+          initPhi(phi[dout],zeta[dout],eLogBeta, x_d);
 
           //cout<<" ------------------------ doc level updates --------------------"<<endl;
           //Mat<double> gamma(T,2);
           Col<double> eLogSig_gam(mT);
           Mat<double> gamma_prev(mT,2);
           gamma_prev.ones();
-          gamma_prev.col(1) += mAlpha;
+          gamma_prev.col(1) += HDP<U>::mAlpha;
           bool converged = false;
           uint32_t o=0;
           while(!converged){
@@ -336,8 +337,8 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
             compElogSig(eLogSig_gam,gamma[dout]); // precompute 
 
-            updateZeta(zeta[dout],phi[dout],eLogSig_a,eLogBeta, mX[d]);
-            updatePhi(phi[dout],zeta[dout],eLogSig_gam,eLogBeta, mX[d]);
+            updateZeta(zeta[dout],phi[dout],eLogSig_a,eLogBeta, x_d);
+            updatePhi(phi[dout],zeta[dout],eLogSig_gam,eLogBeta, x_d);
 
             converged = (accu(gamma_prev != gamma[dout]))==0 || o>60 ;
             gamma_prev = gamma[dout];
@@ -345,10 +346,10 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 //            cout<<"o="<<o<<endl;
           }
 
-          DistriContainer<uint32_t> d_lambda(mH0,mK); // batch updates
+          DistriContainer<U> d_lambda(HDP<U>::mH0,mK); // batch updates
           Mat<double> d_a(mK,2); 
           //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
-          computeNaturalGradients(d_lambda, d_a, zeta[dout], phi[dout], mOmega, D, mX[d]);
+          computeNaturalGradients(d_lambda, d_a, zeta[dout], phi[dout], HDP<U>::mOmega, D, x_d);
 #pragma omp critical
           {
             for (uint32_t k=0; k<d_lambda.size(); ++k)
@@ -373,21 +374,21 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         a = (1.0-ro)*a + (ro/S)*db_a;
 
         perp[dd+bS/2] = 0.0;
-        if (mX_te.size() > 0) {
-          cout<<"computing "<<mX_te.size()<<" perplexities"<<endl;
+        if (HDP<U>::mX_te.size() > 0) {
+          cout<<"computing "<<HDP<U>::mX_te.size()<<" perplexities"<<endl;
 #pragma omp parallel for schedule(dynamic) 
-          for (uint32_t i=0; i<mX_te.size(); ++i)
+          for (uint32_t i=0; i < HDP<U>::mX_te.size(); ++i)
           {
             //cout<<"mX_te: "<< mX_te[i].n_rows << "x"<< mX_te[i].n_cols<<endl;
             //cout<<"mX_ho: "<< mX_ho[i].n_rows << "x"<< mX_ho[i].n_cols<<endl;
-            double perp_i =  perplexity(mX_te[i],mX_ho[i],dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
+            double perp_i =  perplexity(HDP<U>::mX_te[i],HDP<U>::mX_ho[i],dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
             //cout<<"perp_"<<i<<"="<<perp_i<<endl;
 #pragma omp critical
             {
               perp[dd+bS/2] += perp_i;
             }
           }
-          perp[dd+bS/2] /= double(mX_te.size());
+          perp[dd+bS/2] /= double(HDP<U>::mX_te.size());
           //cout<<"Perplexity="<<mPerp[d]<<endl;
         }
       }
@@ -397,9 +398,10 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
 
     // compute the perplexity of a given document split into x_test (to find a topic model for the doc) and x_ho (to evaluate the perplexity)
-    double perplexity(const Mat<uint32_t>& x_te, const Mat<uint32_t>& x_ho, uint32_t d, double kappa=0.75)
+    double perplexity(const Mat<U>& x_te, const Mat<U>& x_ho, uint32_t d, double kappa=0.75)
     {
-      if (mX.size() > 0 && mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
+      if (HDP<U>::mX.size() > 0 && HDP<U>::mX.size() == mPhi.size()) { // this should indicate that there exists a estimate already
+       
         uint32_t N = x_te.n_cols;
         uint32_t T = mT; 
         uint32_t K = mK; 
@@ -411,8 +413,8 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
         Mat<double> a(mA);// DONE: make deep copy here!
 
-        DistriContainer<uint32_t> lambda(mLambda);
-        double omega = mOmega;
+        DistriContainer<U> lambda(HDP<U>::mLambda);
+        double omega = HDP<U>::mOmega;
 
         cout<<"updating copied model with x"<<endl;
         updateEst(x_te,zeta,phi,gamma,a,lambda,omega,d,kappa);
@@ -422,7 +424,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
         cout<<"x_te: "<<size(x_te);
         Row<double> logP=logP_w(x_te,phi, zeta, gamma, lambda);
-        return HDP<uint32_t>::perplexity(x_ho, logP);
+        return HDP<U>::perplexity(x_ho, logP);
         //return perplexity(x_ho, zeta, phi, gamma, lambda);
       }else{
         return 1.0/0.0;
@@ -435,13 +437,13 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      */
     Row<double> logP_w(uint32_t d) const {
 //      cout<<"mX.size="<<mX.size()<<endl;
-      return logP_w(mX[d],mPhi[d],mZeta[d],mGamma[d],mLambda);
+      return logP_w(HDP<U>::mX[d],mPhi[d],mZeta[d],mGamma[d],HDP<U>::mLambda);
     };
 
     /* 
      * log probability using the samples x (not using sufficient statistics -> x is just a list of words)
      */
-    Row<double> logP_w(const Mat<uint32_t>& x, const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const DistriContainer<uint32_t>& lambda) const
+    Row<double> logP_w(const Mat<U>& x, const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const DistriContainer<U>& lambda) const
     { 
       Row<double> p(mNw);
       p.zeros();
@@ -463,7 +465,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       //cout<<"getWordTopics done"<<endl;
       //cout<<"z="<<z.t()<<size(z);
       Mat<double> beta;
-      getCorpTopics(beta,lambda);
+      HDP<U>::getCorpTopics(beta,lambda);
       //cout<<"getCorpTopics done"<<endl;
       //cout<<"beta:\t"<<size(beta);
 
@@ -489,7 +491,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
      * precompute necessary digamma function values, because these are slowing the whole algorithm down
      * all the update methods for zeta and phi need these values very often! I can precumpute these once after updating the global parameters (and hence lambda)
      */
-    void compElogBeta(Mat<double>& eLogBeta, const DistriContainer<uint32_t>& lambda, const Mat<uint32_t>& x_d) const 
+    void compElogBeta(Mat<double>& eLogBeta, const DistriContainer<U>& lambda, const Mat<U>& x_d) const 
     { 
       eLogBeta.zeros(mK,x_d.n_cols);
 
@@ -522,7 +524,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       }
     }
 
-    void initZeta(Mat<double>& zeta, const Mat<double>& eLogBeta, const Mat<uint32_t>& x_d)
+    void initZeta(Mat<double>& zeta, const Mat<double>& eLogBeta, const Mat<U>& x_d)
     {
       uint32_t N = x_d.n_cols;
       uint32_t T = zeta.n_rows;
@@ -543,7 +545,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       //cerr<<"normalization check:"<<endl<<sum(zeta,1).t()<<endl; // sum over rows
     };
 
-    void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& eLogBeta, const Mat<uint32_t>& x_d)
+    void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& eLogBeta, const Mat<U>& x_d)
     {
       uint32_t N = x_d.n_cols;
       uint32_t T = zeta.n_rows;
@@ -567,7 +569,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       uint32_t T = phi.n_cols;
 
       gamma.ones();
-      gamma.col(1) *= mAlpha;
+      gamma.col(1) *= HDP<U>::mAlpha;
       for (uint32_t i=0; i<T; ++i) 
       {
         for (uint32_t n=0; n<N; ++n){
@@ -580,7 +582,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       //cout<<gamma.t()<<endl;
     };
 
-    void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Col<double>& eLogSig_a, const Mat<double>& eLogBeta, const Mat<uint32_t>& x_d)
+    void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Col<double>& eLogSig_a, const Mat<double>& eLogBeta, const Mat<U>& x_d)
     {
 
       assert(x_d.n_rows == 1);
@@ -603,7 +605,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
     }
 
 
-    void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Col<double>& eLogSig_gam, const Mat<double>& eLogBeta, const Mat<uint32_t>& x_d)
+    void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Col<double>& eLogSig_gam, const Mat<double>& eLogBeta, const Mat<U>& x_d)
     {
 
       assert(x_d.n_rows == 1);
@@ -624,14 +626,14 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
       }
     }
 
-    void computeNaturalGradients(DistriContainer<uint32_t>& d_lambda, Mat<double>& d_a, const Mat<double>& zeta, const Mat<double>&  phi, double omega, uint32_t D, const Mat<uint32_t>& x_d)
+    void computeNaturalGradients(DistriContainer<U>& d_lambda, Mat<double>& d_a, const Mat<double>& zeta, const Mat<double>&  phi, double omega, uint32_t D, const Mat<U>& x_d)
     {
 //      uint32_t N = x_d.n_cols;
 //      uint32_t Nw = d_lambda.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
 
-      d_lambda.init(mH0,mK);
+      d_lambda.init(HDP<U>::mH0,mK);
 
 //      d_lambda.zeros();
       d_a.zeros();

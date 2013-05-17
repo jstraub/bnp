@@ -20,7 +20,6 @@ using namespace std;
 using namespace arma;
 
 
-
 /*
  * templated on the unit
  */

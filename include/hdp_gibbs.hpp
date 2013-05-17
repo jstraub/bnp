@@ -6,7 +6,7 @@
 
 #include "random.hpp"
 #include "baseMeasure.hpp"
-#include "hdp.hpp"
+#include "hdp_base.hpp"
 #include "probabilityHelpers.hpp"
 
 #include <stddef.h>

@@ -48,7 +48,7 @@ int main(int argc, char** argv)
   //alphas *= 1.1; // smaller alpha means more uncertainty in the where the good distributions are
   double alpha =1.0, gamma=100.0;
   Dir dir(alphas);
-  HDP_var hdp_onl(dir, alpha, gamma);
+  HDP_var<uint32_t> hdp_onl(dir, alpha, gamma);
 
   hdp_onl.densityEst(x,Nw,0.9,10,2,1);
 
