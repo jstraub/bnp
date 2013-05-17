@@ -22,6 +22,42 @@
 using namespace std;
 using namespace arma;
 
+template <class U>
+class DistriContainer:
+{
+public:
+  DistriContainer(const BaseMeasure<U>& a, uint32_t d)
+    : mDistris(d,NULL)
+  {
+    for (uint32_t i=0; i<d; ++i)
+      mDistris[i] = a.getClopy();
+  };
+
+
+  DistriContainer(const vector<BaseMeasure<U>* >& a)
+    : mDistris(d,NULL)
+  {
+    for (uint32_t i=0; i<d; ++i)
+      mDistris[i] = a[i]->getCopy();
+  };
+
+  ~DistriContainer()
+  {
+    for (uint32_t i=0; i<d; ++i)
+      delete mDistris[i];
+  };
+
+  BaseMeasure<U>* operator[](uint32_t i)
+  {
+    assert(i<mDistris.size());
+    return mDistris[i];
+  };
+
+private:
+  vector<BaseMeasure<U>* > mDistris;
+}
+
+
 /*
  * this one assumes that the number of words per document is 
  * smaller than the dictionary size
@@ -292,9 +328,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
       for (uint32_t dd=0; dd<ind.n_elem; dd += S)
       {
-        vector<BaseMeasure<uint32_t> > db_lambda(mK,NULL); // batch updates
-        for (uint32_t k=0; k<db_lambda.size(); ++k)
-          db_lambda[k] = mH0.getCopy();
+        DistriContainer<uint32_t> db_lambda(mH0,mK);
 
         Mat<double> db_a(mK,2); 
         db_a.zeros();
@@ -344,16 +378,14 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 //            cout<<"o="<<o<<endl;
           }
 
-          vector<BaseMeasure<uint32_t> > d_lambda(mK,NULL); // batch updates
-          for (uint32_t k=0; k<d_lambda.size(); ++k)
-            d_lambda[k] = mH0.getCopy();
+          DistriContainer<uint32_t> d_lambda(mH0,mK); // batch updates
           Mat<double> d_a(mK,2); 
           //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
           computeNaturalGradients(d_lambda, d_a, zeta[dout], phi[dout], mOmega, D, mX[d]);
 #pragma omp critical
           {
             for (uint32_t k=0; k<d_lambda.size(); ++k)
-              db_lambda[k].fromRow(db_lambda[k].asRow()+d_lambda[k].asRow());
+              db_lambda[k]->fromRow(db_lambda[k]->asRow() + d_lambda[k]->asRow());
             db_a += d_a;
           }
         }
@@ -369,7 +401,7 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
         //cout<<"a="<<a<<endl;
         
         for (uint32_t k=0; k<d_lambda.size(); ++k)
-          lambda[k].fromRow((1.0-ro)*lambda[k].asRow() + (ro/S)*db_lambda[k].asRow()); //TODO: doies this make sense for NIW prior???
+          lambda[k]->fromRow((1.0-ro)*lambda[k]->asRow() + (ro/S)*db_lambda[k]->asRow()); //TODO: doies this make sense for NIW prior???
         //lambda = (1.0-ro)*lambda + (ro/S)*db_lambda;
         a = (1.0-ro)*a + (ro/S)*db_a;
 
@@ -412,10 +444,9 @@ class HDP_var: public HDP<uint32_t>, public virtual HDP_var_base
 
         Mat<double> a(mA);// DONE: make deep copy here!
 
-        vector<BaseMeasure<uint32_t> > lambda(mLambda.size(),NULL);
-        for (uint32_t i=0; i<lambda.size(); ++i){
+        vector<BaseMeasure<uint32_t>* > lambda(mLambda.size(),NULL);
+        for (uint32_t i=0; i<lambda.size(); ++i)
           lambda[i] = mLambda[i]->getCopy();
-        }
         double omega = mOmega;
 
         cout<<"updating copied model with x"<<endl;
