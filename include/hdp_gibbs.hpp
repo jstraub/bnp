@@ -324,25 +324,41 @@ class HDP_gibbs : public HDP<U>
 
     Row<double> logP_w(uint32_t d) const
     {
-      Row<double> logP(mNw);
-      logP.zeros();
       uint32_t N = mZ_ji[d].n_elem;
+      Row<double> logP(N);
+      logP.zeros();
       for (uint32_t i=0; i<N; ++i){
-        logP[ HDP<U>::mX[d](i) ] += log(mBeta( mZ_ji[d](i), HDP<U>::mX[d](i)));
+        logP[ i ] += mBeta[mZ_ji[d](i)]->mode()->logP(HDP<U>::mX[d].col(i));
       }
       return logP;
     };
 
 
+    Mixture<U> docMixture(uint32_t d) const 
+    {  
+//      uint32_t N = mZ_ji[d].n_elem;
+      Col<uint32_t> z_u = unique(mZ_ji[d]);
+      Row<double> ps(z_u.n_elem);
+
+      DistriContainer<U> beta(z_u.n_elem);
+      for (uint32_t i=0; i < z_u.n_elem; ++i){
+        ps[i] = sum(mZ_ji[d]==z_u(i));
+        beta[i] = mBeta[z_u(i)]->mode()->getCopy(); // TODO only works for Dir Base Measure I guess
+      }
+      return Mixture<U>(beta,ps);
+
+    }
+
     /* compute the perplexity of all test docs after gibbs sampling is done
      */
-    Row<double> perplexity(){
+    Row<double> perplexity()
+    {
       mPerp.set_size(HDP<U>::mX_ho.size());
       for (uint32_t i=0; i<mX_id_test.size(); ++i){
         // iterate over all held out data and compute the perplexity
         uint32_t d=mX_id_test[i];
-        Row<double> logP = logP_w(d);
-        mPerp(i) = HDP<U>::perplexity(HDP<U>::mX_ho[i],logP);
+        Mixture<U> mix = docMixture(d);
+        mPerp(i) = HDP<U>::perplexity(HDP<U>::mX_ho[i],mix);
       }
       return mPerp;
     };
@@ -355,7 +371,7 @@ class HDP_gibbs : public HDP<U>
     uint32_t mNw; // number of different words 
     uint32_t mK;
     vector<uint32_t> mT;
-    Mat<double> mBeta; // corpus level topics
+    DistriContainer<U> mBeta; // corpus level topics
     Row<double> mPerp; // perplexities of all test docs after sampling is finished
 
   private:
@@ -363,21 +379,30 @@ class HDP_gibbs : public HDP<U>
     //TODO: compute topics from the labeling
     void computeTopics(void)
     {
-      mBeta.set_size(mK,mNw); // corpus level topics
-      mBeta.zeros();
-      uint32_t D=HDP<U>::mX.size(); // D=J -> number of documents in corpus; document d/j
-      for (uint32_t d=0; d<D; ++d){
-        uint32_t N = mZ_ji[d].n_elem;
-        for (uint32_t i=0; i<N; ++i){
-          assert(mZ_ji[d](i)<mK);
-          assert(HDP<U>::mX[d](i)<mNw);
-          mBeta(mZ_ji[d](i), HDP<U>::mX[d](i)) ++; // increment count for word x_di in topic z_di 
-        }
-      }
-      //normalize
+      mBeta.init(HDP<U>::mH0,mK);
+
       for (uint32_t k=0; k<mK; ++k){
-        mBeta.row(k) /= sum(mBeta.row(k));
+        Mat<U> x_k(HDP<U>::mX[0].n_rows,0);
+
+        uint32_t D=HDP<U>::mX.size(); // D=J -> number of documents in corpus; document d/j
+        for (uint32_t d=0; d<D; ++d){
+//          uint32_t N = mZ_ji[d].n_elem;
+          x_k = join_rows(x_k, HDP<U>::mX[d].cols(find(mZ_ji[d] == k )));
+
+//          for (uint32_t i=0; i<N; ++i){
+//            assert(mZ_ji[d](i)<mK);
+//            assert(HDP<U>::mX[d](i)<mNw);
+//            mBeta[
+//              mBeta(mZ_ji[d](i), HDP<U>::mX[d](i)) ++; // increment count for word x_di in topic z_di 
+//          }
+        }
+        mBeta[k]->posterior(x_k);
       }
+
+//      //normalize
+//      for (uint32_t k=0; k<mK; ++k){
+//        mBeta.row(k) /= sum(mBeta.row(k));
+//      }
     };
 
     Mat<U> getXinK(const vector<Mat<U> >& x, uint32_t j_x, uint32_t i_x, uint32_t k, 

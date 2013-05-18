@@ -165,7 +165,7 @@ if __name__ == '__main__':
 #    fig01.show()
 #    raw_input('Press enter to continue')
 
-    hdp_var = HDP_sample(K,T,Nw,omega,alpha,dirAlphas)
+    hdp_var = HDP_sample(K,T,Nw,omega,alpha,dirichlet)
     #hdp_var.loadHDPSample(x,topic,docTopicInd,z,v,sigV,pi,sigPi,omega,alpha,dirAlphas)
     hdp_var.loadHDPSample(x_tr=x_tr,x_te=x_ho,hdp=hdp)
     hdp_var.save('model.mat')

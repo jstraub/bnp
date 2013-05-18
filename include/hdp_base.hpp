@@ -61,7 +61,7 @@ class HDP // : public DP<U>
     //virtual Row<double> logP_w(uint32_t d) const=0;
 
 
-    double perplexity(const Mat<U>& x_ho, const Row<double>& logP) const
+    double perplexity(const Mat<U>& x_ho, const Mixture<U>& mix) const
     {
       assert(x_ho.n_rows==1);
 
@@ -70,7 +70,7 @@ class HDP // : public DP<U>
       for (uint32_t i=0; i<N; ++i){
         //cout<<"c_z_n = "<<c[z[w]]<<" z_n="<<z[w]<<" w="<<w<<" N="<<N<<" x_w="<<x_ho[w]<<" topics.shape="<<topics.n_rows<<" "<<topics.n_cols;
 //        cout<<"x_ho_i="<<x_ho(i)<<"; logP_x_ho_i="<<logP(x_ho(i))<<endl;
-          perp -= logP(x_ho(i));
+          perp -= mix.logP(x_ho.col(i)); // logP(x_ho(i));
         //cout<<"w="<<w<<"\tx_ho_w="<<x_ho[w]<<"\tlogP="<<logP[w]<<"\tperp+="<<-double(x_ho[w])*logP[w]<<endl;
       } cout<<endl;
       perp /= double(N);
@@ -110,7 +110,10 @@ class HDP // : public DP<U>
     
     bool getCorpTopics(Mat<double>& topics) const
     {
-      return getCorpTopics(topics,mLambda);
+      DistriContainer<U> tops(mLambda.size());
+      getCorpTopics(tops,mLambda);
+      tops.toMat(topics);
+      return true;
     };
 
 protected:
@@ -126,25 +129,19 @@ protected:
     //Mat<double> mLambda; // corpus level topics (Dirichlet)
 
 
-    bool getCorpTopic(Row<double>& topic, const BaseMeasure<U>* lambda) const
-    {
-      // mode of dirichlet (MAP estimate)
-      lambda->mode(topic);
-      return true;
-    };
+//    bool getCorpTopic(Row<double>& topic, const BaseMeasure<U>* lambda) const
+//    {
+//      // mode of dirichlet (MAP estimate)
+//      lambda->mode(topic);
+//      return true;
+//    };
 
-    bool getCorpTopics(Mat<double>& topics, const DistriContainer<U>& lambda) const
+    bool getCorpTopics( DistriContainer<U>& topics, const DistriContainer<U>& lambda) const
     {
       uint32_t K = lambda.size();
-      Row<double> beta;
-      lambda[0]->mode(beta);
-      uint32_t Nw = beta.n_elem;
-      topics.set_size(K,Nw);
+      topics.resize(K);
       for (uint32_t k=0; k<K; k++){
-        // mode of dirichlet (MAP estimate)
-        Row<double> beta;
-        lambda[k]->mode(beta);
-        topics.row(k) = beta;
+        topics[k] = lambda[k]->mode()->getCopy();
 //        cout<<"lambda_"<<k<<"="<<lambda.row(k)<<endl;
 //        cout<<"topic_"<<k<<"="<<topics.row(k)<<endl;
 //        cout<<"sum over topic_"<<k<<"="<<sum(topics.row(k))<<endl<<endl;
@@ -152,6 +149,7 @@ protected:
       }
       return true;
     };
+
 private:
 
 };

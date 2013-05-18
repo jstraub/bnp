@@ -423,12 +423,45 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
         //TODO: compute probabilities then use that to compute perplexity
 
         cout<<"x_te: "<<size(x_te);
-        Row<double> logP=logP_w(x_te,phi, zeta, gamma, lambda);
-        return HDP<U>::perplexity(x_ho, logP);
+        Mixture<U> mix = docMixture(phi, zeta, gamma, lambda);
+        return HDP<U>::perplexity(x_ho, mix);
         //return perplexity(x_ho, zeta, phi, gamma, lambda);
       }else{
         return 1.0/0.0;
       }
+    };
+
+    Mixture<U> docMixture(uint32_t d) const {
+//      cout<<"mX.size="<<mX.size()<<endl;
+      return docMixture(mPhi[d],mZeta[d],mGamma[d],HDP<U>::mLambda);
+    };
+    Mixture<U> docMixture(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const DistriContainer<U>& lambda) const
+    {
+      Col<double> pi;
+      Col<double> sigPi;
+      Col<uint32_t> c;
+      getDocTopics(pi,sigPi,c,gamma,zeta);
+      //cout<<"getDocTopics done"<<endl;
+      //cout<<"c="<<c.t()<<size(c);
+      Col<uint32_t> z(mNw);
+      getWordTopics(z, phi);
+      //cout<<"getWordTopics done"<<endl;
+      //cout<<"z="<<z.t()<<size(z);
+
+      DistriContainer<U> beta;
+      HDP<U>::getCorpTopics(beta,lambda);
+//      cout<<"getCorpTopics done"<<endl;
+      //cout<<"beta:\t"<<size(beta);
+
+      Col<uint32_t> c_u = unique(c);
+      Row<double> ps(c_u.n_elem); // proportions in  the mixture
+      DistriContainer<U> beta_d(c_u.n_elem);
+      for (uint32_t i=0; i< c_u.n_elem; ++i){
+        beta_d[i] = beta[c_u(i)]->getCopy();
+        ps[i] = sum(sigPi.elem(find(c == c_u(i) )));
+      }
+//      cout<<"Mixture done"<<endl;
+      return Mixture<U>(beta_d,ps);
     };
 
     /* Probability distribution over the words in document d
@@ -439,15 +472,13 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
 //      cout<<"mX.size="<<mX.size()<<endl;
       return logP_w(HDP<U>::mX[d],mPhi[d],mZeta[d],mGamma[d],HDP<U>::mLambda);
     };
-
     /* 
      * log probability using the samples x (not using sufficient statistics -> x is just a list of words)
      */
     Row<double> logP_w(const Mat<U>& x, const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const DistriContainer<U>& lambda) const
     { 
-      Row<double> p(mNw);
+      Row<double> p(x.n_cols);
       p.zeros();
-
 //      cout<<"x:\t"<<size(x);
 //      cout<<"phi:\t"<<size(phi);
 //      cout<<"zeta:\t"<<size(zeta);
@@ -464,18 +495,19 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
       getWordTopics(z, phi);
       //cout<<"getWordTopics done"<<endl;
       //cout<<"z="<<z.t()<<size(z);
-      Mat<double> beta;
+
+      DistriContainer<U> beta;
       HDP<U>::getCorpTopics(beta,lambda);
       //cout<<"getCorpTopics done"<<endl;
       //cout<<"beta:\t"<<size(beta);
 
       for (uint32_t i=0; i<x.n_cols; ++i){
         //cout<<"z_"<<i<<"="<<z[i]<<endl;
-        p[x[i]] += logCat(x[i], beta.row( c[ z[i] ]));
+        p[i] = beta[c[z[i]]]->logP(x.col(i));// logCat(x[i], beta.row( c[ z[i] ]));
         //cout<<"p_"<<x[i]<<"="<<p[x[i]]<<endl;
       }
-      for (uint32_t w=0; w<mNw; ++w)
-        p[w] = p[w]==0.0?-1e10:p[w];
+//      for (uint32_t w=0; w<mNw; ++w)
+//        p[w] = p[w]==0.0?-1e10:p[w];
 
       //cout<<"p="<<p<<endl;
       return p;

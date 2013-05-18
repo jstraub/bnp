@@ -77,7 +77,7 @@ public:
     exit(0);
   };
 
-  virtual void mode(Row<double>& mode) const
+  virtual BaseMeasure<U>* mode() const
   {
     cerr<<"BaseMeasure:: mode()"<<endl;
     exit(0);};
@@ -92,79 +92,123 @@ public:
     cerr<<"BaseMeasure:: posteriorHDP_var()"<<endl;
     exit(0);};
 
+  virtual void posterior(const Mat<U>& x)
+  {
+    cerr<<"BaseMeasure:: posterior()"<<endl;
+    exit(0);};
+
+  virtual double logP(const Col<U>& x) const
+  { 
+    cerr<<"BaseMeasure:: logP()"<<endl;
+    exit(0);}
+
 protected:
   uint32_t mRowDim;
 
 };
 
+
 /*
- * Container for base measure pointers
+ * Multinomial distribution
  */
-template <class U>
-class DistriContainer
+class Mult : public BaseMeasure<uint32_t>
 {
-public:
+  public:
 
-  DistriContainer()
-    : mDistris(0,NULL)
-  {
-  };
+    Mult(const Mult& mult)
+      : mP(mult.mP)
+    {};
 
-  DistriContainer(const BaseMeasure<U>& a, uint32_t d)
-    : mDistris(d,NULL)
-  {
-    for (uint32_t i=0; i<d; ++i)
-      mDistris[i] = a.getCopy();
-  };
-
-  DistriContainer(const vector<BaseMeasure<U>* >& a)
-    : mDistris(a.size(),NULL)
-  {
-    for (uint32_t i=0; i<a.size(); ++i)
-      mDistris[i] = a[i]->getCopy();
-  };
-
-  DistriContainer(const DistriContainer<U>& a)
-    : mDistris(a.size(),NULL)
-  {
-    for (uint32_t i=0; i<a.size(); ++i)
-      mDistris[i] = a[i]->getCopy();
-  };
-
-  ~DistriContainer()
-  {
-    for (uint32_t i=0; i<mDistris.size(); ++i)
+    Mult(const Row<double>& p)
+      : mP(p)
     {
-      //cout<<"deleting "<<mDistris.size()<<" "<<i<<" :"<<mDistris[i]<<endl;
-      delete mDistris[i];
-    }
-  };
-  
-  void init(const BaseMeasure<U>& a, uint32_t d)
+      mRowDim = p.n_cols;
+    };
+
+  virtual BaseMeasure<uint32_t>* getCopy() const
   { 
-    for (uint32_t i=0; i<mDistris.size(); ++i)
-      delete mDistris[i];
-
-    mDistris.resize(d,NULL);
-    for (uint32_t i=0; i<d; ++i)
-      mDistris[i] = a.getCopy();
+    return new Mult(*this);
   };
 
-  BaseMeasure<U>* operator[](const uint32_t i) const
+  virtual Row<double> asRow() const
   {
-    assert(i<mDistris.size());
-    return mDistris[i];
+    return mP;
   };
 
-  uint32_t size() const
+  virtual void fromRow(const Row<double>& r)
   {
-    return mDistris.size();
+    mP = r;
+    mRowDim = r.n_cols;
   };
 
+
+  virtual double logP(const Col<uint32_t>& x) const
+  {
+    return log(mP[x(0)]);
+  };
+
+  Row<double> mP;
 private:
-  vector<BaseMeasure<U>* > mDistris;
 };
 
+/*
+ * Mutlivariate Gaussian distribution
+ */
+class Gauss : public BaseMeasure<double>
+{
+  public:
+    Gauss(const Gauss& gauss)
+      : mMu(gauss.mMu), mSig(gauss.mSig)
+    { };
+
+    Gauss(const Col<double>& mu, const Mat<double>& sig)
+      : mMu(mu), mSig(sig)
+    {
+      uint32_t d=mMu.n_rows;
+      mRowDim = d*d+d;
+    };
+
+  virtual BaseMeasure<double>* getCopy() const
+  { 
+    return new Gauss(*this);
+  };
+
+  /*
+   * puts all parameters, mu and Sig into one vector
+   * (0 to d^2-1) Sig
+   * (d^2 to d^2+d-1) mu
+   */
+  virtual Row<double> asRow() const
+  {
+    uint32_t d = mMu.n_elem;
+    Row<double> row(d*d+d);
+    for (uint32_t i=0; i<d; ++i)
+      for (uint32_t j=0; j<d; ++j)
+       row(j+i*d) = mSig(j,i); // column major
+    for (uint32_t i=0; i<d; ++i)
+      row(d*d+i) = mMu(i);
+    return row;
+  };
+  
+  virtual void fromRow(const Row<double>& row)
+  {
+    uint32_t d = mMu.n_elem; // we already have a Vtheta from the init;
+    for (uint32_t i=0; i<d; ++i)
+      for (uint32_t j=0; j<d; ++j)
+        mSig(j,i) = row(j+i*d); // column major
+    for (uint32_t i=0; i<d; ++i)
+      mMu(i) = row(d*d+i);
+  };
+
+  virtual double logP(const Col<double>& x) const
+  {
+    return -0.5*(double(mSig.n_rows)*1.8378770664093453 + log(det(mSig)) +  as_scalar((x-mMu).t()*solve(mSig,x-mMu)));
+  };
+
+  Col<double> mMu;
+  Mat<double> mSig;
+private:
+};
 
 class Dir : public BaseMeasure<uint32_t>
 {
@@ -200,10 +244,12 @@ public:
     mAlpha0 = sum(r);
   };
 
-  virtual void mode(Row<double>& mode) const
+  virtual BaseMeasure<uint32_t>* mode() const
+//  virtual BaseMeasure<uint32_t> mode() const
   {
-    mode.set_size(mAlphas.size()); 
+    Row<double> mode(mAlphas.size()); 
     dirMode(mode,mAlphas);
+    return new Mult(mode);
   };
 
   virtual double Elog(const Col<uint32_t>& x) const
@@ -236,6 +282,14 @@ public:
     mAlphas += D*lambda;
     //cout<<"lambda-nu="<<d_lambda[k].t()<<endl;
     //cout<<"lambda="<<d_lambda[k].t()<<endl;
+  };
+
+  virtual void posterior(const Mat<uint32_t>& x)
+  { 
+    uint32_t N = x.n_cols;
+    for (uint32_t i=0; i< N; ++i)
+      mAlphas[x[i]] ++;
+    mAlpha0= sum(mAlphas);
   };
 
   /*
@@ -330,16 +384,19 @@ public:
     mKappa = row(d*d+d+1);
   };
 
-  virtual void mode(Row<double>& mode) const
+  virtual BaseMeasure<double>* mode() const
   { 
     uint32_t d = mVtheta.n_elem; // we already have a Vtheta from the init;
-    mode.set_size(d*d+d); 
-    //TODO: not sure about covariance...
-    for (uint32_t i=0; i<d; ++i)
-      for (uint32_t j=0; j<d; ++j)
-        mode(j+i*d) = mDelta(j,i)/(mNu+d+1); // column major
-    for (uint32_t i=0; i<d; ++i)
-      mode(d*d+i) = mVtheta(i); // sure about the mean
+    Mat<double> sig = mDelta/(mNu+d+1);
+    return new Gauss(mVtheta,sig);
+
+//    mode.set_size(d*d+d); 
+//    //TODO: not sure about covariance...
+//    for (uint32_t i=0; i<d; ++i)
+//      for (uint32_t j=0; j<d; ++j)
+//        mode(j+i*d) = mDelta(j,i)/(mNu+d+1); // column major
+//    for (uint32_t i=0; i<d; ++i)
+//      mode(d*d+i) = mVtheta(i); // sure about the mean
   };
 
   virtual double Elog(const Col<double>& x) const
@@ -353,8 +410,25 @@ public:
 
   virtual void posteriorHDP_var(const Col<double>& zeta, const Mat<double>& phi, uint32_t D, const Mat<double>& x)
   {
+    // TODO: use zeta and Phi!!
     uint32_t n = x.n_cols;
-    Col<double> x_hat=sum(x,1);
+    Col<double> x_hat=sum(x,1)/n;
+    Mat<double> S(mDelta);
+    S.zeros();
+    for (uint32_t i=0; i<n; ++i)
+      S += (x.col(i) - x_hat) * (x.col(i) - x_hat).t();
+    
+    mDelta = mDelta + S + (mKappa*n)/(mKappa+n)*(x_hat - mVtheta)*(x_hat - mVtheta).t();
+    mVtheta = mKappa/(mKappa+n)* mVtheta + n/(mKappa+n)*x_hat;
+    mKappa += x.n_cols;
+    mNu += x.n_cols;
+  };
+
+
+  virtual void posterior(const Mat<double>& x)
+  {
+    uint32_t n = x.n_cols;
+    Col<double> x_hat=sum(x,1)/n;
     Mat<double> S(mDelta);
     S.zeros();
     for (uint32_t i=0; i<n; ++i)
@@ -428,107 +502,124 @@ public:
 };
 
 
-class Mult : public BaseMeasure<uint32_t>
+/*
+ * Container for base measure pointers
+ */
+template <class U>
+class DistriContainer
 {
-  public:
+public:
 
-    Mult(const Mult& mult)
-      : Mult(mult.mP)
-    {};
+  DistriContainer(uint32_t d=0)
+    : mDistris(d,NULL)
+  {};
 
-    Mult(const Row<double>& p)
-      : mP(p)
-    {
-      mRowDim = p.n_cols;
-    };
-
-  virtual BaseMeasure<U>* getCopy() const
-  { 
-    return new Mult(*this);
-  };
-
-  virtual Row<double> asRow() const
+  DistriContainer(const BaseMeasure<U>& a, uint32_t d)
+    : mDistris(d,NULL)
   {
-    return mP;
-  };
-
-  virtual void fromRow(const Row<double>& r)
-  {
-    mP = r;
-    mRowDim = p.n_cols;
-  };
-
-
-  Row<double> mP;
-private:
-};
-
-class Gauss : public BaseMeasure<double>
-{
-  public:
-    Gauss(const Gauss& gauss)
-      : Gauss(gauss.mMu, gauss.mSig)
-    { };
-
-    Mult(const Col<double>& mu, const Mat<double>& sig)
-      : mMu(mu), mSig(sig)
-    {
-      uint32_t d=mMu.n_rows;
-      mRowDim = d*d+d;
-    };
-
-  virtual BaseMeasure<U>* getCopy() const
-  { 
-    return new Gauss(*this);
-  };
-
-  /*
-   * puts all parameters, mu and Sig into one vector
-   * (0 to d^2-1) Sig
-   * (d^2 to d^2+d-1) mu
-   */
-  virtual Row<double> asRow() const
-  {
-    uint32_t d = mVtheta.n_elem;
-    Row<double> row(d*d+d+2);
-
     for (uint32_t i=0; i<d; ++i)
-      for (uint32_t j=0; j<d; ++j)
-        row(j+i*d) = mDelta(j,i); // column major
-    for (uint32_t i=0; i<d; ++i)
-      row(d*d+i) = mVtheta(i);
-    row(d*d+d) = mNu;
-    row(d*d+d+1) = mKappa;
-    return row;
+      mDistris[i] = a.getCopy();
+  };
+
+  DistriContainer(const vector<BaseMeasure<U>* >& a)
+    : mDistris(a.size(),NULL)
+  {
+    for (uint32_t i=0; i<a.size(); ++i)
+      mDistris[i] = a[i]->getCopy();
+  };
+
+  DistriContainer(const DistriContainer<U>& a)
+    : mDistris(a.size(),NULL)
+  {
+    for (uint32_t i=0; i<a.size(); ++i)
+      mDistris[i] = a[i]->getCopy();
+  };
+
+  ~DistriContainer()
+  {
+    for (uint32_t i=0; i<mDistris.size(); ++i)
+    {
+      //cout<<"deleting "<<mDistris.size()<<" "<<i<<" :"<<mDistris[i]<<endl;
+      delete mDistris[i];
+    }
   };
   
-  virtual void fromRow(const Row<double>& row)
-  {
-    uint32_t d = mVtheta.n_elem; // we already have a Vtheta from the init;
+  void init(const BaseMeasure<U>& a, uint32_t d)
+  { 
+    for (uint32_t i=0; i<mDistris.size(); ++i)
+      delete mDistris[i];
+
+    mDistris.resize(d,NULL);
     for (uint32_t i=0; i<d; ++i)
-      for (uint32_t j=0; j<d; ++j)
-        mDelta(j,i) = row(j+i*d); // column major
-    for (uint32_t i=0; i<d; ++i)
-      mVtheta(i) = row(d*d+i);
-    mNu = row(d*d+d);
-    mKappa = row(d*d+d+1);
+      mDistris[i] = a.getCopy();
   };
-  virtual Row<double> asRow() const
+
+  BaseMeasure<U>* operator[](const uint32_t i) const
   {
-
-    return mP;
+    assert(i<mDistris.size());
+    return mDistris[i];
   };
 
-  virtual void fromRow(const Row<double>& r)
+  BaseMeasure<U>*& operator[](const uint32_t i)
   {
-    mP = r;
-    mRowDim = p.n_cols;
+    assert(i<mDistris.size());
+    return mDistris[i];
   };
 
+  uint32_t size() const
+  {
+    return mDistris.size();
+  };
 
-  Col<double> mMu;
-  Mat<double> mSig;
+  void resize(uint32_t i)
+  {
+    mDistris.resize(i,NULL);
+  };
+
+  void toMat( Mat<double>& mat) const
+  {
+    mat.set_size(this->size(), mDistris[0]->rowDim() );
+    for (uint32_t i=0; i< this->size(); ++i)
+      mat.row(i) = mDistris[i]->asRow();
+  };
+
 private:
+  vector<BaseMeasure<U>* > mDistris;
 };
+
+/*
+ * Mixture of probabiliti distributions
+ */
+template <class U>
+class Mixture
+{
+  public:
+    Mixture()
+      : mDistris()
+    { };
+
+    Mixture(const Mixture<U>& mix)
+      : mDistris(mix.mDistris), mP(mix.mP)
+    {};
+
+    Mixture(const DistriContainer<U>& distris, const Row<double>& ps)
+      : mDistris(distris), mP(ps)
+    {};
+
+    double logP(const Col<U>& x) const
+    {
+      double p=0.0 ;
+      for (uint32_t i=0; i<mDistris.size(); ++i)
+        p += mP[i]*exp(mDistris[i]->logP(x));
+      return log(p);
+    };  
+
+    DistriContainer<U> mDistris;
+    Row<double> mP;
+
+  private:
+};
+
+
 
 #endif /* BASEMEASURE_HPP_ */
