@@ -114,6 +114,7 @@ BOOST_PYTHON_MODULE(libbnp)
     .def("getArect",&TestNp2Arma_py::getArect)
     .def("putArect",&TestNp2Arma_py::putArect)
     .def("getAcol",&TestNp2Arma_py::getAcol)
+    .def("resizeAmat",&TestNp2Arma_py::resizeAmat)
     .def("getArow",&TestNp2Arma_py::getArow);
 
 }

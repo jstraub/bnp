@@ -228,6 +228,43 @@ class TestNp2Arma_py
     a_wrap = Arow;
   }
 
+  // TODO not working - gave up
+  void resizeAmat(const numeric::array& np)
+  {
+
+    // Get pointer to np array
+    PyArrayObject* a = (PyArrayObject*)PyArray_FROM_O(np.ptr());
+    if(!checkPyArr(a,2,NpTyp<double>::Num)) exit(0);
+
+    PyArray_Dims newshape;
+    newshape.len=2;
+    newshape.ptr = new long int[2];
+    newshape.ptr[0] = 3;
+    newshape.ptr[1] = 3;
+
+    PyArrayObject* b= (PyArrayObject*) PyArray_Resize(a, &newshape, 1,  NPY_ANYORDER );
+
+    // do not copy the data!
+    cout<<a->nd<<": "<<a->dimensions[0]<<"x"<<a->dimensions[1]<<endl;
+    cout<<"strides: "<<a->strides[0]<<" "<<a->strides[1]<<endl;
+    
+    cout<<b->nd<<": "<<b->dimensions[0]<<"x"<<b->dimensions[1]<<endl;
+    cout<<"strides: "<<b->strides[0]<<" "<<b->strides[1]<<endl;
+//    a->data = (char*)Amat.memptr();
+//    a->nd = 2;
+//    a->strides[0] = 8*3;
+//    a->strides[1] = 8;
+//    a->dimensions[0] = 3;
+//    a->dimensions[1] = 3;
+
+
+    //arma::Mat<U> a_wrap=arma::Mat<U>((U*)a->data,a->dimensions[1],a->dimensions[0],false,true); // verse the dimensions to getthe expected behavior
+   
+    
+    
+
+  }
+
   private:
   Mat<double> Amat;
   Mat<double> Arect;

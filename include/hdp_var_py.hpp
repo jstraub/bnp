@@ -33,21 +33,16 @@ class HDP_var_py : public HDP_var_base_py, public HDP_var<U>
 public:
   HDP_var_py(const BaseMeasure<U>& base, double alpha, double gamma)
   :  HDP_var_base_py(0,0,0), HDP_var<U>(base,alpha,gamma)
-  {
-    //cout<<"Creating "<<typeid(this).name()<<endl;
-  };
+  { };
 
   bool densityEst(uint32_t Nw, double kappa, uint32_t K, uint32_t T, uint32_t S)
   {
-//    cout<<"mX.size()="<<HDP_var::mX.size()<<endl;
-//    cout<<"mX_ho.size()="<<HDP_var::mX_ho.size()<<endl;
-//    for (uint32_t i=0; i<HDP_var::mX.size(); ++i)
-//      cout<<"  x_"<<i<<": "<<HDP_var::mX[i].n_rows<<"x"<<HDP_var::mX[i].n_cols<<endl;
-//
     return HDP_var<U>::densityEst(Nw,kappa,K,T,S);
   }
 
-  // makes no copy of the external data x_i
+  /*
+   * makes no copy of the external data x_i
+   */
   uint32_t addDoc(const numeric::array& x_i)
   {
     return HDP_var<U>::addDoc(np2mat<U>(x_i));
@@ -59,19 +54,19 @@ public:
   };
 
 
-  // after an initial densitiy estimate has been made using addDoc() and densityEst()
-  // can use this to update the estimate with information from additional x 
+  /* 
+   * after an initial densitiy estimate has been made using addDoc() and densityEst()
+   * can use this to update the estimate with information from additional x 
+   */
   bool updateEst(const numeric::array& x, double ro=0.75)
   {
     return HDP_var<U>::updateEst(np2mat<U>(x),ro);
   }
-
   bool updateEst_batch(double kappa, uint32_t S){
     return HDP_var<U>::updateEst_batch(kappa,S);
   }
 
   /* 
-   *
    * works on the data in lambda -> size has to be correct in order for this to work!
    * makes a copy of the internal labels vector
    */
@@ -84,8 +79,6 @@ public:
       return false;
     else{
       lambda_wrap = lambda_row;
-      //      for (uint32_t i=0; i<lambda_wrap.n_rows; ++i)
-      //        lambda_wrap.at(i)=lambda_col.at(i);
       return true;
     }
   };
@@ -94,14 +87,8 @@ public:
   {
     Mat<double> beta_mat;
     if(!HDP_var<U>::getCorpTopics(beta_mat)){return false;} // works on the data in _mat
-//    Mat<double> beta_wrap=np2mat<double>(beta); 
-//    if((beta_mat.n_rows != beta_wrap.n_rows)||(beta_mat.n_cols != beta_wrap.n_cols))
-//      return false;
-//    else{
-
-      assignMat2np(beta_mat,beta);
-      return true;
-//    }
+    assignMat2np(beta_mat,beta);
+    return true;
   };
 
 };

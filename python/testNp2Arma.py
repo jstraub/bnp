@@ -38,3 +38,10 @@ print('{}'.format(Aput))
 t.putArect(Aput)
 print '---------'
 
+while 42:
+  Ares = np.zeros((0,0))
+  print('{}'.format(Ares.shape))
+  t.resizeAmat(Ares)
+  print('{}'.format(Ares.shape))
+  print('{}'.format(Ares))
+

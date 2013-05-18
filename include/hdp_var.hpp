@@ -52,7 +52,6 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
       return x_ind;
     };
 
-
     /* 
      * Initializes the corpus level parameters mA and mLambda according 
      * to Blei's Stochastic Variational paper
@@ -432,7 +431,6 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
     };
 
     Mixture<U> docMixture(uint32_t d) const {
-//      cout<<"mX.size="<<mX.size()<<endl;
       return docMixture(mPhi[d],mZeta[d],mGamma[d],HDP<U>::mLambda);
     };
     Mixture<U> docMixture(const Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& gamma, const DistriContainer<U>& lambda) const
@@ -699,23 +697,6 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
       //cout<<"da="<<d_a<<endl;
     }
 
-
-
-//    double ElogBeta(const Mat<double>& lambda, uint32_t k, uint32_t w_dn)
-//    {
-//      //if(lambda[k](w_dn)<1e-6){
-//      //  cout<<"\tlambda[k]("<<w_dn<<") near zero: "<<lambda[k](w_dn)<<endl;
-//      //}
-//      return digamma(lambda(k,w_dn)) - digamma(sum(lambda.row(k)));
-//    }
-//
-//    double ElogSigma(const Mat<double>& a, uint32_t k)
-//    {
-//      double e=digamma(a(k,0)) - digamma(a(k,0) + a(k,1));
-//      for (uint32_t l=0; l<k; ++l)
-//        e+=digamma(a(l,1)) - digamma(a(l,0) + a(l,1));
-//      return e; 
-//    }
 
     //bool normalizeLogDistribution(Row<double>& r)
     bool normalizeLogDistribution(arma::subview_row<double> r)
