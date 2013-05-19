@@ -8,6 +8,7 @@ import scipy
 import scipy.io as sio
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import matplotlib.mlab as mlab
 import numpy as np
 
 import time
@@ -54,11 +55,13 @@ if __name__ == '__main__':
 
   print("---------------- Starting! --------------")
   
-#  dataType='uint32'
-#  hdp = HDP_var_Dir_inc(K,T,Nw,omega,alpha,dirAlphas)
-
-  dataType='double'
-  hdp = HDP_var_NIW_inc(K,T,Nw,omega,alpha,np.ones((1,1))*1,2.1,np.ones((1,1))*6.1,2.1)
+  discrete = False
+  if discrete:
+    dataType='uint32'
+    hdp = HDP_var_Dir_inc(K,T,Nw,omega,alpha,dirAlphas)
+  else:
+    dataType='double'
+    hdp = HDP_var_NIW_inc(K,T,Nw,omega,alpha,np.ones((1,1))*1,2.1,np.ones((1,1))*6.1,2.1)
 
   x=[]
   x_tr=[]
@@ -96,6 +99,16 @@ if __name__ == '__main__':
   fig0=plt.figure(0)
   imgplot=plt.imshow(hdp.docTopicsImg(),interpolation='nearest',cmap=cm.hot);
   fig0.show()
+
+  if not discrete:
+    fig1=plt.figure()
+    X=np.linspace(-5,5,100)
+    mu=hdp.state['beta'][:,0]
+    sig=np.sqrt(hdp.state['beta'][:,1])
+    prop = hdp.state['sigV']
+    for i in range(0,mu.shape[0]):
+      plt.plot(X,prop[i]*mlab.normpdf(X,mu[i],sig[i]))
+    fig1.show()
 
 #  symKLimg = hdp.symKLImg();
 #  print('logP_w:\n{}'.format(hdp.state['logP_w']))

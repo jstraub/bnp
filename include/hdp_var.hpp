@@ -75,7 +75,6 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
 //      GammaRnd gammaRnd(1.0, 1.0);
 //      for (uint32_t k=0; k<K; ++k){
 //        for (uint32_t w=0; w<Nw; ++w) HDP<U>::mLambda(k,w) = gammaRnd.draw();
-//        HDP<U>::mLambda.row(k) *= double(D)*100.0/double(K*Nw);
 //        HDP<U>::mLambda.row(k) += ((Dir*)(&mH0))->mAlphas;
 //      }
     };
@@ -230,8 +229,8 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
       compElogSig(eLogSig_a, a);
 
       //    cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
-      initZeta(zeta,eLogBeta, x);
-      initPhi(phi,zeta,eLogBeta, x);
+      initZeta(zeta,eLogBeta);
+      initPhi(phi,zeta,eLogBeta);
 
       // ------------------------ doc level updates --------------------
       bool converged = false;
@@ -246,8 +245,8 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
         
         compElogSig(eLogSig_gam,gamma); // precompute 
 
-        updateZeta(zeta,phi,eLogSig_a,eLogBeta, x);
-        updatePhi(phi,zeta,eLogSig_gam,eLogBeta, x);
+        updateZeta(zeta,phi,eLogSig_a,eLogBeta);
+        updatePhi(phi,zeta,eLogSig_gam,eLogBeta);
 
         converged = (accu(gamma_prev != gamma))==0 || o>60 ;
         gamma_prev = gamma;
@@ -319,8 +318,8 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
 
           //Mat<double> zeta(T,K);
           phi[dout].resize(N,mT);
-          initZeta(zeta[dout],eLogBeta, x_d);
-          initPhi(phi[dout],zeta[dout],eLogBeta, x_d);
+          initZeta(zeta[dout],eLogBeta);
+          initPhi(phi[dout],zeta[dout],eLogBeta);
 
 //            cout<<"zeta_init="<<zeta[dout]<<endl;
 //            cout<<"phi_init="<<phi[dout]<<endl;
@@ -342,8 +341,8 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
 
             compElogSig(eLogSig_gam,gamma[dout]); // precompute 
 
-            updateZeta(zeta[dout],phi[dout],eLogSig_a,eLogBeta, x_d);
-            updatePhi(phi[dout],zeta[dout],eLogSig_gam,eLogBeta, x_d);
+            updateZeta(zeta[dout],phi[dout],eLogSig_a,eLogBeta);
+            updatePhi(phi[dout],zeta[dout],eLogSig_gam,eLogBeta);
 
             converged = (accu(gamma_prev != gamma[dout]))==0 || o>60 ;
             gamma_prev = gamma[dout];
@@ -413,7 +412,7 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
             }
           }
           perp[dd+bS/2] /= double(HDP<U>::mX_te.size());
-          //cout<<"Perplexity="<<mPerp[d]<<endl;
+          cout<<"Perplexity="<<perp[dd+bS/2]<<endl;
         }
       }
       cout<<"perp="<<perp.t()<<endl;
@@ -579,9 +578,9 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
       }
     }
 
-    void initZeta(Mat<double>& zeta, const Mat<double>& eLogBeta, const Mat<U>& x_d)
+    void initZeta(Mat<double>& zeta, const Mat<double>& eLogBeta)
     {
-      uint32_t N = x_d.n_cols;
+      uint32_t N = eLogBeta.n_cols; // x_d.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
       //cerr<<"\tinit zeta"<<endl;
@@ -600,9 +599,9 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
       //cerr<<"normalization check:"<<endl<<sum(zeta,1).t()<<endl; // sum over rows
     };
 
-    void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& eLogBeta, const Mat<U>& x_d)
+    void initPhi(Mat<double>& phi, const Mat<double>& zeta, const Mat<double>& eLogBeta)
     {
-      uint32_t N = x_d.n_cols;
+      uint32_t N = phi.n_rows; // x_d.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
       //cout<<"\tinit phi"<<endl;
@@ -637,12 +636,11 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
       //cout<<gamma.t()<<endl;
     };
 
-    void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Col<double>& eLogSig_a, const Mat<double>& eLogBeta, const Mat<U>& x_d)
+    void updateZeta(Mat<double>& zeta, const Mat<double>& phi, const Col<double>& eLogSig_a, const Mat<double>& eLogBeta)
     {
+//      assert(x_d.n_rows == 1);
 
-      assert(x_d.n_rows == 1);
-
-      uint32_t N = x_d.n_cols;
+      uint32_t N = phi.n_rows; // x_d.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
 
@@ -660,12 +658,11 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
     }
 
 
-    void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Col<double>& eLogSig_gam, const Mat<double>& eLogBeta, const Mat<U>& x_d)
+    void updatePhi(Mat<double>& phi, const Mat<double>& zeta, const Col<double>& eLogSig_gam, const Mat<double>& eLogBeta)
     {
+//      assert(x_d.n_rows == 1);
 
-      assert(x_d.n_rows == 1);
-
-      uint32_t N = x_d.n_cols;
+      uint32_t N = phi.n_rows; // x_d.n_cols;
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
 

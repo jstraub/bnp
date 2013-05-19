@@ -60,7 +60,7 @@ class HDP // : public DP<U>
 
     double perplexity(const Mat<U>& x_ho, const Mixture<U>& mix) const
     {
-      assert(x_ho.n_rows==1);
+//      assert(x_ho.n_rows==1);
 
       uint32_t N = x_ho.n_cols;
       double perp = 0.0;
