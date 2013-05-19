@@ -42,18 +42,19 @@ class HDP_var_base_py : public virtual HDP_var_base
     : HDP_var_base(K,T,Nw)
   {};
 
-  bool getWordDistr_py(const numeric::array& p)
+  //TODO:
+  bool getWordDistr_py(const numeric::array& p, uint32_t d)
   {
-    Mat<double> p_mat; // can do this since x_mat gets copied inside    
-    if (HDP_var_base::getWordDistr(p_mat))
-    {
-      assignMat2np(p_mat,p);
+    Row<double> p_arma = logP_w(d);
+    Row<double> p_wrap = np2row<double>(p); // can do this since x_mat gets copied inside    
+    if(p_wrap.n_elem == p_arma.n_elem)
+    { 
+      p_wrap = p_arma;
       return true;
     }else{
       return false;
     }
   }
-
 
   void getA_py(numeric::array& a)
   {

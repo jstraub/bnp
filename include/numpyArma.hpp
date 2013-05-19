@@ -231,7 +231,6 @@ class TestNp2Arma_py
   // TODO not working - gave up
   void resizeAmat(const numeric::array& np)
   {
-
     // Get pointer to np array
     PyArrayObject* a = (PyArrayObject*)PyArray_FROM_O(np.ptr());
     if(!checkPyArr(a,2,NpTyp<double>::Num)) exit(0);
@@ -257,11 +256,7 @@ class TestNp2Arma_py
 //    a->dimensions[0] = 3;
 //    a->dimensions[1] = 3;
 
-
     //arma::Mat<U> a_wrap=arma::Mat<U>((U*)a->data,a->dimensions[1],a->dimensions[0],false,true); // verse the dimensions to getthe expected behavior
-   
-    
-    
 
   }
 

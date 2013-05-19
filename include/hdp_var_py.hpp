@@ -66,6 +66,11 @@ public:
     return HDP_var<U>::updateEst_batch(kappa,S);
   }
 
+
+  uint32_t getTopicPriorDescriptionLength()
+  {
+    return HDP<U>::mH0.rowDim();
+  };
   /* 
    * works on the data in lambda -> size has to be correct in order for this to work!
    * makes a copy of the internal labels vector
@@ -81,6 +86,11 @@ public:
       lambda_wrap = lambda_row;
       return true;
     }
+  };
+
+  uint32_t getTopicsDescriptionLength()
+  {
+    return HDP<U>::mH0.mode()->rowDim();
   };
 
   bool getCorpTopics_py(numeric::array& beta)

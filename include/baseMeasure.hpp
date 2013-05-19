@@ -10,6 +10,7 @@
 
 #include "probabilityHelpers.hpp"
 
+#include <boost/math/special_functions/gamma.hpp>
 #include <armadillo>
 
 #include <stddef.h>
@@ -117,12 +118,14 @@ class Mult : public BaseMeasure<uint32_t>
 
     Mult(const Mult& mult)
       : mP(mult.mP)
-    {};
+    {
+      mRowDim = mP.n_cols;
+    };
 
     Mult(const Row<double>& p)
       : mP(p)
     {
-      mRowDim = p.n_cols;
+      mRowDim = mP.n_cols;
     };
 
   virtual BaseMeasure<uint32_t>* getCopy() const
@@ -159,7 +162,10 @@ class Gauss : public BaseMeasure<double>
   public:
     Gauss(const Gauss& gauss)
       : mMu(gauss.mMu), mSig(gauss.mSig)
-    { };
+    {
+      uint32_t d=mMu.n_rows;
+      mRowDim = d*d+d;
+    };
 
     Gauss(const Col<double>& mu, const Mat<double>& sig)
       : mMu(mu), mSig(sig)
@@ -388,6 +394,9 @@ public:
   { 
     uint32_t d = mVtheta.n_elem; // we already have a Vtheta from the init;
     Mat<double> sig = mDelta/(mNu+d+1);
+//    cout<<"mu: "<<mVtheta;
+//    cout<<"sig:"<<sig;
+
     return new Gauss(mVtheta,sig);
 
 //    mode.set_size(d*d+d); 
@@ -401,27 +410,85 @@ public:
 
   virtual double Elog(const Col<double>& x) const
   {
+    //TODO: make it log from the beginning
     uint32_t d = mVtheta.n_elem; // we already have a Vtheta from the init;
-    double a = (gamma((mNu+1.0)/2.0)/( pow((mNu-d+1.0)*datum::pi,d/2.0)* gamma((mNu-d+1.0)/2.0)* sqrt((mKappa+1.0)/(mKappa*(mNu-d+1.0)))* sqrt(det(mDelta)) )) ;
+    double a = (boost::math::tgamma((mNu+1.0)/2.0)/( pow((mNu-d+1.0)*datum::pi,d/2.0)* boost::math::tgamma((mNu-d+1.0)/2.0)* sqrt((mKappa+1.0)/(mKappa*(mNu-d+1.0)))* sqrt(det(mDelta)) )) ;
     double b = as_scalar((x-mVtheta).t()*solve(mDelta,x-mVtheta));
     double c = pow(1.0+(mKappa/(mKappa+1.0))*b,(mNu+1.0)/2.0);
-    return a/c;
+    
+//    cout<<boost::math::tgamma((mNu+1.0)/2.0)<<" "<<sqrt(det(mDelta))<<" "<<boost::math::tgamma((mNu-d+1.0)/2.0)<<" "<<(mNu-d+1.0)<<endl;
+//    cout<<"vtheta: "<<mVtheta;
+//    cout<<"delta: "<<mDelta;
+//    cout<<"kappa: "<<mKappa<<" nu="<<mNu<<endl;
+//    cout<<a<<" "<<b<<" "<<c<<"="<< log(a)-log(c)<<endl;
+//
+//    if(a <= 0.0 || c <= 0.0)
+//      exit(0);
+    return log(a)-log(c);
   };
 
   virtual void posteriorHDP_var(const Col<double>& zeta, const Mat<double>& phi, uint32_t D, const Mat<double>& x)
   {
-    // TODO: use zeta and Phi!!
-    uint32_t n = x.n_cols;
-    Col<double> x_hat=sum(x,1)/n;
+    uint32_t N = x.n_cols;
+    uint32_t T = zeta.n_rows;
+
+//    cout<<" -----------------"<<endl;
+//    cout<<"N="<<N<<" T="<<T<<endl;
+    double counts=0.0;
+    for (uint32_t i=0; i<T; ++i){
+//      cout<<"counts= "<<counts<<" zeta="<<zeta(i)<<" sumphi="<<sum(phi.col(i))<<endl;
+      counts += zeta(i)*sum(phi.col(i));
+      
+    }
+
+    Col<double> x_hat(x.n_rows);
+    x_hat.zeros();
+    for (uint32_t i=0; i<T; ++i){
+      Col<double> x_sum(x.n_rows);
+      x_sum.zeros();
+      for (uint32_t n=0; n<N; ++n){
+        x_sum += phi(n,i)*x.col(n);
+      }
+      x_hat += zeta(i) * (x_sum/sum(phi.col(i)));
+    }
+
     Mat<double> S(mDelta);
     S.zeros();
-    for (uint32_t i=0; i<n; ++i)
-      S += (x.col(i) - x_hat) * (x.col(i) - x_hat).t();
+    for (uint32_t i=0; i<T; ++i){
+      Mat<double> S_sum(mDelta);
+      S_sum.zeros();
+      for (uint32_t n=0; n<N; ++n){
+        S_sum += phi(n,i)*(x.col(n)-x_hat)*(x.col(n)-x_hat).t();
+      }
+      S += zeta(i) * (S_sum/sum(phi.col(i)));
+    }
+
+    // TODO: use zeta and Phi!!
+//    uint32_t n = x.n_cols;
+//    Col<double> x_hat=sum(x,1)/n;
+//    Mat<double> S(mDelta)
+//    S.zeros();
+//    for (uint32_t i=0; i<n; ++i)
+//      S += (x.col(i) - x_hat) * (x.col(i) - x_hat).t();
+//
+//    cout<<"vtheta: "<<mVtheta;
+//    cout<<"delta: "<<mDelta;
+//    cout<<"kappa: "<<mKappa<<" nu="<<mNu<<endl;
+//    cout<<"S="<<S;
+//    cout<<"x_hat="<<x_hat;
+//    cout<<"counts="<<counts<<endl;
     
-    mDelta = mDelta + S + (mKappa*n)/(mKappa+n)*(x_hat - mVtheta)*(x_hat - mVtheta).t();
-    mVtheta = mKappa/(mKappa+n)* mVtheta + n/(mKappa+n)*x_hat;
-    mKappa += x.n_cols;
-    mNu += x.n_cols;
+    mDelta = mDelta + S + (mKappa*counts)/(mKappa+counts)*(x_hat - mVtheta)*(x_hat - mVtheta).t();
+    mVtheta = mKappa/(mKappa+counts)* mVtheta + counts/(mKappa+counts)*x_hat;
+    mKappa += counts;
+    mNu += counts;
+
+//    cout<<"vtheta: "<<mVtheta;
+//    cout<<"delta: "<<mDelta;
+//    cout<<"kappa: "<<mKappa<<" nu="<<mNu<<endl;
+//
+//    if(!is_finite(mVtheta))
+//      exit(0);
   };
 
 

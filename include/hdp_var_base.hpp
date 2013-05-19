@@ -101,17 +101,17 @@ class HDP_var_base
       return Row<double>(1);
     };
 
-    bool getWordDistr(Mat<double>& p){
-      uint32_t D=mZeta.size();
-      p.set_size(D,mNw);
-//      assert(p.n_rows == D);
-//      assert(p.n_cols == mNw);
-//      cout<<"D="<<D<<endl;
-      for (uint32_t d=0; d<D; ++d){
-        p.row(d) = logP_w(d);
-      }
-      return true;
-    };
+//    bool getWordDistr(Mat<double>& p){
+//      uint32_t D=mZeta.size();
+//      p.set_size(D,mNw);
+////      assert(p.n_rows == D);
+////      assert(p.n_cols == mNw);
+////      cout<<"D="<<D<<endl;
+//      for (uint32_t d=0; d<D; ++d){
+//        p.row(d) = logP_w(d);
+//      }
+//      return true;
+//    };
 
 protected:
     Mat<double> mA; // corpus level Beta process alpha parameter for stickbreaking

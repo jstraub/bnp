@@ -58,9 +58,6 @@ class HDP // : public DP<U>
       return mX_ho.size();
     };
 
-    //virtual Row<double> logP_w(uint32_t d) const=0;
-
-
     double perplexity(const Mat<U>& x_ho, const Mixture<U>& mix) const
     {
       assert(x_ho.n_rows==1);
@@ -76,7 +73,6 @@ class HDP // : public DP<U>
       perp /= double(N);
       perp /= log(2.0); // since it is log base 2 in the perplexity formulation!
       perp = pow(2.0,perp);
-//      cout<<"perp="<<perp<<endl;
 
       return perp;
     };
@@ -97,16 +93,16 @@ class HDP // : public DP<U>
      * The mode of the estimate dirichlet distribution parameterized by lambda is used
      * as an estimate for the Multinomial distribution of the respective topics
      */
-    bool getCorpTopic(Row<double>& topic, uint32_t k) const
-    {
-      if(mLambda.size() > 0 && k < mLambda.size())
-      {
-        mLambda[k]->mode(topic);
-        return true; 
-      }else{
-        return false;
-      }
-    };
+//    bool getCorpTopic(Row<double>& topic, uint32_t k) const
+//    {
+//      if(mLambda.size() > 0 && k < mLambda.size())
+//      {
+//        mLambda[k]->mode(topic);
+//        return true; 
+//      }else{
+//        return false;
+//      }
+//    };
     
     bool getCorpTopics(Mat<double>& topics) const
     {
@@ -126,15 +122,7 @@ protected:
     vector<Mat<U> > mX_ho; //  held out data
 
     DistriContainer<U> mLambda;
-    //Mat<double> mLambda; // corpus level topics (Dirichlet)
 
-
-//    bool getCorpTopic(Row<double>& topic, const BaseMeasure<U>* lambda) const
-//    {
-//      // mode of dirichlet (MAP estimate)
-//      lambda->mode(topic);
-//      return true;
-//    };
 
     bool getCorpTopics( DistriContainer<U>& topics, const DistriContainer<U>& lambda) const
     {
@@ -142,6 +130,11 @@ protected:
       topics.resize(K);
       for (uint32_t k=0; k<K; k++){
         topics[k] = lambda[k]->mode()->getCopy();
+
+//        cout<<lambda[k]->asRow();
+//        cout<<topics[k]->asRow();
+//        cout<<" ---- "<<endl;
+//
 //        cout<<"lambda_"<<k<<"="<<lambda.row(k)<<endl;
 //        cout<<"topic_"<<k<<"="<<topics.row(k)<<endl;
 //        cout<<"sum over topic_"<<k<<"="<<sum(topics.row(k))<<endl<<endl;

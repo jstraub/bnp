@@ -322,6 +322,12 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
           initZeta(zeta[dout],eLogBeta, x_d);
           initPhi(phi[dout],zeta[dout],eLogBeta, x_d);
 
+//            cout<<"zeta_init="<<zeta[dout]<<endl;
+//            cout<<"phi_init="<<phi[dout]<<endl;
+//            cout<<"eLogBeta="<<eLogBeta<<endl;
+//            if(!is_finite(zeta[dout]))
+//              exit(0);
+
           //cout<<" ------------------------ doc level updates --------------------"<<endl;
           //Mat<double> gamma(T,2);
           Col<double> eLogSig_gam(mT);
@@ -331,7 +337,7 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
           bool converged = false;
           uint32_t o=0;
           while(!converged){
-            //           cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
+//            cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
             updateGamma(gamma[dout],phi[dout]);
 
             compElogSig(eLogSig_gam,gamma[dout]); // precompute 
@@ -343,11 +349,16 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
             gamma_prev = gamma[dout];
             ++o;
 //            cout<<"o="<<o<<endl;
+
+//            cout<<"zeta="<<zeta[dout]<<endl;
+//            cout<<"phi="<<phi[dout]<<endl;
+//            if(!is_finite(zeta[dout]))
+//              exit(0);
           }
 
           DistriContainer<U> d_lambda(HDP<U>::mH0,mK); // batch updates
           Mat<double> d_a(mK,2); 
-          //      cout<<" --------------------- natural gradients --------------------------- "<<endl;
+//          cout<<" --------------------- natural gradients dout="<< dout<<" dd="<< dd<<" --------------------------- "<<endl;
           computeNaturalGradients(d_lambda, d_a, zeta[dout], phi[dout], HDP<U>::mOmega, D, x_d);
 #pragma omp critical
           {
@@ -367,8 +378,22 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
         //cout<<"d_a="<<d_a<<endl;
         //cout<<"a="<<a<<endl;
         
+
+//        cout<<"dLambda"<<endl;
+//        for (uint32_t k=0; k<10; ++k)
+//          cout<<db_lambda[k]->asRow();
+//        
+//        cout<<"Before"<<endl;
+//        for (uint32_t k=0; k<10; ++k)
+//          cout<<lambda[k]->asRow();
+//
         for (uint32_t k=0; k<db_lambda.size(); ++k)
           lambda[k]->fromRow((1.0-ro)*lambda[k]->asRow() + (ro/S)*db_lambda[k]->asRow()); //TODO: doies this make sense for NIW prior???
+
+//        cout<<"After"<<endl;
+//        for (uint32_t k=0; k<10; ++k)
+//          cout<<lambda[k]->asRow();
+
         //lambda = (1.0-ro)*lambda + (ro/S)*db_lambda;
         a = (1.0-ro)*a + (ro/S)*db_a;
 
@@ -669,6 +694,8 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
       d_a.zeros();
       for (uint32_t k=0; k<K; ++k) 
       { // for all K corpus level topics
+//        cout<<zeta.col(k).t()<<endl;
+//        cout<<phi;
         d_lambda[k]->posteriorHDP_var(zeta.col(k),phi,D,x_d);
 
 //        for (uint32_t i=0; i<T; ++i) 

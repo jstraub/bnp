@@ -96,8 +96,8 @@ class HDP_base:
   def __init__(s, K=None,T=None,Nw=None,omega=None,alpha=None,base=None, pathToModel=None):
 
     s.scalars = ['K','T','Nw','omega','alpha','D_tr','D_te']
-    s.matrices = ['c','pi','sigPi','base','beta','sigV','v','perp','logP_w']
-    s.listMatrices=['z','x_tr','x_te']
+    s.matrices = ['c','pi','sigPi','base','beta','sigV','v','perp']
+    s.listMatrices=['z','x_tr','x_te','logP_w']
     
     s.shape=dict()
 
@@ -213,17 +213,13 @@ class HDP_base:
       s.state['v'] = np.zeros(s.state['K'],dtype=np.double)
       hdp.getCorpTopicProportions(s.state['v'],s.state['sigV'])
       print('gotCorpTopicProportions {} {}'.format(s.state['v'].shape,s.state['sigV'].shape))
-
-      s.state['logP_w'] =np.zeros((D_tr,s.state['Nw']),dtype=np.double)
-      hdp.getWordDistr(s.state['logP_w'])
-      print('gotWordDistr {}'.format(s.state['logP_w'].shape))
-      print('gotWordDistr {}'.format(s.state['logP_w']))
       
       s.state['perp'] = np.zeros(D_tr)
       hdp.getPerplexity(s.state['perp'])
       print('Perplexity of iterations: {}'.format(s.state['perp']))
 
-      s.state['beta']= np.zeros((s.state['K'],s.state['Nw']),dtype=np.double)
+      betaCols = hdp.getTopicsDescriptionLength()
+      s.state['beta']= np.zeros((s.state['K'],betaCols),dtype=np.double)
       hdp.getCorpTopics(s.state['beta'])
       print('beta={}'.format(s.state['beta'].shape))
       print('beta={}'.format(s.state['beta']))
@@ -233,12 +229,13 @@ class HDP_base:
       s.state['c']=np.zeros((D_tr,s.state['T']),dtype=np.uint32)
       if hdp.getDocTopics(s.state['pi'],s.state['sigPi'],s.state['c']):
         print('pi: {}'.format(s.state['pi'].shape))
-        print('pi: {}'.format(s.state['pi']))
+#        print('pi: {}'.format(s.state['pi']))
         print('sigPi: {}'.format(s.state['sigPi'].shape))
         print('sigPi: {}'.format(s.state['sigPi']))
       else:
         print('error while loading pi, sigPi and c from C++ model')
 
+      s.state['logP_w'] = [] #np.zeros((D_tr,s.state['Nw']),dtype=np.double)
       s.state['z']=[] # word indices to doc topics
       for d in range(0,D_tr):
         N_d = s.state['x_tr'][d].size
@@ -249,6 +246,9 @@ class HDP_base:
         #print('c({0}): {1}'.format(d,s.state['c'][d]))
         s.state['z'].append(np.zeros(N_d,dtype=np.uint32))
         hdp.getWordTopics(s.state['z'][d],d)
+        s.state['logP_w'].append(np.zeros(N_d,dtype=np.double))
+        hdp.getWordDistr(s.state['logP_w'][d],d)
+        
     else:
       print('Error loading hdp of type {}'.format(type(hdp)))
 

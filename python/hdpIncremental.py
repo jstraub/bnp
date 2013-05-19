@@ -5,7 +5,6 @@ from dirHdpGenerative import *
 
 
 class HDP_var_Dir_inc(HDP_base):
-  
   def __init__(s,K,T,Nw,omega,alpha,Lambda):
     s.base = bnp.Dir(Lambda)
     s.hdp_var = bnp.HDP_var_Dir(s.base,alpha,omega)
@@ -24,9 +23,10 @@ class HDP_var_Dir_inc(HDP_base):
     if s.firstEst:
       print('initial estimate: D={}; K={}; T={}; kappa={}; Nw={}; S={};'.format(len(x_tr),s.state['K'],s.state['T'],kappa,s.state['Nw'],S))
       s.hdp_var.densityEst(s.state['Nw'],kappa,s.state['K'],s.state['T'],S)
+      s.firstEst = False 
     else:
       print('updated estimate: D={}; K={}; T={}; kappa={}; Nw={}; S={};'.format(len(x_tr),s.state['K'],s.state['T'],kappa,s.state['Nw'],S))
-      s.hdp_var.updateEst(kappa,S)
+      s.hdp_var.updateEst_batch(kappa,S)
 
 
 class HDP_var_NIW_inc(HDP_base):
@@ -49,8 +49,9 @@ class HDP_var_NIW_inc(HDP_base):
     if s.firstEst:
       print('initial estimate: D={}; K={}; T={}; kappa={}; Nw={}; S={};'.format(len(x_tr),s.state['K'],s.state['T'],kappa,s.state['Nw'],S))
       s.hdp_var.densityEst(s.state['Nw'],kappa,s.state['K'],s.state['T'],S)
+      s.firstEst = False 
     else:
       print('updated estimate: D={}; K={}; T={}; kappa={}; Nw={}; S={};'.format(len(x_tr),s.state['K'],s.state['T'],kappa,s.state['Nw'],S))
-      s.hdp_var.updateEst(kappa,S)
+      s.hdp_var.updateEst_batch(kappa,S)
 
 
