@@ -5,6 +5,7 @@ import scipy.special as scisp
 import scipy.io as sio
 
 import matplotlib.pyplot as plt
+import pickle
 
 def stickBreaking(v):
   N = v.size
@@ -121,20 +122,22 @@ class HDP_base:
       s.load(pathToModel)
 
   def save(s,path):
-    sio.savemat(path,s.state)
+    pickle.dump(s.state,open(path,'w'))
+#    sio.savemat(path,s.state,oned_as='row')
 
   def load(s,path):
     try:
-      s.loaded=sio.loadmat(path)
+#      s.loaded=sio.loadmat(path)
+      s.state=pickle.load(open(path,'r'))
       print('Found model under {0}'.format(path))
     except Exception, err:
       print('Did not find model under {0}'.format(path))
       return False
-    print('--- loading state from mat file at {}'.format(path))
-    if HDP_base.__parseLoad(s,s.loaded):
-      print('--- loaded state successfully!')
-    else:
-      print('--- error while loading state!')
+#    print('--- loading state from mat file at {}'.format(path))
+#    if HDP_base.__parseLoad(s,s.loaded):
+#      print('--- loaded state successfully!')
+#    else:
+#      print('--- error while loading state!')
     return True
 
   def __parseLoad(s,mat):
