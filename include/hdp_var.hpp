@@ -157,7 +157,7 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
         mPhi.resize(mPhi.size()+Db);
         mGamma.resize(mGamma.size()+Db);
         mPerp.resize(mPerp.n_elem+Db);
-        mPerp.rows(mPerp.n_elem-Db,mPerp.n_elem) = perp;
+        mPerp.rows(mPerp.n_elem-Db,mPerp.n_elem-1) = perp;
         for (uint32_t i=0; i<ind.n_elem; ++i){
           mZeta[ind[i]] = zeta[i];
           mPhi[ind[i]] = phi[i];
