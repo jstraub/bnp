@@ -32,7 +32,7 @@ if __name__ == '__main__':
   parser.add_argument('-H', type=int, default=2, help='number of held out documents for perplexity computation')
   parser.add_argument('-N', type=int, default=100, help='number of words per document')
   parser.add_argument('-Nw', type=int, default=10, help='alphabet size (how many different words)')
-  parser.add_argument('-a','--alpha', type=float, default=1.0, help='concentration parameter for document level')
+  parser.add_argument('-a','--alpha', type=float, default=3.0, help='concentration parameter for document level')
   parser.add_argument('-o','--omega', type=float, default=30.0, help='concentration parameter for corpus level')
   parser.add_argument('-k','--kappa', type=float, default=0.9, help='forgetting rate for stochastic updates')
   #parser.add_argument('-s', action='store_false', help='switch to make the program use synthetic data')
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     hdp = HDP_var_Dir_inc(K,T,Nw,omega,alpha,dirAlphas)
   else:
     dataType='double'
-    hdp = HDP_var_NIW_inc(K,T,Nw,omega,alpha,np.ones((1,1))*1,2.1,np.ones((1,1))*6.1,2.1)
+    hdp = HDP_var_NIW_inc(K,T,Nw,omega,alpha,np.ones((1,1))*(-5),2.1,np.ones((1,1))*8.1*3,2.1)
 
   x=[]
   x_tr=[]
@@ -71,7 +71,7 @@ if __name__ == '__main__':
       x_te.append(np.fromstring(line, dtype=dataType, sep=" "))
     else:
       x.append(np.fromstring(line, dtype=dataType, sep=" "))
-      print('{}'.format(x[-1]))
+      #print('{}'.format(x[-1]))
     if len(x) >= S:
       print('----------')
   hdp.updateEst(x,kappa,S,x_te)
@@ -101,14 +101,41 @@ if __name__ == '__main__':
   fig0.show()
 
   if not discrete:
+
+    X=np.linspace(-20,20,100)
+    sig=np.sqrt(hdp.state['beta'][:,0])
+    mu=hdp.state['beta'][:,1]
+
     fig1=plt.figure()
-    X=np.linspace(-5,5,100)
-    mu=hdp.state['beta'][:,0]
-    sig=np.sqrt(hdp.state['beta'][:,1])
     prop = hdp.state['sigV']
     for i in range(0,mu.shape[0]):
       plt.plot(X,prop[i]*mlab.normpdf(X,mu[i],sig[i]))
     fig1.show()
+
+    toPlot = [0,1,2,3,4,100,101,102,103,104]
+    fig2=plt.figure()
+    for d in toPlot:
+      sigPi=hdp.state['sigPi'][d,:]
+      c = hdp.state['c'][d,:]
+      
+      Y=np.zeros(X.size)
+      c_u = np.unique(c)
+      sigPi_u = np.zeros(c_u.size)
+      for i in range(0,c_u.size):
+        sigPi_u[i] = np.sum(sigPi[c_u[i] == c])
+        Y += sigPi_u[i]*mlab.normpdf(X,mu[c_u[i]],sig[c_u[i]])
+      print('{}: c_u={}; sigPi_u={}'.format(d,c_u,sigPi_u))
+      
+      plt.subplot(2,1,d/100)
+      plt.plot(X,Y)
+      plt.title(str(d))
+    
+      plt.plot(X,mlab.normpdf(X,np.mean(x_tr[d]), np.std(x_tr[d]) ),'r-')
+
+    fig2.show()
+      
+    
+
 
 #  symKLimg = hdp.symKLImg();
 #  print('logP_w:\n{}'.format(hdp.state['logP_w']))

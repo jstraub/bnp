@@ -4,14 +4,32 @@
 double digamma(double x)
 {
   //http://en.wikipedia.org/wiki/Digamma_function#Computation_and_approximation
-  if(x<1e-50){
-    //cerr<<"\tdigamma param x near zero: "<<x<<" cutting of"<<endl;
-    x=1e-50;
-  }
+//  if(x<1e-50){
+//    //cerr<<"\tdigamma param x near zero: "<<x<<" cutting of"<<endl;
+//    x=1e-50;
+//  }
   //double x_sq = x*x;
   //return log(x)-1.0/(2.0*x)-1.0/(12.0*x_sq)+1.0/(12*x_sq*x_sq)-1.0/(252.0*x_sq*x_sq*x_sq);
-  return boost::math::digamma(x);
+  if (is_finite(x)){
+    return boost::math::digamma(x);
+  }else{
+    cout<<" warning digam of: "<<x<<endl;
+    exit(1);
+    return 709; // digamma(1e308) = 709. ... 
+  }
 }
+
+double digamma_mult(double x,uint32_t d)
+{
+  double digam_d = 0.0;
+  for (uint32_t i=1; i<d+1; ++i)
+  {
+//    cout<<"digamma_mult of "<<(x + (1.0-double(i))/2)<<" = "<<digamma(x + (1.0-double(i))/2)<<endl;
+    digam_d += digamma(x + (1.0-double(i))/2);
+  }
+  return digam_d;
+}
+
 
 // cateorical distribution (Multionomial for one word)
 double Cat(uint32_t x, Row<double> pi)

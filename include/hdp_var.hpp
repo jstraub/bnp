@@ -191,6 +191,7 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
         uint32_t d = HDP<U>::mX.size()-1;
         mPerp.resize(d+1);
 
+
         if(updateEst(HDP<U>::mX[d],mZeta[d],mPhi[d],mGamma[d],mA,HDP<U>::mLambda,HDP<U>::mOmega,d,kappa))
         {
           mPerp[d] = 0.0;
@@ -223,6 +224,7 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
 
       Mat<double> eLogBeta(mK,x.n_cols); //TODO
       Col<double> digam_lamb_sum(mK);
+
       compElogBeta(eLogBeta,  lambda, x);
 
       Col<double> eLogSig_a(K);
@@ -231,6 +233,17 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
       //    cout<<"---------------- Document "<<d<<" N="<<N<<" -------------------"<<endl;
       initZeta(zeta,eLogBeta);
       initPhi(phi,zeta,eLogBeta);
+
+      if(!is_finite(zeta))
+      {
+        cout<<"updateEst::a="<<size(a)<<endl<<a;
+        cout<<"updateEst::lambda="<<lambda[0]->asRow();
+        cout<<"updateEst::x="<<size(x)<<endl<<x;
+        cout<<"zeta_init="<<zeta<<endl;
+        cout<<"phi_init="<<phi<<endl;
+        cout<<"eLogBeta="<<eLogBeta<<endl;
+        exit(0);
+      }
 
       // ------------------------ doc level updates --------------------
       bool converged = false;
@@ -242,7 +255,14 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
       while(!converged){
         //      cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
         updateGamma(gamma,phi);
-        
+
+        if (!is_finite(gamma)){
+          cout<<"gamma="<<gamma;
+          cout<<"phi="<<phi;
+          exit(1);
+        }
+
+
         compElogSig(eLogSig_gam,gamma); // precompute 
 
         updateZeta(zeta,phi,eLogSig_a,eLogBeta);
@@ -251,6 +271,14 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
         converged = (accu(gamma_prev != gamma))==0 || o>60 ;
         gamma_prev = gamma;
         ++o;
+
+        if(!is_finite(zeta))
+        {
+          cout<<"o="<<o<<endl;
+          cout<<"zeta="<<zeta.row(0)<<" |.|="<<sum(exp(zeta.row(0)))<<endl;
+          cout<<"phi="<<phi.row(0)<<" |.|="<<sum(exp(phi.row(0)))<<endl;
+          exit(0);
+        }
       }
 
       //    cout<<" --------------------- natural gradients --------------------------- "<<endl;
@@ -259,12 +287,15 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
       Mat<double> d_a(K,2); 
       computeNaturalGradients(d_lambda, d_a, zeta, phi, omega, D, x);
 
+      cout<<"update::d_lambda:"<<d_lambda.toMat().rows(0,5);
+      cout<<"update::lambda:"<<lambda.toMat().rows(0,5);
+
       //    cout<<" ------------------- global parameter updates: ---------------"<<endl;
       double ro = exp(-kappa*log(1+double(d+1)));
       //    cout<<"\tro="<<ro<<endl;
       for (uint32_t k=0; k<mK; ++k)
         lambda[k]->fromRow( (1.0-ro)*lambda[k]->asRow() + ro* d_lambda[k]->asRow());
-      
+
       //lambda = (1.0-ro)*lambda + ro*d_lambda;
       a = (1.0-ro)*a+ ro*d_a;
       return true;
@@ -339,18 +370,24 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
 //            cout<<"-------------- Iterating local params #"<<o<<" -------------------------"<<endl;
             updateGamma(gamma[dout],phi[dout]);
 
+            if (!is_finite(gamma[dout])){
+              cout<<"gamma="<<gamma[dout];
+              cout<<"phi="<<phi[dout];
+              exit(1);
+            }
+
             compElogSig(eLogSig_gam,gamma[dout]); // precompute 
 
             updateZeta(zeta[dout],phi[dout],eLogSig_a,eLogBeta);
             updatePhi(phi[dout],zeta[dout],eLogSig_gam,eLogBeta);
 
-            converged = (accu(gamma_prev != gamma[dout]))==0 || o>60 ;
+            converged = (accu(gamma_prev != gamma[dout]))==0 || o>30 ;
             gamma_prev = gamma[dout];
             ++o;
-//            cout<<"o="<<o<<endl;
 
-//            cout<<"zeta="<<zeta[dout]<<endl;
-//            cout<<"phi="<<phi[dout]<<endl;
+//            cout<<"o="<<o<<endl;
+//            cout<<"zeta="<<zeta[dout].row(0)<<" |.|="<<sum(zeta[dout].row(0))<<endl;
+//            cout<<"phi="<<phi[dout].row(0)<<" |.|="<<sum(phi[dout].row(0))<<endl;
 //            if(!is_finite(zeta[dout]))
 //              exit(0);
           }
@@ -373,9 +410,8 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
         uint32_t bS = min(S,ind.n_elem-dd); // necessary for the last batch, which migth not form a complete batch
         //TODO: what is the time dd? d_0 needed?
         double ro = exp(-kappa*log(1+double(t)+double(bS)/2.0)); // as "time" use the middle of the batch 
-        cout<<" -- global parameter updates t="<<t<<" bS="<<bS<<" ro="<<ro<<endl;
-        //cout<<"d_a="<<d_a<<endl;
-        //cout<<"a="<<a<<endl;
+//        cout<<" -- global parameter updates t="<<t<<" bS="<<bS<<" ro="<<ro<<endl;
+//        cout<<"d_a="<<db_a<<endl;
         
 
 //        cout<<"dLambda"<<endl;
@@ -385,16 +421,20 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
 //        cout<<"Before"<<endl;
 //        for (uint32_t k=0; k<10; ++k)
 //          cout<<lambda[k]->asRow();
-//
+
+        cout<<"update_batch::db_lambda:"<<endl<<db_lambda.toMat().rows(0,5);
         for (uint32_t k=0; k<db_lambda.size(); ++k)
           lambda[k]->fromRow((1.0-ro)*lambda[k]->asRow() + (ro/S)*db_lambda[k]->asRow()); //TODO: doies this make sense for NIW prior???
+        cout<<"update_batch::lambda(after):"<<endl<<lambda.toMat().rows(0,5);
 
 //        cout<<"After"<<endl;
 //        for (uint32_t k=0; k<10; ++k)
 //          cout<<lambda[k]->asRow();
 
+
         //lambda = (1.0-ro)*lambda + (ro/S)*db_lambda;
         a = (1.0-ro)*a + (ro/S)*db_a;
+        cout<<"update_batch::lambda:"<<lambda.toMat().rows(0,5);
 
         perp[dd+bS/2] = 0.0;
         if (HDP<U>::mX_te.size() > 0) {
@@ -404,6 +444,7 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
           {
             //cout<<"mX_te: "<< mX_te[i].n_rows << "x"<< mX_te[i].n_cols<<endl;
             //cout<<"mX_ho: "<< mX_ho[i].n_rows << "x"<< mX_ho[i].n_cols<<endl;
+            //TODO: these subfunctions work on the member variables!!! dont do that...
             double perp_i =  perplexity(HDP<U>::mX_te[i],HDP<U>::mX_ho[i],dd+bS/2+1,ro); //perplexity(mX_ho[i], mZeta[d], mPhi[d], mGamma[d], lambda);
             //cout<<"perp_"<<i<<"="<<perp_i<<endl;
 #pragma omp critical
@@ -438,6 +479,10 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
 
         DistriContainer<U> lambda(HDP<U>::mLambda);
         double omega = HDP<U>::mOmega;
+
+
+        cout<<"perplexity::lambda:"<<lambda.toMat().rows(0,5);
+        cout<<"perplexity::mLambda:"<<HDP<U>::mLambda.toMat().rows(0,5);
 
         cout<<"updating copied model with x"<<endl;
         updateEst(x_te,zeta,phi,gamma,a,lambda,omega,d,kappa);
@@ -572,7 +617,7 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
     void compElogSig(Col<double>& eLogSig, const Mat<double>& a) const
     {
       for (uint32_t k=0; k<a.n_rows; ++k){
-        eLogSig(k)=digamma(a(k,0)) - digamma(a(k,0) + a(k,1));
+        eLogSig(k) = digamma(a(k,0)) - digamma(a(k,0) + a(k,1));
         for (uint32_t l=0; l<k; ++l)
           eLogSig(k) += digamma(a(l,1)) - digamma(a(l,0) + a(l,1));
       }
@@ -685,7 +730,7 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
       uint32_t T = zeta.n_rows;
       uint32_t K = zeta.n_cols;
 
-      d_lambda.init(HDP<U>::mH0,mK);
+//      d_lambda.init(HDP<U>::mH0,mK);
 
 //      d_lambda.zeros();
       d_a.zeros();
@@ -718,37 +763,47 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
         d_a(k,0) = D*d_a(k,0)+1.0;
         d_a(k,1) = D*d_a(k,1)+omega;
       }
-      //cout<<"da="<<d_a<<endl;
     }
 
 
     //bool normalizeLogDistribution(Row<double>& r)
-    bool normalizeLogDistribution(arma::subview_row<double> r)
+    bool normalizeLogDistribution(arma::subview_row<double> r) const
     {
-      //r.row(i)=exp(r.row(i));
-      //cout<<" r="<<r<<endl;
-      double minR = as_scalar(min(r));
-      //cout<<" minR="<<minR<<endl;
-      if(minR > -100.0) {
-        //cout<<" logDenom="<<sum(exp(r),1)<<endl;
-        double denom = as_scalar(sum(exp(r),1));
-        //cout<<" logDenom="<<denom<<endl;
-        r -= log(denom); // avoid division by 0
-        //cout<<" r - logDenom="<<r<<endl;
-        r = exp(r);
-        r /= sum(r);
-        //cout<<" exp(r - logDenom)="<<r<<endl;
-        return true;
-      }else{ // cannot compute this -> set the smallest r to 1.0 and the rest to 0
-        double maxR = as_scalar(max(r));
-        //cout<<"maxR="<<maxR<<" <-" <<arma::max(r) <<endl;
-        uint32_t kMax=as_scalar(find(r==maxR,1));
-        //cout<<"maxR="<<maxR<<" kMax="<<kMax<<" <-" <<arma::max(r) <<endl;
-        r.zeros();
-        r(kMax)=1.0;
-        //cout<<" r ="<<r<<endl;
-        return false;
-      }
+      // known as the log sum exp trick!
+//      cout<<" r="<<r<<endl;
+      double maxR = as_scalar(max(r));
+//      cout<<"  maxR="<<maxR<<endl;
+//      cout<<"  exp(r-maxR)="<<exp(r-maxR)<<endl;
+     
+      r -= maxR + log(sum(exp(r-maxR)));
+      r=exp(r);
+
+//      cout<<" r="<<r<<endl;
+      return true;
+
+
+//      double minR = as_scalar(min(r));
+//      cout<<" minR="<<minR<<endl;
+//      if(minR > -100.0) {
+//        cout<<" logDenom="<<sum(exp(r),1)<<endl;
+//        double denom = as_scalar(sum(exp(r),1));
+//        cout<<" logDenom="<<denom<<endl;
+//        r -= log(denom); // avoid division by 0
+//        cout<<" r - logDenom="<<r<<endl;
+//        r = exp(r);
+//        r /= sum(r);
+//        cout<<" exp(r - logDenom)="<<r<<endl;
+//        return true;
+//      }else{ // cannot compute this -> set the smallest r to 1.0 and the rest to 0
+//        double maxR = as_scalar(max(r));
+//        cout<<"maxR="<<maxR<<" <-" <<arma::max(r) <<endl;
+//        uint32_t kMax=as_scalar(find(r==maxR,1));
+//        cout<<"maxR="<<maxR<<" kMax="<<kMax<<" <-" <<arma::max(r) <<endl;
+//        r.zeros();
+//        r(kMax)=1.0;
+//        cout<<" r ="<<r<<endl;
+//        return false;
+//      }
     }
 
 };

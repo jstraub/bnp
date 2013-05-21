@@ -393,7 +393,7 @@ public:
   virtual BaseMeasure<double>* mode() const
   { 
     uint32_t d = mVtheta.n_elem; // we already have a Vtheta from the init;
-    Mat<double> sig = mDelta/(mNu+d+1);
+    Mat<double> sig = mDelta/(mNu+d+2);
 //    cout<<"mu: "<<mVtheta;
 //    cout<<"sig:"<<sig;
 
@@ -411,20 +411,30 @@ public:
   virtual double Elog(const Col<double>& x) const
   {
     //TODO: make it log from the beginning
-    uint32_t d = mVtheta.n_elem; // we already have a Vtheta from the init;
-    double a = (boost::math::tgamma((mNu+1.0)/2.0)/( pow((mNu-d+1.0)*datum::pi,d/2.0)* boost::math::tgamma((mNu-d+1.0)/2.0)* sqrt((mKappa+1.0)/(mKappa*(mNu-d+1.0)))* sqrt(det(mDelta)) )) ;
-    double b = as_scalar((x-mVtheta).t()*solve(mDelta,x-mVtheta));
-    double c = pow(1.0+(mKappa/(mKappa+1.0))*b,(mNu+1.0)/2.0);
-    
+    double d = mVtheta.n_elem; // we already have a Vtheta from the init;
+
+//    double b = as_scalar((x-mVtheta).t()*solve(mDelta,x-mVtheta));
+//    double logA=boost::math::lgamma((mNu+1.0)/2.0) - (d/2.0)*log((mNu-d+1.0)*datum::pi) - boost::math::lgamma((mNu-d+1.0)/2.0) - 0.5*(log(mKappa+1.0)-log(mKappa*(mNu-d+1.0))) - 0.5*log(det(mDelta));
+//    double logC=log (1.0+(mKappa/(mKappa+1.0))*b)*((mNu+1.0)/2.0);
+
 //    cout<<boost::math::tgamma((mNu+1.0)/2.0)<<" "<<sqrt(det(mDelta))<<" "<<boost::math::tgamma((mNu-d+1.0)/2.0)<<" "<<(mNu-d+1.0)<<endl;
+
 //    cout<<"vtheta: "<<mVtheta;
 //    cout<<"delta: "<<mDelta;
 //    cout<<"kappa: "<<mKappa<<" nu="<<mNu<<endl;
-//    cout<<a<<" "<<b<<" "<<c<<"="<< log(a)-log(c)<<endl;
-//
-//    if(a <= 0.0 || c <= 0.0)
-//      exit(0);
-    return log(a)-log(c);
+    double sq = as_scalar((x+mVtheta).t()*solve(mDelta,x+mVtheta));
+
+    double eLog= -0.5*d*log(datum::pi) -0.5*log(det(mDelta)) +0.5*digamma_mult(-0.5*mNu,uint32_t(d)) -0.5*(d/mKappa) -0.5*mNu*sq;
+
+    if(!is_finite(mVtheta)|| !is_finite(eLog))
+    {
+      cout<<"vtheta: "<<mVtheta;
+      cout<<"delta: "<<mDelta;
+      cout<<"kappa: "<<mKappa<<" nu="<<mNu<<endl;
+      cout<<"Elog="<<eLog<<" sq="<<sq<<" digamma_mult="<<digamma_mult(-0.5*mNu,uint32_t(d))<<endl;
+      exit(0);
+    }
+    return eLog;
   };
 
   virtual void posteriorHDP_var(const Col<double>& zeta, const Mat<double>& phi, uint32_t D, const Mat<double>& x)
@@ -438,8 +448,8 @@ public:
     for (uint32_t i=0; i<T; ++i){
 //      cout<<"counts= "<<counts<<" zeta="<<zeta(i)<<" sumphi="<<sum(phi.col(i))<<endl;
       counts += zeta(i)*sum(phi.col(i));
-      
     }
+    counts*=D;
 
     Col<double> x_hat(x.n_rows);
     x_hat.zeros();
@@ -449,8 +459,9 @@ public:
       for (uint32_t n=0; n<N; ++n){
         x_sum += phi(n,i)*x.col(n);
       }
-      x_hat += zeta(i) * (x_sum/sum(phi.col(i)));
+      x_hat += zeta(i) * x_sum;
     }
+    x_hat *= D/counts;
 
     Mat<double> S(mDelta);
     S.zeros();
@@ -460,7 +471,7 @@ public:
       for (uint32_t n=0; n<N; ++n){
         S_sum += phi(n,i)*(x.col(n)-x_hat)*(x.col(n)-x_hat).t();
       }
-      S += zeta(i) * (S_sum/sum(phi.col(i)));
+      S += zeta(i) * S_sum;
     }
 
     // TODO: use zeta and Phi!!
@@ -470,25 +481,35 @@ public:
 //    S.zeros();
 //    for (uint32_t i=0; i<n; ++i)
 //      S += (x.col(i) - x_hat) * (x.col(i) - x_hat).t();
-//
-//    cout<<"vtheta: "<<mVtheta;
+
+      cout<<" -----------------"<<endl;
+      cout<<"vtheta(before): "<<mVtheta;
 //    cout<<"delta: "<<mDelta;
 //    cout<<"kappa: "<<mKappa<<" nu="<<mNu<<endl;
 //    cout<<"S="<<S;
-//    cout<<"x_hat="<<x_hat;
+//    cout<<"x_hat="<<x_hat<< " sum/N="<<sum(x,1)/N;
 //    cout<<"counts="<<counts<<endl;
     
-    mDelta = mDelta + S + (mKappa*counts)/(mKappa+counts)*(x_hat - mVtheta)*(x_hat - mVtheta).t();
+    mDelta = mDelta + D*S + (mKappa*counts)/(mKappa+counts)*(x_hat - mVtheta)*(x_hat - mVtheta).t();
     mVtheta = mKappa/(mKappa+counts)* mVtheta + counts/(mKappa+counts)*x_hat;
     mKappa += counts;
     mNu += counts;
 
-//    cout<<"vtheta: "<<mVtheta;
-//    cout<<"delta: "<<mDelta;
-//    cout<<"kappa: "<<mKappa<<" nu="<<mNu<<endl;
-//
-//    if(!is_finite(mVtheta))
+
+//    if(!is_finite(mVtheta) || accu(mDelta<0.0)>0)
+    {
+//      cout<<"zeta="<<zeta.t();
+//      cout<<"phi="<<phi;
+//      cout<<"N="<<N<<" T="<<T<<endl;
+//      cout<<"x="<<x;
+      cout<<"S="<<S;
+      cout<<"x_hat="<<x_hat<< " sum/N="<<sum(x,1)/N;
+      cout<<"counts="<<counts<<endl;
+      cout<<"-> vtheta: "<<mVtheta;
+      cout<<"-> delta: "<<mDelta;
+      cout<<"-> kappa: "<<mKappa<<" nu="<<mNu<<endl;
 //      exit(0);
+    }
   };
 
 
@@ -648,6 +669,13 @@ public:
     mat.set_size(this->size(), mDistris[0]->rowDim() );
     for (uint32_t i=0; i< this->size(); ++i)
       mat.row(i) = mDistris[i]->asRow();
+  };
+
+  Mat<double> toMat() const
+  {
+    Mat<double> mat;
+    toMat(mat);
+    return mat;
   };
 
 private:

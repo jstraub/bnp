@@ -9,7 +9,10 @@
 using namespace std;
 using namespace arma;
 
+// digamma function
 double digamma(double x);
+// multivariate digamma function
+double digamma_mult(double x,uint32_t d);
 // cateorical distribution (Multionomial for one word)
 double Cat(uint32_t x, Row<double> pi);
 // log cateorical distribution (Multionomial for one word)

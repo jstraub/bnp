@@ -206,7 +206,7 @@ class HDP_base:
       print("---------------------- obtaining results -------------------------");
       s.state['x_tr'] = x_tr
       s.state['x_te'] = x_te
-      print('{}'.format(s.state['x_tr']))
+      #print('{}'.format(s.state['x_tr']))
 
       D_tr=s.state['D_tr']=len(s.state['x_tr'])
       D_te=s.state['D_te']=len(s.state['x_te'])
@@ -232,9 +232,9 @@ class HDP_base:
       s.state['c']=np.zeros((D_tr,s.state['T']),dtype=np.uint32)
       if hdp.getDocTopics(s.state['pi'],s.state['sigPi'],s.state['c']):
         print('pi: {}'.format(s.state['pi'].shape))
-#        print('pi: {}'.format(s.state['pi']))
+        #print('pi: {}'.format(s.state['pi']))
         print('sigPi: {}'.format(s.state['sigPi'].shape))
-        print('sigPi: {}'.format(s.state['sigPi']))
+        #print('sigPi: {}'.format(s.state['sigPi']))
       else:
         print('error while loading pi, sigPi and c from C++ model')
 
