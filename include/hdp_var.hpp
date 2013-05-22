@@ -398,8 +398,10 @@ class HDP_var: public HDP<U>, public virtual HDP_var_base
           computeNaturalGradients(d_lambda, d_a, zeta[dout], phi[dout], HDP<U>::mOmega, D, x_d);
 #pragma omp critical
           {
-            for (uint32_t k=0; k<d_lambda.size(); ++k)
+            cout<<"update_batch::d_lambda:"<<endl<<d_lambda.toMat().rows(0,5);
+            for (uint32_t k=0; k<d_lambda.size(); ++k){
               db_lambda[k]->fromRow(db_lambda[k]->asRow() + d_lambda[k]->asRow());
+            }
             db_a += d_a;
           }
         }

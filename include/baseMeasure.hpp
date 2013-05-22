@@ -490,7 +490,7 @@ public:
 //    cout<<"x_hat="<<x_hat<< " sum/N="<<sum(x,1)/N;
 //    cout<<"counts="<<counts<<endl;
     
-    mDelta = mDelta + D*S + (mKappa*counts)/(mKappa+counts)*(x_hat - mVtheta)*(x_hat - mVtheta).t();
+    mDelta += D*S + (mKappa*counts)/(mKappa+counts)*(x_hat - mVtheta)*(x_hat - mVtheta).t();
     mVtheta = mKappa/(mKappa+counts)* mVtheta + counts/(mKappa+counts)*x_hat;
     mKappa += counts;
     mNu += counts;
@@ -510,6 +510,11 @@ public:
       cout<<"-> kappa: "<<mKappa<<" nu="<<mNu<<endl;
 //      exit(0);
     }
+  };
+
+  virtual void posterior(const NIW& niw)
+  {
+    mDelta +=;  
   };
 
 

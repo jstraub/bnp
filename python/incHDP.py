@@ -27,9 +27,9 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(description = 'hdp topic modeling of synthetic data')
   parser.add_argument('-T', type=int, default=10, help='document level truncation')
   parser.add_argument('-K', type=int, default=100, help='corpus level truncation')
-  parser.add_argument('-S', type=int, default=10, help='mini batch size')
+  parser.add_argument('-S', type=int, default=1, help='mini batch size')
   #parser.add_argument('-D', type=int, default=500, help='number of documents to synthesize')
-  parser.add_argument('-H', type=int, default=2, help='number of held out documents for perplexity computation')
+  parser.add_argument('-H', type=int, default=1, help='number of held out documents for perplexity computation')
   parser.add_argument('-N', type=int, default=100, help='number of words per document')
   parser.add_argument('-Nw', type=int, default=10, help='alphabet size (how many different words)')
   parser.add_argument('-a','--alpha', type=float, default=3.0, help='concentration parameter for document level')
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     hdp = HDP_var_Dir_inc(K,T,Nw,omega,alpha,dirAlphas)
   else:
     dataType='double'
-    hdp = HDP_var_NIW_inc(K,T,Nw,omega,alpha,np.ones((1,1))*(-5),2.1,np.ones((1,1))*8.1*3,2.1)
+    hdp = HDP_var_NIW_inc(K,T,Nw,omega,alpha,np.ones((1,1))*(-5),2.1,np.ones((1,1))*5.1*3,2.1)
 
   x=[]
   x_tr=[]
@@ -72,8 +72,8 @@ if __name__ == '__main__':
     else:
       x.append(np.fromstring(line, dtype=dataType, sep=" "))
       #print('{}'.format(x[-1]))
-    if len(x) >= S:
-      print('----------')
+#    if len(x) >= S:
+#      print('----------')
   hdp.updateEst(x,kappa,S,x_te)
   x_tr.extend(x)
   x=[]
